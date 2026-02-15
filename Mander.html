@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mander</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            width: 100vw;
+            max-width: 100%;
+        }
+
+        .header {
+            width: min(100vw, calc(100vh - 100px));
+            height: 50px;
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0 auto;
+            overflow: visible;
+        }
+
+        .status-left {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            position: absolute;
+            left: 0;
+            z-index: 1;
+            padding-right: 0.5em;
+        }
+
+        .status-center {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            white-space: nowrap;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1;
+        }
+
+        .controls-right {
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            position: absolute;
+            right: 0;
+            z-index: 1;
+            gap: 0.5em;
+        }
+
+        .board-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            background-color: #f0f0f0;
+        }
+
+        .footer {
+            width: 100%;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .board {
+            width: min(100vw, calc(100vh - 100px));
+            height: min(100vw, calc(100vh - 100px));
+            background-color: #d9a359;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #last-move-text {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            white-space: nowrap;
+        }
+
+        #copy-move {
+            font-size: 1.2em;
+            padding: 0;
+            border: none;
+            background: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .copy-icon {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+        }
+
+        #copy-move:hover .copy-icon path {
+            fill: #555;
+        }
+
+        .grid {
+            display: grid;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        .lines {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .point {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .stone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-sizing: border-box;
+            z-index: 2;
+        }
+
+        .black {
+            background: black;
+        }
+
+        .white {
+            background: white;
+            border: 2px solid black;
+        }
+
+        .square {
+            border-radius: 0;
+            width: 88.62%;
+            height: 88.62%;
+        }
+
+        .last-move::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 22%;
+            height: 22%;
+            border-radius: 50%;
+            background: red;
+            z-index: 3;
+        }
+
+        .replay-controls {
+            display: flex;
+            flex-wrap: nowrap;
+            width: 100%;
+            gap: 0.5em;
+            overflow: hidden;
+            justify-content: center;
+        }
+
+        .replay-controls button,
+        .replay-controls select {
+            flex: 0 1 auto;
+            padding: 0.3em 0.5em;
+            font-size: 1em;
+            border: 2px solid black;
+            background: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            min-width: 0;
+            text-overflow: clip;
+            overflow: hidden;
+            white-space: nowrap;
+            max-width: 100px;
+        }
+
+        button, select {
+            font-size: 1em;
+            padding: 0.3em 0.5em;
+            border: 2px solid black;
+            background: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:not(:disabled):hover, select:hover {
+            background: #FFF5E9;
+        }
+
+        select {
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .replay-controls button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .stone-icon {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+            margin-right: 0.5em;
+        }
+
+        #message {
+            font-family: Arial, sans-serif;
+            position: absolute;
+            left: calc(50vw + 50vh - 30px);
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2em;
+            color: #d32f2f;
+            width: 20vw;
+            text-align: left;
+        }
+
+        .left-spacing {
+            margin-left: 0.5em;
+        }
+
+        #random-button {
+            flex: 0 1 auto;
+            min-width: 0;
+            text-align: center;
+            max-width: 8em;
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div class="header">
+        <div class="status-left" id="turn-status"></div>
+        <div class="status-center" id="prison-status"></div>
+        <div class="controls-right">
+            <div id="last-move-display" style="display: flex; align-items: center; gap: 0.5em;">
+                <span id="last-move-text"></span>
+                <button id="copy-move" title="Copy last move" style="display: none;">
+                    <svg class="copy-icon" viewBox="0 0 23 24">
+                        <path fill="black" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="board-container">
+        <div class="board" id="board">
+            <div class="lines" id="lines"></div>
+            <div class="grid" id="grid"></div>
+        </div>
+        <div id="message"></div>
+    </div>
+    <div class="footer">
+        <div class="replay-controls">
+            <button onmousedown="replayStart()">Start</button>
+            <button onmousedown="replayBack()">Back</button>
+            <button onmousedown="replayForward()">Forward</button>
+            <button onmousedown="replayEnd()">End</button>
+            <button id="random-button" onmousedown="generateRandomGame()">Random game</button>
+            <select id="save-options" onchange="handleSave()">
+                <option value="" disabled selected hidden>Save</option>
+                <option value="file">To file</option>
+                <option value="clipboard">To clipboard</option>
+            </select>
+            <select id="load-options" onchange="handleLoad()">
+                <option value="" disabled selected hidden>Load</option>
+                <option value="file">From file</option>
+                <option value="clipboard">From clipboard</option>
+            </select>
+            <select id="komi" onchange="changeKomi()">
+                <!-- Options will be populated by JavaScript -->
+            </select>
+            <select id="board-size" onchange="changeBoardSize()">
+                <option value="7">7×7</option>
+                <option value="9">9×9</option>
+                <option value="11">11×11</option>
+                <option value="13" selected>13×13</option>
+                <option value="15">15×15</option>
+                <option value="17">17×17</option>
+                <option value="19">19×19</option>
+                <option value="21">21×21</option>
+            </select>
+            <input type="file" id="load-input" style="display: none;" accept=".txt" onchange="loadGame(event)">
+        </div>
+    </div>
+</div>
+
+<script>
+    let SIZE = 13;
+    let board = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
+    let turn = 'black';
+    let komi = 7;
+    let lastMoveX = null;
+    let lastMoveY = null;
+    let lastShape = null;
+    let gameHistory = [];
+    let currentMoveIndex = -1;
+    let isGenerating = false;
+    let generationInterval = null;
+
+    const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
+    const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
+
+    function initBoard() {
+        const gridDiv = document.getElementById('grid');
+        gridDiv.innerHTML = '';
+        const linesDiv = document.getElementById('lines');
+        linesDiv.innerHTML = '';
+        
+        const canvas = document.createElement('canvas');
+        const boardSize = document.getElementById('board').offsetWidth;
+        canvas.width = boardSize;
+        canvas.height = boardSize;
+        const ctx = canvas.getContext('2d');
+        ctx.strokeStyle = 'black';
+        const cellSize = boardSize / SIZE;
+        
+        gridDiv.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+        gridDiv.style.gridTemplateRows = `repeat(${SIZE}, 1fr)`;
+
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const point = document.createElement('div');
+                point.className = 'point';
+                point.dataset.x = i;
+                point.dataset.y = j;
+                
+                point.addEventListener('mousedown', (e) => {
+                    const x = i;
+                    const y = j;
+                    let shape;
+                    if (e.button === 0) shape = 'circle';
+                    else if (e.button === 2) shape = 'square';
+                    else return;
+                    place(x, y, shape);
+                });
+                
+                point.addEventListener('contextmenu', (e) => e.preventDefault());
+                
+                const stone = document.createElement('div');
+                stone.className = 'stone';
+                point.appendChild(stone);
+                gridDiv.appendChild(point);
+            }
+        }
+
+        for (let i = 0; i < SIZE; i++) {
+            const pos = cellSize / 2 + i * cellSize;
+            ctx.beginPath();
+            ctx.lineWidth = (i === 0 || i === SIZE - 1) ? 2 : 1;
+            ctx.moveTo(pos, cellSize / 2);
+            ctx.lineTo(pos, boardSize - cellSize / 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.lineWidth = (i === 0 || i === SIZE - 1) ? 2 : 1;
+            ctx.moveTo(cellSize / 2, pos);
+            ctx.lineTo(boardSize - cellSize / 2, pos);
+            ctx.stroke();
+        }
+        linesDiv.appendChild(canvas);
+
+        updateStatus();
+        updateLastMoveDisplay();
+        updateButtonTooltips();
+    }
+
+    function saveGameState() {
+        return {
+            board: board.map(row => row.map(cell => cell ? {...cell} : null)),
+            turn: turn,
+            lastMoveX: lastMoveX,
+            lastMoveY: lastMoveY,
+            lastShape: lastShape
+        };
+    }
+
+    function loadGameState(state) {
+        board = state.board.map(row => row.map(cell => cell ? {...cell} : null));
+        turn = state.turn;
+        lastMoveX = state.lastMoveX;
+        lastMoveY = state.lastMoveY;
+        lastShape = state.lastShape;
+        renderBoard();
+        updateStatus();
+    }
+
+    function resetGame(newSize) {
+        SIZE = newSize;
+        board = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
+        turn = 'black';
+        lastMoveX = lastMoveY = lastShape = null;
+        gameHistory = [saveGameState()];
+        currentMoveIndex = 0;
+        clearMessage();
+        initBoard();
+        updateReplayButtons();
+        renderBoard();
+        updateLastMoveDisplay();
+    }
+
+    function changeBoardSize() {
+        const select = document.getElementById('board-size');
+        const newSize = parseInt(select.value);
+        resetGame(newSize);
+        select.blur();
+    }
+
+    function changeKomi() {
+        const select = document.getElementById('komi');
+        komi = parseInt(select.value);
+        updateStatus();
+        select.blur();
+    }
+
+    function initKomiSelect() {
+        const komiSelect = document.getElementById('komi');
+        for (let i = 0; i <= 20; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.text = `Komi ${i}`;
+            if (i === 7) option.selected = true;
+            komiSelect.appendChild(option);
+        }
+    }
+
+    function clearLastMoveMarker() {
+        if (lastMoveX !== null && lastMoveY !== null) {
+            const points = document.getElementsByClassName('point');
+            const stone = points[lastMoveX * SIZE + lastMoveY].firstChild;
+            stone.classList.remove('last-move');
+        }
+        lastMoveX = null;
+        lastMoveY = null;
+        lastShape = null;
+    }
+
+    function setLastMoveMarker(x, y) {
+        clearLastMoveMarker();
+        const points = document.getElementsByClassName('point');
+        const stone = points[x * SIZE + y].firstChild;
+        stone.classList.add('last-move');
+        lastMoveX = x;
+        lastMoveY = y;
+    }
+
+    function clearMessage() {
+        document.getElementById('message').textContent = '';
+    }
+
+    function setMessage(text) {
+        document.getElementById('message').textContent = text;
+        setTimeout(clearMessage, 3000);
+    }
+
+    function getClumps(shape) {
+        const visited = Array.from({length: SIZE}, () => Array(SIZE).fill(false));
+        const clumps = [];
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                if (board[i][j] && board[i][j].shape === shape && !visited[i][j]) {
+                    const clump = [];
+                    const queue = [[i, j]];
+                    visited[i][j] = true;
+                    clump.push([i, j]);
+                    let idx = 0;
+                    while (idx < queue.length) {
+                        const [cx, cy] = queue[idx++];
+                        for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
+                            const nx = cx + dx, ny = cy + dy;
+                            if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE &&
+                                board[nx][ny] && board[nx][ny].shape === shape && !visited[nx][ny]) {
+                                visited[nx][ny] = true;
+                                queue.push([nx, ny]);
+                                clump.push([nx, ny]);
+                            }
+                        }
+                    }
+                    clumps.push(clump);
+                }
+            }
+        }
+        return clumps;
+    }
+
+    function isBounded(clump) {
+        for (const [cx, cy] of clump) {
+            for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
+                const nx = cx + dx, ny = cy + dy;
+                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && board[nx][ny] === null) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    function resolveClaims(placer) {
+        const opponent = placer === 'black' ? 'white' : 'black';
+        const shapes = ['circle', 'square'];
+        for (const sh of shapes) {
+            const clumps = getClumps(sh);
+            for (const clump of clumps) {
+                if (isBounded(clump)) {
+                    let placerCount = 0, opponentCount = 0;
+                    for (const [px, py] of clump) {
+                        if (board[px][py].color === placer) placerCount++;
+                        else opponentCount++;
+                    }
+                    const claimer = (placerCount > opponentCount) ? placer : opponent; // tie → opponent
+                    for (const [px, py] of clump) {
+                        board[px][py].color = claimer;
+                    }
+                }
+            }
+        }
+    }
+
+    function place(x, y, shape) {
+        if (board[x][y] !== null) {
+            setMessage("Position occupied!");
+            return;
+        }
+        const placer = turn;
+        board[x][y] = {color: placer, shape: shape};
+        setLastMoveMarker(x, y);
+        lastShape = shape;
+        resolveClaims(placer);
+        turn = placer === 'black' ? 'white' : 'black';
+
+        if (currentMoveIndex < gameHistory.length - 1) {
+            gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+        }
+        gameHistory.push(saveGameState());
+        currentMoveIndex++;
+
+        updateReplayButtons();
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+    }
+
+    function replayStart() {
+        currentMoveIndex = 0;
+        loadGameState(gameHistory[0]);
+        clearMessage();
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function replayBack() {
+        if (currentMoveIndex > 0) {
+            currentMoveIndex--;
+            loadGameState(gameHistory[currentMoveIndex]);
+            clearMessage();
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+    }
+
+    function replayForward() {
+        if (currentMoveIndex < gameHistory.length - 1) {
+            currentMoveIndex++;
+            loadGameState(gameHistory[currentMoveIndex]);
+            clearMessage();
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+    }
+
+    function replayEnd() {
+        currentMoveIndex = gameHistory.length - 1;
+        loadGameState(gameHistory[currentMoveIndex]);
+        clearMessage();
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function hasValidMove() {
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                if (board[i][j] === null) return true;
+            }
+        }
+        return false;
+    }
+
+    function updateReplayButtons() {
+        const startBtn = document.querySelector('button[onmousedown="replayStart()"]');
+        const backBtn = document.querySelector('button[onmousedown="replayBack()"]');
+        const forwardBtn = document.querySelector('button[onmousedown="replayForward()"]');
+        const endBtn = document.querySelector('button[onmousedown="replayEnd()"]');
+        const randomBtn = document.getElementById('random-button');
+
+        if (isGenerating) {
+            startBtn.disabled = true;
+            backBtn.disabled = true;
+            forwardBtn.disabled = true;
+            endBtn.disabled = true;
+            randomBtn.disabled = false;
+        } else {
+            startBtn.disabled = currentMoveIndex === 0;
+            backBtn.disabled = currentMoveIndex === 0;
+            forwardBtn.disabled = currentMoveIndex === gameHistory.length - 1;
+            endBtn.disabled = currentMoveIndex === gameHistory.length - 1;
+            randomBtn.disabled = !hasValidMove();
+        }
+    }
+
+    function renderBoard() {
+        const points = document.getElementsByClassName('point');
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const stone = points[i * SIZE + j].firstChild;
+                stone.className = 'stone';
+                if (board[i][j] !== null) {
+                    const piece = board[i][j];
+                    if (piece.color === 'black') stone.classList.add('black');
+                    else stone.classList.add('white');
+                    if (piece.shape === 'square') stone.classList.add('square');
+                }
+                if (i === lastMoveX && j === lastMoveY) {
+                    stone.classList.add('last-move');
+                }
+            }
+        }
+        updateButtonTooltips();
+    }
+
+    function updateStatus() {
+        const turnStatus = document.getElementById('turn-status');
+        const scoreStatus = document.getElementById('prison-status');
+        
+        let black_circles = 0, black_squares = 0;
+        let white_circles = 0, white_squares = 0;
+        
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const cell = board[i][j];
+                if (cell) {
+                    if (cell.shape === 'circle') {
+                        if (cell.color === 'black') black_circles++;
+                        else white_circles++;
+                    } else {  // square
+                        if (cell.color === 'black') black_squares++;
+                        else white_squares++;
+                    }
+                }
+            }
+        }
+        
+        const totalPlaced = black_circles + black_squares + white_circles + white_squares;
+        const empty = SIZE * SIZE - totalPlaced;
+        
+        const totalCells = SIZE * SIZE;
+        const digits = totalCells.toString().length;
+        
+        const lowest_black = Math.min(black_circles, black_squares);
+        const highest_black = Math.max(black_circles, black_squares);
+        const lowest_white = Math.min(white_circles, white_squares);
+        const highest_white = Math.max(white_circles, white_squares);
+        
+        const effective_lowest_white = lowest_white + komi;
+        
+        const padded_highest_black = highest_black.toString().padStart(digits, '0');
+        const padded_highest_white = highest_white.toString().padStart(digits, '0');
+        
+        scoreStatus.innerHTML = 
+            `${lowest_black}.${padded_highest_black}<span class="left-spacing">${blackStoneSVG}</span> ` +
+            `${effective_lowest_white}.${padded_highest_white}<span class="left-spacing">${whiteStoneSVG}</span>`;
+        
+        if (empty === 0) {
+            const score_black = lowest_black + highest_black / Math.pow(10, digits);
+            const score_white = lowest_white + komi + highest_white / Math.pow(10, digits);
+            const diff = score_black - score_white;
+            
+            let result;
+            if (diff > 1e-10) {
+                result = `${blackStoneSVG} wins by ${diff.toFixed(digits)}!`;
+            } else if (diff < -1e-10) {
+                result = `${whiteStoneSVG} wins by ${(-diff).toFixed(digits)}!`;
+            } else {
+                result = 'Tie!';
+            }
+            turnStatus.innerHTML = result;
+        } else {
+            const turnSVG = turn === 'black' ? blackStoneSVG : whiteStoneSVG;
+            turnStatus.innerHTML = `${turnSVG} to move`;
+        }
+        
+        adjustHeaderLayout();
+    }
+
+    function stopGeneration() {
+        if (generationInterval) {
+            clearInterval(generationInterval);
+            generationInterval = null;
+            isGenerating = false;
+            const randomBtn = document.getElementById('random-button');
+            randomBtn.style.width = '';
+            randomBtn.textContent = 'Random game';
+            randomBtn.setAttribute('onmousedown', 'generateRandomGame()');
+            updateReplayButtons();
+            updateStatus();
+            renderBoard();
+        }
+    }
+
+    function measureRandomGameWidth() {
+        const randomBtn = document.getElementById('random-button');
+        const clone = randomBtn.cloneNode(true);
+        clone.textContent = 'Random game';
+        clone.style.width = '';
+        clone.style.visibility = 'hidden';
+        clone.style.position = 'absolute';
+        clone.removeAttribute('onmousedown');
+        document.body.appendChild(clone);
+        const width = clone.offsetWidth;
+        document.body.removeChild(clone);
+        return width;
+    }
+
+    async function generateRandomGame() {
+        if (isGenerating) {
+            stopGeneration();
+            return;
+        }
+        isGenerating = true;
+        const randomBtn = document.getElementById('random-button');
+        const randomGameWidth = measureRandomGameWidth();
+        randomBtn.style.width = `${randomGameWidth}px`;
+        randomBtn.textContent = 'Stop';
+        randomBtn.setAttribute('onmousedown', 'stopGeneration()');
+        updateReplayButtons();
+
+        generationInterval = setInterval(() => {
+            if (!hasValidMove()) {
+                stopGeneration();
+                return;
+            }
+            const empties = [];
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (board[i][j] === null) empties.push([i, j]);
+                }
+            }
+            const [x, y] = empties[Math.floor(Math.random() * empties.length)];
+            const shape = Math.random() < 0.5 ? 'circle' : 'square';
+            place(x, y, shape);
+        }, 1);
+    }
+
+    function updateLastMoveDisplay() {
+        const lastMoveText = document.getElementById('last-move-text');
+        const copyButton = document.getElementById('copy-move');
+        
+        if (currentMoveIndex <= 0 || gameHistory.length <= 1) {
+            lastMoveText.textContent = '';
+            copyButton.style.display = 'none';
+            return;
+        }
+
+        const state = gameHistory[currentMoveIndex];
+        const playerSymbol = state.turn === 'black' ? 'W' : 'B';
+
+        if (state.lastMoveX === null || state.lastShape === null) {
+            lastMoveText.textContent = '';
+            copyButton.style.display = 'none';
+            return;
+        }
+
+        const shapeChar = state.lastShape === 'circle' ? 'C' : 'S';
+        const col = String.fromCharCode(97 + state.lastMoveY);
+        const row = SIZE - state.lastMoveX;
+        lastMoveText.textContent = `${playerSymbol}${shapeChar}${col}${row}`;
+        copyButton.style.display = 'inline-flex';
+    }
+
+    function copyLastMove() {
+        const lastMoveText = document.getElementById('last-move-text').textContent;
+        if (lastMoveText) {
+            navigator.clipboard.writeText(lastMoveText).then(() => {
+                setMessage('Move copied!');
+            }).catch(() => {
+                setMessage('Failed to copy move!');
+            });
+        }
+    }
+
+    function generateGameRecordText(history, currentBoardSize, currentKomi) {
+        const boardSizeStr = `${currentBoardSize}x${currentBoardSize}`;
+        const moveList = [`${boardSizeStr} ${currentKomi}`];
+        for (let i = 1; i < history.length; i++) {
+            const state = history[i];
+            const player = history[i - 1].turn;
+            const playerSymbol = player === 'black' ? 'B' : 'W';
+            if (state.lastMoveX !== null && state.lastShape !== null) {
+                const shapeChar = state.lastShape === 'circle' ? 'C' : 'S';
+                const col = String.fromCharCode(97 + state.lastMoveY);
+                const row = currentBoardSize - state.lastMoveX;
+                moveList.push(`${playerSymbol}${shapeChar}${col}${row}`);
+            }
+        }
+        return moveList.join(' ');
+    }
+
+    function processGameRecordText(moveText) {
+        moveText = moveText.trim();
+        if (!moveText) {
+            setMessage("Error: Input data is empty.");
+            return false;
+        }
+        const moves = moveText.split(/\s+/);
+        const sizeMatch = moves[0].match(/^(\d+)x(\d+)$/i);
+        if (!sizeMatch || parseInt(sizeMatch[1]) !== parseInt(sizeMatch[2])) {
+            setMessage("Error: Invalid board size format.");
+            return false;
+        }
+        const newSize = parseInt(sizeMatch[1]);
+        const boardSizeSelect = document.getElementById('board-size');
+        let isValidSize = false;
+        for (let opt of boardSizeSelect.options) {
+            if (parseInt(opt.value) === newSize) { isValidSize = true; break; }
+        }
+        if (!isValidSize) {
+            setMessage(`Error: Unsupported board size ${newSize}×${newSize}.`);
+            return false;
+        }
+
+        let komiValue = 0;
+        let moveStartIndex = 1;
+        if (moves.length > 1) {
+            const potentialKomi = parseInt(moves[1]);
+            if (!isNaN(potentialKomi) && potentialKomi >= 0 && potentialKomi <= 20) {
+                komiValue = potentialKomi;
+                moveStartIndex = 2;
+            }
+        }
+
+        komi = komiValue;
+        document.getElementById('komi').value = komiValue;
+
+        resetGame(newSize);
+        boardSizeSelect.value = newSize;
+
+        let expectedPlayer = 'black';
+        for (let i = moveStartIndex; i < moves.length; i++) {
+            const m = moves[i].match(/^([BW])([cs])([a-z])(\d+)$/i);
+            if (!m) {
+                setMessage(`Error: Invalid move format '${moves[i]}'.`);
+                return false;
+            }
+            const [, pSym, sChar, colChar, rowStr] = m;
+            const filePlayer = pSym.toUpperCase() === 'B' ? 'black' : 'white';
+            const shape = sChar.toUpperCase() === 'C' ? 'circle' : 'square';
+            const y = colChar.toLowerCase().charCodeAt(0) - 97;
+            const x = newSize - parseInt(rowStr);
+
+            if (filePlayer !== expectedPlayer) {
+                setMessage(`Error: Turn mismatch at move '${moves[i]}'.`);
+                return false;
+            }
+            if (x < 0 || x >= newSize || y < 0 || y >= newSize) {
+                setMessage(`Error: Move '${moves[i]}' out of bounds.`);
+                return false;
+            }
+            place(x, y, shape);
+            if (document.getElementById('message').textContent) return false;
+            expectedPlayer = expectedPlayer === 'black' ? 'white' : 'black';
+        }
+        updateReplayButtons();
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+        clearMessage();
+        return true;
+    }
+
+    function handleSave() {
+        const saveSelect = document.getElementById('save-options');
+        const option = saveSelect.value;
+        if (option === 'file' || option === 'clipboard') {
+            const gameText = generateGameRecordText(gameHistory, SIZE, komi);
+            if (option === 'file') {
+                const blob = new Blob([gameText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'mander_game.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } else if (option === 'clipboard') {
+                navigator.clipboard.writeText(gameText).then(() => {
+                    setMessage('Game copied to clipboard!');
+                }).catch(() => {
+                    setMessage('Failed to copy game!');
+                });
+            }
+        }
+        saveSelect.value = '';
+        saveSelect.blur();
+    }
+
+    function loadGame(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            processGameRecordText(e.target.result);
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    }
+
+    function handleLoad() {
+        const loadSelect = document.getElementById('load-options');
+        const option = loadSelect.value;
+        if (option === 'file') {
+            document.getElementById('load-input').click();
+        } else if (option === 'clipboard') {
+            navigator.clipboard.readText().then(text => {
+                processGameRecordText(text);
+            }).catch(() => {
+                setMessage('Failed to read from clipboard!');
+            });
+        }
+        loadSelect.value = '';
+        loadSelect.blur();
+    }
+
+    function getTotalMaxWidth() {
+        const controls = document.querySelector('.replay-controls');
+        const elements = controls.querySelectorAll('button, select');
+        const numElements = elements.length;
+        const numGaps = numElements - 1;
+        const sampleElement = elements[0];
+        const styles = getComputedStyle(sampleElement);
+        const maxWidth = parseFloat(styles.maxWidth);
+        const padding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+        const border = parseFloat(styles.borderLeftWidth) + parseFloat(styles.borderRightWidth);
+        const gap = parseFloat(getComputedStyle(controls).gap);
+        const elementWidth = maxWidth + padding + border;
+        return (elementWidth * numElements) + (gap * numGaps);
+    }
+
+    function updateButtonTooltips() {
+        const elements = document.querySelectorAll('.replay-controls button, .replay-controls select');
+        const totalMaxWidth = getTotalMaxWidth();
+        const windowWidth = window.innerWidth;
+        elements.forEach(el => {
+            let text = el.tagName === 'BUTTON' ? el.textContent.trim() :
+                       el.selectedIndex >= 0 ? el.options[el.selectedIndex].text.trim() : '';
+            if (windowWidth < totalMaxWidth) el.setAttribute('title', text);
+            else el.removeAttribute('title');
+        });
+    }
+
+    function adjustHeaderLayout() {
+        const header = document.querySelector('.header');
+        const statusLeft = document.querySelector('.status-left');
+        const statusCenter = document.querySelector('.status-center');
+        const controlsRight = document.querySelector('.controls-right');
+        const board = document.querySelector('.board');
+
+        const headerWidth = header.offsetWidth;
+        const boardWidth = board.offsetWidth;
+        const leftWidth = statusLeft.offsetWidth;
+        const centerWidth = statusCenter.offsetWidth;
+        const rightWidth = controlsRight.offsetWidth;
+
+        statusCenter.style.position = 'absolute';
+        statusCenter.style.left = '50%';
+        statusCenter.style.transform = 'translateX(-50%)';
+
+        statusLeft.style.position = 'absolute';
+        controlsRight.style.position = 'absolute';
+        statusLeft.style.left = '0';
+        controlsRight.style.right = '0';
+
+        const centerLeft = (headerWidth - centerWidth) / 2;
+        const centerRight = centerLeft + centerWidth;
+
+        const leftOverlap = leftWidth > centerLeft;
+        const rightOverlap = rightWidth > (headerWidth - centerRight);
+
+        if (leftOverlap || rightOverlap) {
+            const leftPush = leftOverlap ? leftWidth - centerLeft : 0;
+            const rightPush = rightOverlap ? rightWidth - (headerWidth - centerRight) : 0;
+            if (leftPush > 0) statusLeft.style.left = `-${leftPush}px`;
+            if (rightPush > 0) controlsRight.style.right = `-${rightPush}px`;
+        } else {
+            statusLeft.style.left = '0';
+            controlsRight.style.right = '0';
+        }
+    }
+
+    resetGame(SIZE);
+    initKomiSelect();
+    updateButtonTooltips();
+    adjustHeaderLayout();
+
+    document.getElementById('copy-move').addEventListener('mousedown', copyLastMove);
+
+    // Prevent arrow keys from affecting the selects
+    const komiSelect = document.getElementById('komi');
+    const boardSizeSelect = document.getElementById('board-size');
+    const saveSelect = document.getElementById('save-options');
+    const loadSelect = document.getElementById('load-options');
+
+    komiSelect.addEventListener('keydown', (event) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+        }
+    });
+    boardSizeSelect.addEventListener('keydown', (event) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+        }
+    });
+    saveSelect.addEventListener('keydown', (event) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+        }
+    });
+    loadSelect.addEventListener('keydown', (event) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        initBoard();
+        renderBoard();
+        updateButtonTooltips();
+        if (isGenerating) {
+            const randomBtn = document.getElementById('random-button');
+            const randomGameWidth = measureRandomGameWidth();
+            randomBtn.style.width = `${randomGameWidth}px`;
+        }
+        adjustHeaderLayout();
+    });
+
+    window.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        if (event.deltaY > 0) replayForward();
+        else if (event.deltaY < 0) replayBack();
+    }, { passive: false });
+
+    document.addEventListener('DOMContentLoaded', updateButtonTooltips);
+    document.querySelectorAll('.replay-controls select').forEach(select => {
+        select.addEventListener('change', () => {
+            updateButtonTooltips();
+            if (select.id === 'save-options' || select.id === 'load-options') select.value = '';
+            select.blur();
+        });
+    });
+
+    // Full keyboard shortcuts
+    window.addEventListener('keydown', (event) => {
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT' || activeElement.tagName === 'TEXTAREA';
+
+        const keysToPrevent = ['r', 'k', 'l', 'i', 'o', 'a', 's', 'z', 'x', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+
+        if (isInputFocused && activeElement.tagName === 'SELECT' && ['ArrowUp', 'ArrowDown', 'Space'].includes(event.key)) {
+            // Allow default select navigation/opening
+        } else if (isInputFocused && (event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey))) {
+            // Allow system copy
+        } else if (isInputFocused && (event.key.toLowerCase() === 'x' && (event.metaKey || event.ctrlKey))) {
+            // Allow system cut
+        } else if (isInputFocused && (event.key.toLowerCase() === 'z' && (event.metaKey || event.ctrlKey))) {
+            // Allow system undo
+        } else if (keysToPrevent.includes(event.key.toLowerCase())) {
+            event.preventDefault();
+        } else {
+            return;
+        }
+
+        const boardSizeSelect = document.getElementById('board-size');
+        const komiSelect = document.getElementById('komi');
+        const saveSelect = document.getElementById('save-options');
+        const loadSelect = document.getElementById('load-options');
+
+        switch (event.key.toLowerCase()) {
+            case 'r':
+                if (isGenerating) stopGeneration(); else generateRandomGame();
+                break;
+            case 'k': 
+                if (komiSelect && document.activeElement !== komiSelect) {
+                    komiSelect.selectedIndex = Math.max(0, komiSelect.selectedIndex - 1);
+                    komiSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'l': 
+                if (komiSelect && document.activeElement !== komiSelect) {
+                    komiSelect.selectedIndex = Math.min(komiSelect.options.length - 1, komiSelect.selectedIndex + 1);
+                    komiSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'i': 
+                if (boardSizeSelect && document.activeElement !== boardSizeSelect) {
+                    boardSizeSelect.selectedIndex = Math.max(0, boardSizeSelect.selectedIndex - 1);
+                    boardSizeSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'o': 
+                if (boardSizeSelect && document.activeElement !== boardSizeSelect) {
+                    boardSizeSelect.selectedIndex = Math.min(boardSizeSelect.options.length - 1, boardSizeSelect.selectedIndex + 1);
+                    boardSizeSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            
+            // Load from File
+            case 'a':
+                if (loadSelect) {
+                    loadSelect.value = 'file';
+                    loadSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+
+            // Save to File
+            case 's':
+                if (saveSelect) {
+                    saveSelect.value = 'file';
+                    saveSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            
+            // Copy Last Move
+            case 'c':
+                copyLastMove();
+                break;
+
+            // Load from Clipboard
+            case 'z':
+                if (loadSelect) {
+                    loadSelect.value = 'clipboard';
+                    loadSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+                
+            // Save to Clipboard
+            case 'x':
+                if (saveSelect) {
+                    saveSelect.value = 'clipboard';
+                    saveSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+        }
+
+        if (document.activeElement.tagName !== 'SELECT' && !isInputFocused) {
+            switch (event.key) {
+                case 'ArrowUp': replayStart(); break;
+                case 'ArrowDown': replayEnd(); break;
+                case 'ArrowLeft': replayBack(); break;
+                case 'ArrowRight': replayForward(); break;
+            }
+        }
+    });
+</script>
+</body>
+</html>
