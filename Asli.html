@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asli</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            width: 100vw;
+            max-width: 100%;
+        }
+
+        .header {
+            width: min(100vw, calc(100vh - 100px));
+            height: 50px;
+            position: relative; /* Positioning context for absolute children */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0 auto;
+            overflow: visible; /* Allow children to extend beyond bounds */
+        }
+
+        .status-left {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            position: absolute; /* Use absolute positioning for precise alignment */
+            left: 0; /* Align with left edge */
+            z-index: 1; /* Above board */
+            padding-right: 0.5em;
+        }
+
+        .status-center {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            white-space: nowrap;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1; /* Above board */
+        }
+
+        .controls-right {
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            position: absolute; /* Use absolute positioning for precise alignment */
+            right: 0; /* Align with right edge */
+            z-index: 1; /* Above board */
+            gap: 0.5em;
+        }
+
+        .board-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            background-color: #f0f0f0;
+        }
+
+        .footer {
+            width: 100%;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .board {
+            width: min(100vw, calc(100vh - 100px));
+            height: min(100vw, calc(100vh - 100px));
+            background-color: #d9a359;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #last-move-text {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            white-space: nowrap;
+        }
+
+        #copy-move {
+            font-size: 1.2em;
+            padding: 0;
+            border: none;
+            background: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .copy-icon {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+        }
+
+        #copy-move:hover .copy-icon path {
+            fill: #555;
+        }
+
+        .grid {
+            display: grid;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        .lines {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .point {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .stone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-sizing: border-box;
+            z-index: 2;
+        }
+
+        .black {
+            background: black;
+        }
+
+        .white {
+            background: white;
+            border: 2px solid black;
+        }
+
+        .last-move::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 22%;
+            height: 22%;
+            border-radius: 50%;
+            background: red;
+            z-index: 3;
+        }
+
+        .replay-controls {
+            display: flex;
+            flex-wrap: nowrap;
+            width: 100%;
+            gap: 0.5em;
+            overflow: hidden;
+            justify-content: center;
+        }
+
+        .replay-controls button,
+        .replay-controls select {
+            flex: 0 1 auto;
+            padding: 0.3em 0.5em;
+            font-size: 1em;
+            border: 2px solid black;
+            background: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            min-width: 0;
+            text-overflow: clip;
+            overflow: hidden;
+            white-space: nowrap;
+            max-width: 100px;
+        }
+
+        button, select {
+            font-size: 1em;
+            padding: 0.3em 0.5em;
+            border: 2px solid black;
+            background: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:not(:disabled):hover, select:hover {
+            background: #FFF5E9;
+        }
+
+        select {
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .replay-controls button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .stone-icon {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+            margin-right: 0.5em;
+        }
+
+        #message {
+            font-family: Arial, sans-serif;
+            position: absolute;
+            left: calc(50vw + 50vh - 30px);
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2em;
+            color: #d32f2f;
+            width: 20vw;
+            text-align: left;
+        }
+
+        .left-spacing {
+            margin-left: 0.5em;
+        }
+
+        #random-button {
+            flex: 0 1 auto;
+            min-width: 0;
+            text-align: center;
+            max-width: 8em;
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div class="header">
+        <div class="status-left" id="turn-status"></div>
+        <div class="status-center" id="prison-status"></div>
+        <div class="controls-right">
+            <div id="last-move-display" style="display: flex; align-items: center; gap: 0.5em;">
+                <span id="last-move-text"></span>
+                <button id="copy-move" title="Copy last move" style="display: none;">
+                    <svg class="copy-icon" viewBox="0 0 24 24">
+                        <path fill="black" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+                    </svg>
+                </button>
+            </div>
+            <button id="hold-button" onmousedown="hold()">Hold</button>
+        </div>
+    </div>
+    <div class="board-container">
+        <div class="board" id="board">
+            <div class="lines" id="lines"></div>
+            <div class="grid" id="grid"></div>
+        </div>
+        <div id="message"></div>
+    </div>
+    <div class="footer">
+        <div class="replay-controls">
+            <button onmousedown="replayStart()">Start</button>
+            <button onmousedown="replayBack()">Back</button>
+            <button onmousedown="replayForward()">Forward</button>
+            <button onmousedown="replayEnd()">End</button>
+            <button id="random-button" onmousedown="generateRandomGame()">Random game</button>
+            <select id="save-options" onchange="handleSave()">
+                <option value="" disabled selected hidden>Save</option>
+                <option value="file">To file</option>
+                <option value="clipboard">To clipboard</option>
+            </select>
+            <select id="load-options" onchange="handleLoad()">
+                <option value="" disabled selected hidden>Load</option>
+                <option value="file">From file</option>
+                <option value="clipboard">From clipboard</option>
+            </select>
+            <select id="komi" onchange="changeKomi()">
+                <!-- Options will be populated by JavaScript -->
+            </select>
+            <select id="board-size" onchange="changeBoardSize()">
+                <option value="7">7×7</option>
+                <option value="9">9×9</option>
+                <option value="11">11×11</option>
+                <option value="13" selected>13×13</option>
+                <option value="15">15×15</option>
+                <option value="17">17×17</option>
+                <option value="19">19×19</option>
+                <option value="21">21×21</option>
+            </select>
+            <input type="file" id="load-input" style="display: none;" accept=".txt" onchange="loadGame(event)">
+        </div>
+    </div>
+</div>
+
+    <script>
+        let SIZE = 13;
+        let board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+        let turn = 'black';
+        let prison = { black: 0, white: 0 };
+        let lastMinimalIncursion = false;
+        let hasHadMultipleGroups = { black: false, white: false };
+        let lastMoveX = null;
+        let lastMoveY = null;
+        let gameHistory = [];
+        let currentMoveIndex = -1;
+        let isGenerating = false;
+        let generationInterval = null;
+        let komi = 0;
+
+        const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
+        const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
+
+        function initBoard() {
+            const gridDiv = document.getElementById('grid');
+            gridDiv.innerHTML = '';
+            const linesDiv = document.getElementById('lines');
+            linesDiv.innerHTML = '';
+            
+            const canvas = document.createElement('canvas');
+            const boardSize = document.getElementById('board').offsetWidth;
+            canvas.width = boardSize;
+            canvas.height = boardSize;
+            const ctx = canvas.getContext('2d');
+            ctx.strokeStyle = 'black';
+            const cellSize = boardSize / SIZE;
+            
+            gridDiv.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+            gridDiv.style.gridTemplateRows = `repeat(${SIZE}, 1fr)`;
+
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    const point = document.createElement('div');
+                    point.className = 'point';
+                    point.dataset.x = i;
+                    point.dataset.y = j;
+                    point.onmousedown = () => play(i, j);
+                    const stone = document.createElement('div');
+                    stone.className = 'stone';
+                    point.appendChild(stone);
+                    gridDiv.appendChild(point);
+                }
+            }
+
+            for (let i = 0; i < SIZE; i++) {
+                const pos = cellSize / 2 + i * cellSize;
+                ctx.beginPath();
+                ctx.lineWidth = (i === 0 || i === SIZE - 1) ? 2 : 1;
+                ctx.moveTo(pos, cellSize / 2);
+                ctx.lineTo(pos, boardSize - cellSize / 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.lineWidth = (i === 0 || i === SIZE - 1) ? 2 : 1;
+                ctx.moveTo(cellSize / 2, pos);
+                ctx.lineTo(boardSize - cellSize / 2, pos);
+                ctx.stroke();
+            }
+            linesDiv.appendChild(canvas);
+
+            updateStatus();
+            updateLastMoveDisplay();
+            updateButtonTooltips();
+        }
+
+        function saveGameState() {
+            return {
+                board: board.map(row => [...row]),
+                turn: turn,
+                prison: { ...prison },
+                lastMinimalIncursion: lastMinimalIncursion,
+                hasHadMultipleGroups: { ...hasHadMultipleGroups },
+                lastMoveX: lastMoveX,
+                lastMoveY: lastMoveY,
+                komi: komi
+            };
+        }
+
+        function loadGameState(state) {
+            board = state.board.map(row => [...row]);
+            turn = state.turn;
+            prison = { ...state.prison };
+            lastMinimalIncursion = state.lastMinimalIncursion;
+            hasHadMultipleGroups = { ...state.hasHadMultipleGroups };
+            lastMoveX = state.lastMoveX;
+            lastMoveY = state.lastMoveY;
+            komi = state.komi;
+            renderBoard();
+            updateStatus();
+        }
+
+        function resetGame(newSize) {
+            SIZE = newSize;
+            board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+            turn = 'black';
+            prison = { black: komi, white: 0 };
+            lastMinimalIncursion = false;
+            hasHadMultipleGroups = { black: false, white: false };
+            lastMoveX = null;
+            lastMoveY = null;
+            gameHistory = [saveGameState()];
+            currentMoveIndex = 0;
+            clearMessage();
+            initBoard();
+            updateReplayButtons();
+            renderBoard();
+            updateLastMoveDisplay();
+        }
+
+        function changeBoardSize() {
+            const select = document.getElementById('board-size');
+            const newSize = parseInt(select.value);
+            resetGame(newSize);
+            select.blur();
+        }
+
+        function changeKomi() {
+            const select = document.getElementById('komi');
+            komi = parseInt(select.value);
+            resetGame(SIZE);
+            select.blur();
+        }
+
+        function clearLastMoveMarker() {
+            if (lastMoveX !== null && lastMoveY !== null) {
+                const points = document.getElementsByClassName('point');
+                const stone = points[lastMoveX * SIZE + lastMoveY].firstChild;
+                stone.classList.remove('last-move');
+            }
+            lastMoveX = null;
+            lastMoveY = null;
+        }
+
+        function setLastMoveMarker(x, y) {
+            clearLastMoveMarker();
+            const points = document.getElementsByClassName('point');
+            const stone = points[x * SIZE + y].firstChild;
+            stone.classList.add('last-move');
+            lastMoveX = x;
+            lastMoveY = y;
+        }
+
+        function clearMessage() {
+            document.getElementById('message').textContent = '';
+        }
+
+        function setMessage(text) {
+            document.getElementById('message').textContent = text;
+        }
+
+        function getGroup(x, y, color, visited = new Set()) {
+            if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || visited.has(`${x},${y}`) || board[x][y] !== color) {
+                return [];
+            }
+            visited.add(`${x},${y}`);
+            const group = [[x, y]];
+            for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+                group.push(...getGroup(x + dx, y + dy, color, visited));
+            }
+            return group;
+        }
+
+        function isAlive(group, color) {
+            const allGroups = getAllGroups(color);
+            if (allGroups.length > 1) hasHadMultipleGroups[color] = true;
+            if (!hasHadMultipleGroups[color]) return true;
+            if (allGroups.length === 1) return false;
+
+            const groupSet = new Set(group.map(([x, y]) => `${x},${y}`));
+            for (const [x, y] of group) {
+                for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+                    const nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && board[nx][ny] === null) {
+                        if (canReachOtherGroup(nx, ny, color, groupSet)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function canReachOtherGroup(x, y, color, groupSet, visited = new Set()) {
+            if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || visited.has(`${x},${y}`)) return false;
+            const pos = `${x},${y}`;
+            visited.add(pos);
+            if (board[x][y] === color && !groupSet.has(pos)) return true;
+            if (board[x][y] !== null) return false;
+            for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+                if (canReachOtherGroup(x + dx, y + dy, color, groupSet, visited)) return true;
+            }
+            return false;
+        }
+
+        function getAllGroups(color) {
+            const groups = [];
+            const visited = new Set();
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (board[i][j] === color && !visited.has(`${i},${j}`)) {
+                        groups.push(getGroup(i, j, color, visited));
+                    }
+                }
+            }
+            return groups;
+        }
+
+        function getTerritory(x, y, visited = new Set()) {
+            if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || visited.has(`${x},${y}`) || board[x][y] !== null) {
+                return [];
+            }
+            visited.add(`${x},${y}`);
+            const territory = [[x, y]];
+            for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+                territory.push(...getTerritory(x + dx, y + dy, visited));
+            }
+            return territory;
+        }
+
+        function getOwner(territory) {
+            const adjacent = new Set();
+            for (const [x, y] of territory) {
+                for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+                    const nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && board[nx][ny] !== null) {
+                        adjacent.add(board[nx][ny]);
+                    }
+                }
+            }
+            return adjacent.size === 1 ? adjacent.values().next().value : null;
+        }
+
+        function isMinimalIncursion(x, y, color) {
+            const enemy = color === 'black' ? 'white' : 'black';
+            const oldGroups = getAllGroups(enemy);
+            const oldLive = oldGroups.filter(g => isAlive(g, enemy));
+            const tempBoard = board.map(row => [...row]);
+            tempBoard[x][y] = color;
+            board = tempBoard;
+            const newGroups = getAllGroups(enemy);
+            const newLive = newGroups.filter(g => isAlive(g, enemy));
+            board = tempBoard.map(row => [...row]);
+            board[x][y] = null;
+            return oldLive.length - newLive.length === 1;
+        }
+
+        function play(x, y) {
+            if (board[x][y] !== null) return;
+            const enemy = turn === 'black' ? 'white' : 'black';
+            const territories = getAllTerritories();
+            const targetTerritory = territories.find(t => t.some(([tx, ty]) => tx === x && ty === y));
+            const owner = targetTerritory ? getOwner(targetTerritory) : null;
+            const isIncursion = owner === enemy;
+            const isMinimal = isIncursion && isMinimalIncursion(x, y, turn);
+
+            if (isMinimal && lastMinimalIncursion) {
+                setMessage("Cannot make a minimal incursion after opponent's minimal incursion!");
+                return;
+            }
+
+            const oldBoard = board.map(row => [...row]);
+            board[x][y] = turn;
+            lastMinimalIncursion = isMinimal;
+
+            const deadGroups = getAllGroups(enemy).filter(g => !isAlive(g, enemy));
+            for (const group of deadGroups) {
+                for (const [gx, gy] of group) {
+                    board[gx][gy] = null;
+                    prison[enemy]++;
+                }
+            }
+
+            while (prison.black > 0 && prison.white > 0) {
+                prison.black--;
+                prison.white--;
+            }
+
+            const friendlyDead = getAllGroups(turn).filter(g => !isAlive(g, turn));
+            if (friendlyDead.length > 0) {
+                setMessage("Invalid move: Cannot leave dead friendly groups!");
+                board = oldBoard;
+                renderBoard();
+                updateStatus();
+                return;
+            }
+
+            clearMessage();
+            setLastMoveMarker(x, y);
+            turn = turn === 'black' ? 'white' : 'black';
+            if (currentMoveIndex < gameHistory.length - 1) {
+                gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+            }
+            gameHistory.push(saveGameState());
+            currentMoveIndex++;
+            updateReplayButtons();
+            renderBoard();
+            updateStatus();
+            updateLastMoveDisplay();
+        }
+
+        function hold() {
+            const enemy = turn === 'black' ? 'white' : 'black';
+            if (prison[enemy] === 0) {
+                setMessage("No enemy stones in prison to remove!");
+                return;
+            }
+            clearMessage();
+            clearLastMoveMarker();
+            prison[enemy]--;
+            turn = turn === 'black' ? 'white' : 'black';
+            lastMinimalIncursion = false;
+            if (currentMoveIndex < gameHistory.length - 1) {
+                gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+            }
+            gameHistory.push(saveGameState());
+            currentMoveIndex++;
+            updateStatus();
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+
+        function replayStart() {
+            currentMoveIndex = 0;
+            loadGameState(gameHistory[0]);
+            clearMessage();
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+
+        function replayBack() {
+            if (currentMoveIndex > 0) {
+                currentMoveIndex--;
+                loadGameState(gameHistory[currentMoveIndex]);
+                clearMessage();
+                updateReplayButtons();
+                updateLastMoveDisplay();
+            }
+        }
+
+        function replayForward() {
+            if (currentMoveIndex < gameHistory.length - 1) {
+                currentMoveIndex++;
+                loadGameState(gameHistory[currentMoveIndex]);
+                clearMessage();
+                updateReplayButtons();
+                updateLastMoveDisplay();
+            }
+        }
+
+        function replayEnd() {
+            currentMoveIndex = gameHistory.length - 1;
+            loadGameState(gameHistory[currentMoveIndex]);
+            clearMessage();
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+
+        function updateReplayButtons() {
+            const startBtn = document.querySelector('button[onmousedown="replayStart()"]');
+            const backBtn = document.querySelector('button[onmousedown="replayBack()"]');
+            const forwardBtn = document.querySelector('button[onmousedown="replayForward()"]');
+            const endBtn = document.querySelector('button[onmousedown="replayEnd()"]');
+            const randomBtn = document.getElementById('random-button');
+
+            if (isGenerating) {
+                startBtn.disabled = true;
+                backBtn.disabled = true;
+                forwardBtn.disabled = true;
+                endBtn.disabled = true;
+                randomBtn.disabled = false;
+            } else {
+                startBtn.disabled = currentMoveIndex === 0;
+                backBtn.disabled = currentMoveIndex === 0;
+                forwardBtn.disabled = currentMoveIndex === gameHistory.length - 1;
+                endBtn.disabled = currentMoveIndex === gameHistory.length - 1;
+                randomBtn.disabled = !hasValidMove(turn);
+            }
+        }
+
+        function getAllTerritories() {
+            const territories = [];
+            const visited = new Set();
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (board[i][j] === null && !visited.has(`${i},${j}`)) {
+                        territories.push(getTerritory(i, j, visited));
+                    }
+                }
+            }
+            return territories;
+        }
+
+        function renderBoard() {
+            const points = document.getElementsByClassName('point');
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    const stone = points[i * SIZE + j].firstChild;
+                    stone.className = 'stone';
+                    if (board[i][j] === 'black') {
+                        stone.classList.add('black');
+                    } else if (board[i][j] === 'white') {
+                        stone.classList.add('white');
+                    }
+                    if (i === lastMoveX && j === lastMoveY) {
+                        stone.classList.add('last-move');
+                    }
+                }
+            }
+            updateButtonTooltips();
+        }
+
+        function hasValidMove(player) {
+            const enemy = player === 'black' ? 'white' : 'black';
+            if (prison[enemy] > 0) return true;
+
+            for (let x = 0; x < SIZE; x++) {
+                for (let y = 0; y < SIZE; y++) {
+                    if (board[x][y] !== null) continue;
+
+                    const oldBoard = board.map(row => [...row]);
+                    const oldLastMinimalIncursion = lastMinimalIncursion;
+                    const oldHasHadMultipleGroups = { ...hasHadMultipleGroups };
+
+                    const enemy = player === 'black' ? 'white' : 'black';
+                    const territories = getAllTerritories();
+                    const targetTerritory = territories.find(t => t.some(([tx, ty]) => tx === x && ty === y));
+                    const owner = targetTerritory ? getOwner(targetTerritory) : null;
+                    const isIncursion = owner === enemy;
+                    const isMinimal = isIncursion && isMinimalIncursion(x, y, player);
+
+                    if (isMinimal && lastMinimalIncursion) {
+                        continue;
+                    }
+
+                    board[x][y] = player;
+                    lastMinimalIncursion = isMinimal;
+
+                    const deadGroups = getAllGroups(enemy).filter(g => !isAlive(g, enemy));
+                    for (const group of deadGroups) {
+                        for (const [gx, gy] of group) {
+                            board[gx][gy] = null;
+                        }
+                    }
+
+                    const allFriendlyGroups = getAllGroups(player);
+                    if (allFriendlyGroups.length > 1) {
+                        hasHadMultipleGroups[player] = true;
+                    }
+
+                    const friendlyDead = allFriendlyGroups.filter(g => !isAlive(g, player));
+                    const isValid = friendlyDead.length === 0;
+
+                    board = oldBoard;
+                    lastMinimalIncursion = oldLastMinimalIncursion;
+                    hasHadMultipleGroups = oldHasHadMultipleGroups;
+
+                    if (isValid) return true;
+                }
+            }
+            return false;
+        }
+
+        function updateStatus() {
+            const turnStatus = document.getElementById('turn-status');
+            const prisonStatus = document.getElementById('prison-status');
+            turnStatus.innerHTML = `${turn === 'black' ? blackStoneSVG : whiteStoneSVG} to move`;
+            const movesAvailable = hasValidMove(turn);
+            if (!movesAvailable) {
+                const winnerIcon = turn === 'black' ? whiteStoneSVG : blackStoneSVG;
+                turnStatus.innerHTML = `${winnerIcon} wins!`;
+            }
+            prisonStatus.innerHTML = prison.black > 0 ? `Prison: ${prison.black}<span class="left-spacing">${blackStoneSVG}</span>` : 
+                                    prison.white > 0 ? `Prison: ${prison.white}<span class="left-spacing">${whiteStoneSVG}</span>` : '';
+            adjustHeaderLayout();
+        }
+
+        function stopGeneration() {
+            if (generationInterval) {
+                clearInterval(generationInterval);
+                generationInterval = null;
+                isGenerating = false;
+                const randomBtn = document.getElementById('random-button');
+                randomBtn.style.width = ''; // Clear width to restore flex behavior
+                randomBtn.textContent = 'Random game';
+                randomBtn.setAttribute('onmousedown', 'generateRandomGame()');
+                updateReplayButtons();
+                updateStatus();
+                renderBoard();
+            }
+        }
+
+        function measureRandomGameWidth() {
+            const randomBtn = document.getElementById('random-button');
+            // Create a clone of the button with "Random game" text to measure its natural width
+            const clone = randomBtn.cloneNode(true);
+            clone.textContent = 'Random game';
+            clone.style.width = ''; // Clear any explicit width
+            clone.style.visibility = 'hidden'; // Hide it from view
+            clone.style.position = 'absolute'; // Remove from flow
+            clone.removeAttribute('onmousedown'); // Avoid event interference
+            document.body.appendChild(clone);
+            const width = clone.offsetWidth; // Measure width in current flex context
+            document.body.removeChild(clone);
+            return width;
+        }
+
+        async function generateRandomGame() {
+            if (isGenerating) {
+                stopGeneration();
+                return;
+            }
+
+        isGenerating = true;
+        const randomBtn = document.getElementById('random-button');
+        
+        // Measure the width "Random game" would have in the current context
+        const randomGameWidth = measureRandomGameWidth();
+        
+        // Apply the width and switch to "Stop"
+        randomBtn.style.width = `${randomGameWidth}px`;
+        randomBtn.textContent = 'Stop';
+        randomBtn.setAttribute('onmousedown', 'stopGeneration()');
+        updateReplayButtons();
+
+            generationInterval = setInterval(() => {
+                if (!hasValidMove(turn)) {
+                    stopGeneration();
+                    return;
+                }
+
+                const enemy = turn === 'black' ? 'white' : 'black';
+                const validMoves = [];
+
+                for (let x = 0; x < SIZE; x++) {
+                    for (let y = 0; y < SIZE; y++) {
+                        if (board[x][y] !== null) continue;
+
+                        const oldBoard = board.map(row => [...row]);
+                        const oldPrison = { ...prison };
+                        const oldLastMinimalIncursion = lastMinimalIncursion;
+                        const oldHasHadMultipleGroups = { ...hasHadMultipleGroups };
+
+                        const territories = getAllTerritories();
+                        const targetTerritory = territories.find(t => t.some(([tx, ty]) => tx === x && ty === y));
+                        const owner = targetTerritory ? getOwner(targetTerritory) : null;
+                        const isIncursion = owner === enemy;
+                        const isMinimal = isIncursion && isMinimalIncursion(x, y, turn);
+
+                        if (isMinimal && lastMinimalIncursion) continue;
+
+                        board[x][y] = turn;
+                        lastMinimalIncursion = isMinimal;
+
+                        const deadGroups = getAllGroups(enemy).filter(g => !isAlive(g, enemy));
+                        for (const group of deadGroups) {
+                            for (const [gx, gy] of group) {
+                                board[gx][gy] = null;
+                                prison[enemy]++;
+                            }
+                        }
+
+                        while (prison.black > 0 && prison.white > 0) {
+                            prison.black--;
+                            prison.white--;
+                        }
+
+                        const friendlyDead = getAllGroups(turn).filter(g => !isAlive(g, turn));
+                        const isValid = friendlyDead.length === 0;
+
+                        board = oldBoard;
+                        prison = oldPrison;
+                        lastMinimalIncursion = oldLastMinimalIncursion;
+                        hasHadMultipleGroups = oldHasHadMultipleGroups;
+
+                        if (isValid) validMoves.push({ type: 'play', x, y });
+                    }
+                }
+
+                if (prison[enemy] > 0) {
+                    validMoves.push({ type: 'hold' });
+                }
+
+                if (validMoves.length === 0) {
+                    stopGeneration();
+                    return;
+                }
+
+                const move = validMoves[Math.floor(Math.random() * validMoves.length)];
+                if (move.type === 'play') {
+                    play(move.x, move.y);
+                } else if (move.type === 'hold') {
+                    hold();
+                }
+
+                renderBoard();
+                updateStatus();
+                updateLastMoveDisplay();
+            }, 1);
+        }
+
+        function initKomiSelect() {
+            const komiSelect = document.getElementById('komi');
+            for (let i = 0; i <= 20; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.text = `Komi ${i}`;
+                if (i === 7) option.selected = true;
+                komiSelect.appendChild(option);
+            }
+        }
+
+        function updateLastMoveDisplay() {
+            const lastMoveText = document.getElementById('last-move-text');
+            const copyButton = document.getElementById('copy-move');
+            
+            if (currentMoveIndex <= 0 || gameHistory.length <= 1) {
+                lastMoveText.textContent = '';
+                copyButton.style.display = 'none';
+                return;
+            }
+
+            const state = gameHistory[currentMoveIndex];
+            const prevState = gameHistory[currentMoveIndex - 1];
+            const player = state.turn === 'black' ? 'W' : 'B'; // Previous player made the move
+
+            // Check if this is a "Hold" move
+            if (state.lastMoveX === null && state.lastMoveY === null && 
+                (state.prison.black !== prevState.prison.black || state.prison.white !== prevState.prison.white)) {
+                lastMoveText.textContent = `${player}-`;
+            } else if (state.lastMoveX !== null && state.lastMoveY !== null) {
+                // Regular play move
+                const col = String.fromCharCode(97 + state.lastMoveY);
+                const row = SIZE - state.lastMoveX;
+                lastMoveText.textContent = `${player}${col}${row}`;
+            } else {
+                lastMoveText.textContent = '';
+                copyButton.style.display = 'none';
+                return;
+            }
+
+            copyButton.style.display = 'inline-flex'; // Show copy button for valid moves
+        }
+
+        function copyLastMove() {
+            const lastMoveText = document.getElementById('last-move-text').textContent;
+            if (lastMoveText) {
+                navigator.clipboard.writeText(lastMoveText)
+                    .then(() => {
+                        setMessage('Move copied!');
+                        setTimeout(() => {
+                            if (document.getElementById('message').textContent === 'Move copied!') {
+                                clearMessage();
+                            }
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy: ', err);
+                        setMessage('Failed to copy move!');
+                        setTimeout(() => {
+                            if (document.getElementById('message').textContent === 'Failed to copy move!') {
+                                clearMessage();
+                            }
+                        }, 2000);
+                    });
+            }
+        }
+        
+        function triggerLoadGame() {
+            document.getElementById('load-input').click();
+        }
+
+        function getTotalMaxWidth() {
+            const controls = document.querySelector('.replay-controls');
+            const elements = controls.querySelectorAll('button, select');
+            const numElements = elements.length; // Should be 9
+            const numGaps = numElements - 1; // 8 gaps
+
+            // Get computed styles from the first button (assuming all are styled the same)
+            const sampleElement = elements[0];
+            const styles = getComputedStyle(sampleElement);
+            const maxWidth = parseFloat(styles.maxWidth); // 100px
+            const paddingLeft = parseFloat(styles.paddingLeft); // e.g., 8px (0.5em at 16px/em)
+            const paddingRight = parseFloat(styles.paddingRight); // e.g., 8px
+            const borderLeft = parseFloat(styles.borderLeftWidth); // 2px
+            const borderRight = parseFloat(styles.borderRightWidth); // 2px
+            const gap = parseFloat(getComputedStyle(controls).gap); // e.g., 8px (0.5em)
+
+            // Total width per element
+            const elementWidth = maxWidth + paddingLeft + paddingRight + borderLeft + borderRight;
+            // Total width of all elements plus gaps
+            const totalMaxWidth = (elementWidth * numElements) + (gap * numGaps);
+
+            return totalMaxWidth;
+        }
+       
+       function updateButtonTooltips() {
+            const buttons = document.querySelectorAll('.replay-controls button');
+            const selects = document.querySelectorAll('.replay-controls select');
+            const elements = [...buttons, ...selects];
+            const totalMaxWidth = getTotalMaxWidth();
+            const windowWidth = window.innerWidth;
+
+            elements.forEach(element => {
+                let fullText = '';
+                if (element.tagName === 'BUTTON') {
+                    fullText = element.textContent.trim();
+                } else if (element.tagName === 'SELECT' && element.selectedIndex >= 0) {
+                    fullText = element.options[element.selectedIndex].text.trim();
+                }
+
+                if (windowWidth < totalMaxWidth) {
+                    element.setAttribute('title', fullText);
+                } else {
+                    element.removeAttribute('title');
+                }
+            });
+        }
+
+        function adjustHeaderLayout() {
+            const header = document.querySelector('.header');
+            const statusLeft = document.querySelector('.status-left');
+            const statusCenter = document.querySelector('.status-center');
+            const controlsRight = document.querySelector('.controls-right');
+            const board = document.querySelector('.board');
+
+            // Get dimensions
+            const headerWidth = header.offsetWidth; // Should match board width due to margin: 0 auto
+            const boardWidth = board.offsetWidth;
+            const leftWidth = statusLeft.offsetWidth;
+            const centerWidth = statusCenter.offsetWidth;
+            const rightWidth = controlsRight.offsetWidth;
+
+            // Center element is always at 50% with transform
+            statusCenter.style.position = 'absolute';
+            statusCenter.style.left = '50%';
+            statusCenter.style.transform = 'translateX(-50%)';
+
+            // Default positions aligned with board edges
+            statusLeft.style.position = 'absolute';
+            controlsRight.style.position = 'absolute';
+            statusLeft.style.left = '0'; // Align with left edge of board
+            controlsRight.style.right = '0'; // Align with right edge of board
+
+            // Calculate the center element's absolute position in pixels
+            const centerLeft = (headerWidth - centerWidth) / 2;
+            const centerRight = centerLeft + centerWidth;
+
+            // Calculate overlap
+            const leftOverlap = leftWidth > centerLeft; // Left element overlaps center
+            const rightOverlap = rightWidth > (headerWidth - centerRight); // Right element overlaps center
+
+            if (leftOverlap || rightOverlap) {
+                // Calculate the minimum space needed on each side
+                const leftPush = leftOverlap ? leftWidth - centerLeft : 0; // How much to push left inward
+                const rightPush = rightOverlap ? rightWidth - (headerWidth - centerRight) : 0; // How much to push right inward
+
+                // Adjust positions to push elements just enough to avoid overlap
+                if (leftPush > 0) {
+                    statusLeft.style.left = `-${leftPush}px`; // Move left element leftward
+                }
+                if (rightPush > 0) {
+                    controlsRight.style.right = `-${rightPush}px`; // Move right element rightward
+                }
+            } else {
+                // Reset to board edges if no overlap
+                statusLeft.style.left = '0';
+                controlsRight.style.right = '0';
+            }
+        }
+
+        /**
+         * Generates the game record string from the game history.
+         * Uses the *current* global SIZE and komi for the header,
+         * and current SIZE for formatting move coordinates, to match original behavior.
+         */
+        function generateGameRecordText(history, currentBoardSize, currentKomiValue) {
+            const boardSizeStr = `${currentBoardSize}x${currentBoardSize}`;
+            const moveList = [`${boardSizeStr} ${currentKomiValue}`];
+            
+            for (let i = 1; i < history.length; i++) {
+                const state = history[i];          // State *after* the i-th move
+                const prevState = history[i - 1];  // State *before* the i-th move
+
+                const playerWhoMoved = prevState.turn; // 'black' or 'white'
+                const playerSymbol = playerWhoMoved === 'black' ? 'B' : 'W';
+                
+                // A move is a 'play' if lastMoveX/Y is set in the current state.
+                // This inference is based on how play() and hold() affect lastMoveX/Y.
+                if (state.lastMoveX !== null && state.lastMoveY !== null) {
+                    const col = String.fromCharCode(97 + state.lastMoveY);
+                    // Use currentBoardSize for display consistency with original save format.
+                    const row = currentBoardSize - state.lastMoveX; 
+                    moveList.push(`${playerSymbol}${col}${row}`);
+                } else { 
+                    // If lastMoveX/Y are null, it was a hold move (or initial state if i=0, but loop starts at 1).
+                    moveList.push(`${playerSymbol}-`);
+                }
+            }
+            return moveList.join(' ');
+        }
+
+        /**
+         * Processes a game record string to load a game.
+         * Returns true on success, false on failure.
+         * Manages UI updates (messages, board, status, selects).
+         */
+        function processGameRecordText(moveText) {
+            moveText = moveText.trim();
+            if (!moveText) {
+                setMessage("Error: Input data is empty.");
+                // Ensure UI reflects a default or error state
+                renderBoard(); updateReplayButtons(); updateStatus();
+                return false; 
+            }
+
+            const moves = moveText.split(' ');
+            const sizeMatch = moves[0].match(/^(\d+)[-x×*�](\d+)$/);
+            if (!sizeMatch) {
+                setMessage("Error: Input data must start with board size (e.g., '9x9').");
+                renderBoard(); updateReplayButtons(); updateStatus();
+                return false;
+            }
+            const [_, widthStr, heightStr] = sizeMatch;
+            const newSize = parseInt(widthStr);
+            const newHeight = parseInt(heightStr);
+
+            const boardSizeSelect = document.getElementById('board-size');
+            // Check if newSize is one of the valid options in the dropdown
+            let isValidSize = false;
+            for (let i = 0; i < boardSizeSelect.options.length; i++) {
+                if (parseInt(boardSizeSelect.options[i].value) === newSize) {
+                    isValidSize = true;
+                    break;
+                }
+            }
+            
+            if (newSize !== newHeight || !isValidSize) {
+                 const availableSizes = Array.from(boardSizeSelect.options).map(opt => `${opt.value}x${opt.value}`).join(', ');
+                 setMessage(`Error: Invalid board size '${widthStr}x${heightStr}'. Supported sizes: ${availableSizes}.`);
+                 renderBoard(); updateReplayButtons(); updateStatus();
+                 return false;
+            }
+
+            let komiValue = 0; // Default komi
+            let moveStartIndex = 1;
+            // Check if the second element is a number (komi)
+            if (moves.length > 1) {
+                const potentialKomi = parseInt(moves[1]);
+                if (!isNaN(potentialKomi) && potentialKomi >= 0 && potentialKomi <= 20) {
+                    komiValue = potentialKomi;
+                    moveStartIndex = 2; // Komi is present, moves start from index 2
+                }
+            }
+            
+            // Set global komi, then resetGame will use it.
+            komi = komiValue; 
+            resetGame(newSize); // This sets up the board, history, turn, prison with newSize and komi.
+            
+            // Update UI selectors to reflect loaded values
+            boardSizeSelect.value = newSize;
+            const komiSelect = document.getElementById('komi');
+            komiSelect.value = komiValue;
+            
+            let lastPlayerSymbolFromFile = null; // Tracks the 'B' or 'W' from the *previous* move string
+
+            for (let i = moveStartIndex; i < moves.length; i++) {
+                const currentMoveStr = moves[i];
+                const holdMatch = currentMoveStr.match(/^([BW])[-x×*�]$/);
+                const playMatch = currentMoveStr.match(/^([BW])([a-z])(\d+)$/);
+
+                let currentPlayerSymbolFromFile;
+                let isHoldAction = false;
+                let playX = -1, playY = -1;
+
+                if (holdMatch) {
+                    currentPlayerSymbolFromFile = holdMatch[1];
+                    isHoldAction = true;
+                } else if (playMatch) {
+                    currentPlayerSymbolFromFile = playMatch[1];
+                    const [, , colChar, rowNumStr] = playMatch;
+                    playX = SIZE - parseInt(rowNumStr); // SIZE is now the newSize
+                    playY = colChar.charCodeAt(0) - 97;
+                } else {
+                    setMessage(`Error: Invalid move format '${currentMoveStr}' at move ${i - moveStartIndex + 1}.`);
+                    renderBoard(); updateReplayButtons(); updateStatus(); return false;
+                }
+
+                // If the file indicates the same player is moving again,
+                // the opponent (whose turn it is in the game state) must have held.
+                if (lastPlayerSymbolFromFile && lastPlayerSymbolFromFile === currentPlayerSymbolFromFile) {
+                    const enemyOfCurrentTurnPlayer = turn === 'black' ? 'white' : 'black'; // Whose stones are in prison for `turn` player
+                    if (prison[enemyOfCurrentTurnPlayer] > 0) {
+                        hold(); // This updates `turn`, `prison`, `gameHistory`, etc.
+                    } else {
+                         setMessage(`Error: Consecutive moves by ${currentPlayerSymbolFromFile} in record (at '${currentMoveStr}'), but no prisoners for implicit hold by opponent.`);
+                         renderBoard(); updateReplayButtons(); updateStatus(); return false;
+                    }
+                }
+                
+                // After a potential implicit hold, check if the player from the file matches the current game turn.
+                const expectedPlayerSymbolForGameTurn = turn === 'black' ? 'B' : 'W';
+                if (currentPlayerSymbolFromFile !== expectedPlayerSymbolForGameTurn) {
+                    setMessage(`Error: Turn mismatch for move '${currentMoveStr}'. Game expects ${expectedPlayerSymbolForGameTurn}, file has ${currentPlayerSymbolFromFile}.`);
+                    renderBoard(); updateReplayButtons(); updateStatus(); return false;
+                }
+
+                // Now, execute the move from the file
+                if (isHoldAction) {
+                    const enemyOfPlayerHolding = turn === 'black' ? 'white' : 'black';
+                    if (prison[enemyOfPlayerHolding] === 0) {
+                        setMessage(`Error: No enemy stones in prison for hold move '${currentMoveStr}'.`);
+                        renderBoard(); updateReplayButtons(); updateStatus(); return false;
+                    }
+                    hold(); // This updates `turn`, `prison`, `gameHistory`, etc.
+                } else { // Is a play action
+                    if (playX < 0 || playX >= SIZE || playY < 0 || playY >= SIZE) {
+                        setMessage(`Error: Move '${currentMoveStr}' is out of bounds for ${SIZE}x${SIZE} board.`);
+                        renderBoard(); updateReplayButtons(); updateStatus(); return false;
+                    }
+                    if (board[playX][playY] !== null) {
+                        setMessage(`Error: Position for '${currentMoveStr}' (${playMatch[2]}${playMatch[3]}) is already occupied.`);
+                        renderBoard(); updateReplayButtons(); updateStatus(); return false;
+                    }
+                    
+                    clearMessage(); // Clear previous messages before attempting play
+                    play(playX, playY); // This updates board, turn, prison, gameHistory, lastMoveX/Y etc.
+                    
+                    // Check if play() itself set an error message (e.g., invalid move like self-capture)
+                    if (document.getElementById('message').textContent) {
+                        // play() already set the message, so we just fail the load
+                        renderBoard(); updateReplayButtons(); updateStatus(); return false;
+                    }
+                }
+                lastPlayerSymbolFromFile = currentPlayerSymbolFromFile;
+            }
+
+            // Successfully processed all moves
+            updateReplayButtons();
+            renderBoard();
+            updateStatus();
+            updateLastMoveDisplay(); // Show the very last move from the loaded game
+            clearMessage(); // Clear any transient messages
+            return true; 
+        }
+
+        function handleSave() {
+            const saveSelect = document.getElementById('save-options');
+            const option = saveSelect.value;
+            
+            if (option === 'file' || option === 'clipboard') {
+                // Use current SIZE and komi for generating the record, consistent with original behavior.
+                const gameText = generateGameRecordText(gameHistory, SIZE, komi);
+
+                if (option === 'file') {
+                    const blob = new Blob([gameText], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'asli_game.txt';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } else if (option === 'clipboard') {
+                    navigator.clipboard.writeText(gameText)
+                        .then(() => {
+                            setMessage('Game copied to clipboard!');
+                            setTimeout(() => {
+                                if (document.getElementById('message').textContent === 'Game copied to clipboard!') {
+                                    clearMessage();
+                                }
+                            }, 2000);
+                        })
+                        .catch(err => {
+                            console.error('Failed to copy game to clipboard: ', err);
+                            setMessage('Failed to copy game!');
+                            setTimeout(() => {
+                                if (document.getElementById('message').textContent === 'Failed to copy game!') {
+                                    clearMessage();
+                                }
+                            }, 2000);
+                        });
+                }
+            }
+            // Reset the select to default placeholder
+            saveSelect.value = '';
+            saveSelect.blur();
+        }
+
+        // This function is called by the onchange event of the hidden file input
+        function loadGame(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const moveText = e.target.result;
+                if (!processGameRecordText(moveText)) {
+                    // Error messages and UI updates are handled by processGameRecordText
+                    console.error("Failed to process game record from file.");
+                }
+                // On success, processGameRecordText also handles UI updates.
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset file input to allow loading same file again
+        }
+
+        function handleLoad() {
+            const loadSelect = document.getElementById('load-options');
+            const option = loadSelect.value;
+            
+            if (option === 'file') {
+                triggerLoadGame(); // Clicks the hidden file input
+            } else if (option === 'clipboard') {
+                navigator.clipboard.readText()
+                    .then(moveText => {
+                        if (!processGameRecordText(moveText)) {
+                           // Error messages and UI updates handled by processGameRecordText
+                           console.error("Failed to process game record from clipboard.");
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Failed to read from clipboard: ', err);
+                        setMessage('Failed to read from clipboard!');
+                        setTimeout(() => {
+                            if (document.getElementById('message').textContent === 'Failed to read from clipboard!') {
+                                clearMessage();
+                            }
+                        }, 2000);
+                        // Ensure UI is in a sensible state after clipboard error
+                        renderBoard(); 
+                        updateStatus(); 
+                        updateReplayButtons();
+                    });
+            }
+            // Reset the select to default placeholder
+            loadSelect.value = '';
+            loadSelect.blur();
+        }
+
+        resetGame(SIZE);
+        initKomiSelect();
+        changeKomi();
+        updateButtonTooltips();
+        adjustHeaderLayout();
+
+        document.getElementById('copy-move').addEventListener('mousedown', copyLastMove);
+
+        // Prevent arrow keys from affecting the komi and board-size selects
+        const komiSelect = document.getElementById('komi');
+        const boardSizeSelect = document.getElementById('board-size');
+        const saveSelect = document.getElementById('save-options');
+        const loadSelect = document.getElementById('load-options');
+
+        komiSelect.addEventListener('keydown', (event) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                event.preventDefault();
+            }
+        });
+        boardSizeSelect.addEventListener('keydown', (event) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                event.preventDefault();
+            }
+        });
+        saveSelect.addEventListener('keydown', (event) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                event.preventDefault();
+            }
+        });
+        loadSelect.addEventListener('keydown', (event) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                event.preventDefault();
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            initBoard();
+            renderBoard();
+            updateButtonTooltips();
+            if (isGenerating) {
+                const randomBtn = document.getElementById('random-button');
+                const randomGameWidth = measureRandomGameWidth();
+                randomBtn.style.width = `${randomGameWidth}px`;
+            }
+            adjustHeaderLayout();
+        });
+
+        window.addEventListener('wheel', (event) => {
+            event.preventDefault();
+            if (event.deltaY > 0) replayForward();
+            else if (event.deltaY < 0) replayBack();
+        }, { passive: false });
+
+        document.addEventListener('DOMContentLoaded', updateButtonTooltips);
+        // Call whenever the select value changes
+        document.querySelectorAll('.replay-controls select').forEach(select => {
+            select.addEventListener('change', () => {
+                updateButtonTooltips();
+                // Ensure save and load selects reset to default option after selection
+                if (select.id === 'save-options' || select.id === 'load-options') {
+                    select.value = '';
+                }
+                select.blur();
+            });
+        });
+
+        // Add keyboard shortcuts
+        window.addEventListener('keydown', (event) => {
+            const activeElement = document.activeElement;
+            const isInputFocused = activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT' || activeElement.tagName === 'TEXTAREA';
+
+            // Keys that should have default behavior prevented unless specific conditions are met
+            const keysToPrevent = ['r', 'h', 'k', 'l', 'i', 'o', 'a', 's', 'z', 'x', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+
+            if (isInputFocused && activeElement.tagName === 'SELECT' && ['ArrowUp', 'ArrowDown', 'Space'].includes(event.key)) {
+                // Allow default select navigation/opening
+            } else if (isInputFocused && (event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey))) {
+                // Allow system copy (Ctrl+C / Cmd+C) if an input is focused
+            } else if (isInputFocused && (event.key.toLowerCase() === 'x' && (event.metaKey || event.ctrlKey))) {
+                // Allow system cut (Ctrl+X / Cmd+X) if an input is focused (though 'x' is also our custom shortcut)
+            } else if (isInputFocused && (event.key.toLowerCase() === 'z' && (event.metaKey || event.ctrlKey))) {
+                // Allow system undo (Ctrl+Z / Cmd+Z) if an input is focused
+            } else if (keysToPrevent.includes(event.key.toLowerCase())) {
+                event.preventDefault();
+            } else {
+                return; // Don't process other keys not in our list
+            }
+
+            const boardSizeSelect = document.getElementById('board-size');
+            const komiSelect = document.getElementById('komi');
+            const saveSelect = document.getElementById('save-options');
+            const loadSelect = document.getElementById('load-options');
+
+            switch (event.key.toLowerCase()) {
+                case 'r':
+                    if (isGenerating) stopGeneration(); else generateRandomGame();
+                    break;
+                case 'h': hold(); break;
+                case 'k': 
+                    if (komiSelect && document.activeElement !== komiSelect) {
+                        komiSelect.selectedIndex = Math.max(0, komiSelect.selectedIndex - 1);
+                        komiSelect.dispatchEvent(new Event('change'));
+                    }
+                    break;
+                case 'l': 
+                    if (komiSelect && document.activeElement !== komiSelect) {
+                        komiSelect.selectedIndex = Math.min(komiSelect.options.length - 1, komiSelect.selectedIndex + 1);
+                        komiSelect.dispatchEvent(new Event('change'));
+                    }
+                    break;
+                case 'i': 
+                    if (boardSizeSelect && document.activeElement !== boardSizeSelect) {
+                        boardSizeSelect.selectedIndex = Math.max(0, boardSizeSelect.selectedIndex - 1);
+                        boardSizeSelect.dispatchEvent(new Event('change'));
+                    }
+                    break;
+                case 'o': 
+                    if (boardSizeSelect && document.activeElement !== boardSizeSelect) {
+                        boardSizeSelect.selectedIndex = Math.min(boardSizeSelect.options.length - 1, boardSizeSelect.selectedIndex + 1);
+                        boardSizeSelect.dispatchEvent(new Event('change'));
+                    }
+                    break;
+                
+                // Load from File
+                case 'a':
+                    if (loadSelect) {
+                        loadSelect.value = 'file';
+                        loadSelect.dispatchEvent(new Event('change'));
+                    }
+                    break;
+
+                // Save to File
+                case 's':
+                    if (saveSelect) {
+                        saveSelect.value = 'file';
+                        saveSelect.dispatchEvent(new Event('change'));
+                    }
+                    break;
+                
+                // Copy Last Move
+                case 'c':
+                    copyLastMove();
+                    break;
+
+                // Load from Clipboard
+                case 'z':
+                    if (loadSelect) {
+                        loadSelect.value = 'clipboard';
+                        loadSelect.dispatchEvent(new Event('change'));
+                    }
+                    break;
+                    
+                // Save to Clipboard
+                case 'x':
+                    if (saveSelect) {
+                        saveSelect.value = 'clipboard';
+                        saveSelect.dispatchEvent(new Event('change'));
+                    }
+                    break;
+            }
+
+            if (document.activeElement.tagName !== 'SELECT' && !isInputFocused) {
+                switch (event.key) {
+                    case 'ArrowUp': replayStart(); break;
+                    case 'ArrowDown': replayEnd(); break;
+                    case 'ArrowLeft': replayBack(); break;
+                    case 'ArrowRight': replayForward(); break;
+                }
+            }
+        });
+    </script>
+</body>
+</html>

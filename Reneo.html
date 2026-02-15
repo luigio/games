@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reneo</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            background-color: #f0f0f0;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .header {
+            width: 90vmin;
+            height: 8vh;
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0 auto;
+        }
+
+        .status-left {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+        }
+
+        .status-center {
+            font-family: Arial, sans-serif;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.2em;
+        }
+
+        .controls-right {
+            display: flex;
+            gap: 0.5vw;
+        }
+
+        .board-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background-color: #f0f0f0;
+        }
+
+        .board {
+            width: 90vmin;
+            height: 90vmin;
+            background-color: #d9a359;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .grid {
+            display: grid;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        .lines {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .point {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .stone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-sizing: border-box;
+            z-index: 2;
+        }
+
+        .black {
+            background: black;
+        }
+
+        .white {
+            background: white;
+            border: 2px solid black;
+        }
+
+        .last-move::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20%;
+            height: 20%;
+            border-radius: 50%;
+            background: red;
+            z-index: 3;
+        }
+        .swap-dot {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20%;
+            height: 20%;
+            border-radius: 50%;
+            z-index: 3;
+        }
+
+        .swap-dot.swap-black {
+            background: white;
+        }
+
+        .swap-dot.swap-white {
+            background: black;
+        }
+        .footer {
+            width: 90vmin;
+            height: 8vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+        }
+
+        .replay-controls {
+            display: flex;
+            gap: 0.5vw;
+        }
+
+        button, select {
+            font-size: 1em;
+            padding: 0.5vh 0.5vw;
+            border: 2px solid black;
+            background: white;
+            cursor: pointer;
+        }
+
+        select {
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .replay-controls button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .stone-icon {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+            margin-right: 0.5em;
+        }
+
+        #message {
+            font-family: Arial, sans-serif;
+            position: absolute;
+            left: calc(50% + 45vmin);
+            top: 50%;
+            transform: translateY(-50%);
+            margin-left: 1vw;
+            font-size: 1.2em;
+            color: #d32f2f;
+            width: 20vw;
+            text-align: left;
+        }
+
+        .left-spacing {
+            margin-left: 0.5em;
+        }
+
+        #random-button {
+            min-width: 8em;
+            text-align: center;
+        }
+
+        .status-center {
+            font-family: Arial, sans-serif;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.2em;
+            display: flex; /* Added for horizontal alignment of text and icon */
+            align-items: center; /* Vertically center text and icon */
+            gap: 0.5em; /* Space between text and copy button */
+        }
+
+        #last-move-text {
+            white-space: nowrap; /* Prevent text wrapping */
+        }
+
+        #copy-move {
+            padding: 0; /* Remove default padding for tight fit */
+            border: none; /* Remove border for a cleaner look */
+            background: none; /* Transparent background */
+            cursor: pointer;
+            display: flex; /* Ensure icon centers properly */
+            align-items: center;
+            justify-content: center;
+        }
+
+        .copy-icon {
+            width: 1em; /* Match stone-icon size */
+            height: 1em;
+            vertical-align: middle;
+        }
+
+        #copy-move:hover .copy-icon path {
+            fill: #555; /* Darken on hover for feedback */
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div class="header">
+        <div class="status-left" id="turn-status"></div>
+        <div class="status-center" id="last-move-display">
+            <span id="last-move-text"></span>
+            <button id="copy-move" title="Copy last move" style="display: none;">
+                <svg class="copy-icon" viewBox="0 0 24 24">
+                    <path fill="black" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+                </svg>
+            </button>
+        </div>
+        <div class="controls-right">
+            <select id="board-size" onchange="changeBoardSize()">
+                <option value="3">3×3</option>
+                <option value="4">4×4</option>
+                <option value="5">5×5</option>
+                <option value="6">6×6</option>
+                <option value="7">7×7</option>
+                <option value="8">8×8</option>
+                <option value="9">9×9</option>
+                <option value="10">10×10</option>
+                <option value="11">11×11</option>
+                <option value="12">12×12</option>
+                <option value="13" selected>13×13</option>
+                <option value="14">14×14</option>
+                <option value="15">15×15</option>
+                <option value="16">16×16</option>
+                <option value="17">17×17</option>
+                <option value="18">18×18</option>
+                <option value="19">19×19</option>
+            </select>
+            <button id="hold-button" onmousedown="hold()" style="display: none;">Hold</button>
+        </div>
+    </div>
+    <div class="board-container">
+        <div class="board" id="board">
+            <div class="lines" id="lines"></div>
+            <div class="grid" id="grid"></div>
+        </div>
+        <div id="message"></div>
+    </div>
+    <div class="footer">
+        <div class="replay-controls">
+            <button onmousedown="replayStart()">Start</button>
+            <button onmousedown="replayBack()">Back</button>
+            <button onmousedown="replayForward()">Forward</button>
+            <button onmousedown="replayEnd()">End</button>
+            <button id="random-button" onmousedown="generateRandomGame()">Random game</button>
+            <button id="save-button" onmousedown="saveGame()">Save</button>
+            <button id="load-button" onmousedown="triggerLoadGame()">Load</button>
+            <input type="file" id="load-input" style="display: none;" accept=".txt" onchange="loadGame(event)">
+        </div>
+    </div>
+</div>
+
+<script>
+    let SIZE = 13;
+    let board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+    let turn = 0; // 0 for Black, 1 for White, convenience variable
+    let lastMoveX = null;
+    let lastMoveY = null;
+    let gameHistory = [];
+    let currentMoveIndex = -1;
+    let isGenerating = false;
+    let generationInterval = null;
+    let swapTargets = null;
+    let gameOver = false;
+    let blackWins = false;
+    let whiteWins = false;
+    
+    const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
+    const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
+
+    function initBoard() {
+        const gridDiv = document.getElementById('grid');
+        gridDiv.innerHTML = '';
+        const linesDiv = document.getElementById('lines');
+        linesDiv.innerHTML = '';
+        
+        const canvas = document.createElement('canvas');
+        const boardSize = document.getElementById('board').offsetWidth;
+        canvas.width = boardSize;
+        canvas.height = boardSize;
+        const ctx = canvas.getContext('2d');
+        const cellSize = boardSize / SIZE;
+        
+        gridDiv.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+        gridDiv.style.gridTemplateRows = `repeat(${SIZE}, 1fr)`;
+
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const point = document.createElement('div');
+                point.className = 'point';
+                point.dataset.x = i;
+                point.dataset.y = j;
+                point.onmousedown = () => play(i, j);
+                const stone = document.createElement('div');
+                stone.className = 'stone';
+                point.appendChild(stone);
+                gridDiv.appendChild(point);
+            }
+        }
+
+        // Draw all thin black grid lines first
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < SIZE; i++) {
+            const pos = cellSize / 2 + i * cellSize;
+            ctx.beginPath();
+            ctx.moveTo(pos, cellSize / 2);
+            ctx.lineTo(pos, boardSize - cellSize / 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cellSize / 2, pos);
+            ctx.lineTo(boardSize - cellSize / 2, pos);
+            ctx.stroke();
+        }
+
+        // Draw thick edges last (black for top/bottom, white for left/right)
+        ctx.lineWidth = 4;
+        // Top edge (black)
+        ctx.strokeStyle = 'black';
+        ctx.beginPath();
+        ctx.moveTo(cellSize / 2, cellSize / 2);
+        ctx.lineTo(boardSize - cellSize / 2, cellSize / 2);
+        ctx.stroke();
+        // Bottom edge (black)
+        ctx.beginPath();
+        ctx.moveTo(cellSize / 2, boardSize - cellSize / 2);
+        ctx.lineTo(boardSize - cellSize / 2, boardSize - cellSize / 2);
+        ctx.stroke();
+        // Left edge (white)
+        ctx.strokeStyle = 'white';
+        ctx.beginPath();
+        ctx.moveTo(cellSize / 2, cellSize / 2);
+        ctx.lineTo(cellSize / 2, boardSize - cellSize / 2);
+        ctx.stroke();
+        // Right edge (white)
+        ctx.beginPath();
+        ctx.moveTo(boardSize - cellSize / 2, cellSize / 2);
+        ctx.lineTo(boardSize - cellSize / 2, boardSize - cellSize / 2);
+        ctx.stroke();
+
+        linesDiv.appendChild(canvas);
+        updateStatus();
+        updateLastMoveDisplay();
+    }
+
+    function saveGameState() {
+        const blackWins = checkWin(0);
+        const whiteWins = checkWin(1);
+        return {
+            board: board.map(row => [...row]),
+            lastMoveX: lastMoveX,
+            lastMoveY: lastMoveY,
+            gameOver: blackWins || whiteWins,
+            blackWins: blackWins,
+            whiteWins: whiteWins
+        };
+    }
+
+    function loadGameState(state) {
+        board = state.board.map(row => [...row]);
+        turn = currentMoveIndex % 2 === 0 ? 0 : 1; // Even: Black to move, Odd: White to move
+        lastMoveX = state.lastMoveX;
+        lastMoveY = state.lastMoveY;
+        blackWins = state.blackWins;
+        whiteWins = state.whiteWins;
+        gameOver = state.gameOver;
+        swapTargets = null;
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+    }
+
+    function resetGame(newSize) {
+        SIZE = newSize;
+        board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+        turn = 0; // Initial turn is Black
+        lastMoveX = null;
+        lastMoveY = null;
+        gameOver = false;
+        blackWins = false;
+        whiteWins = false;
+        const initialState = saveGameState();
+        initialState.initialX = null;
+        initialState.initialY = null;
+        initialState.swapX = null;
+        initialState.swapY = null;
+        initialState.isSkip = false;
+        gameHistory = [initialState];
+        currentMoveIndex = 0;
+        swapTargets = null;
+        clearMessage();
+        initBoard();
+        renderBoard();
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function changeBoardSize() {
+        const select = document.getElementById('board-size');
+        const newSize = parseInt(select.value);
+        resetGame(newSize);
+    }
+
+    function clearLastMoveMarker() {
+        if (lastMoveX !== null && lastMoveY !== null) {
+            const points = document.getElementsByClassName('point');
+            const stone = points[lastMoveX * SIZE + lastMoveY].firstChild;
+            stone.classList.remove('last-move');
+        }
+        lastMoveX = null;
+        lastMoveY = null;
+    }
+
+    function setLastMoveMarker(x, y) {
+        clearLastMoveMarker();
+        const points = document.getElementsByClassName('point');
+        const stone = points[x * SIZE + y].firstChild;
+        stone.classList.add('last-move');
+        lastMoveX = x;
+        lastMoveY = y;
+    }
+
+    function clearMessage() {
+        document.getElementById('message').textContent = '';
+    }
+
+    function setMessage(text) {
+        document.getElementById('message').textContent = text;
+    }
+
+    function isPartOfCrosscut(x, y) {
+        for (let i = Math.max(0, x-1); i <= x; i++) {
+            for (let j = Math.max(0, y-1); j <= y; j++) {
+                if (i >= SIZE - 1 || j >= SIZE - 1) continue;
+                const a = board[i][j];
+                const b = board[i][j+1];
+                const c = board[i+1][j];
+                const d = board[i+1][j+1];
+                if (a === d && b === c && a !== b && a !== null && b !== null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function getCrosscutEnemies(x, y, player) {
+        const enemies = [];
+        const enemy = player === 0 ? 1 : 0;
+        for (let i = Math.max(0, x-1); i <= x; i++) {
+            for (let j = Math.max(0, y-1); j <= y; j++) {
+                if (i >= SIZE - 1 || j >= SIZE - 1) continue;
+                const a = board[i][j];
+                const b = board[i][j+1];
+                const c = board[i+1][j];
+                const d = board[i+1][j+1];
+                if (a === d && b === c && a !== b && a !== null && b !== null) {
+                    if (a === player) {
+                        enemies.push([i, j+1], [i+1, j]);
+                    } else if (b === player) {
+                        enemies.push([i, j], [i+1, j+1]);
+                    }
+                }
+            }
+        }
+        return [...new Set(enemies.map(pos => pos.join(',')))].map(pos => pos.split(',').map(Number));
+    }
+
+    function getChain(x, y, color, visited = new Set()) {
+        if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || visited.has(`${x},${y}`) || board[x][y] !== color) {
+            return [];
+        }
+        visited.add(`${x},${y}`);
+        const chain = [[x, y]];
+        for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+            chain.push(...getChain(x + dx, y + dy, color, visited));
+        }
+        return chain;
+    }
+
+    function checkWin(color) {
+        const visited = new Set();
+        let startEdge, endEdge;
+        if (color === 0) { // Black
+            startEdge = 0; // Top
+            endEdge = SIZE - 1; // Bottom
+            for (let y = 0; y < SIZE; y++) {
+                if (board[startEdge][y] === 0 && !visited.has(`${startEdge},${y}`)) {
+                    const chain = getChain(startEdge, y, 0, visited);
+                    if (chain.some(([x]) => x === endEdge)) return true;
+                }
+            }
+        } else { // White
+            startEdge = 0; // Left
+            endEdge = SIZE - 1; // Right
+            for (let x = 0; x < SIZE; x++) {
+                if (board[x][startEdge] === 1 && !visited.has(`${x},${startEdge}`)) {
+                    const chain = getChain(x, startEdge, 1, visited);
+                    if (chain.some(([, y]) => y === endEdge)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function play(x, y) {
+        if (gameOver) {
+            setMessage("Game is over!");
+            return;
+        }
+
+        if (swapTargets !== null) {
+            const enemy = turn === 0 ? 1 : 0;
+            if (board[x][y] === enemy && swapTargets.some(([ex, ey]) => ex === x && ey === y)) {
+                const [sx, sy] = [lastMoveX, lastMoveY];
+                board[sx][sy] = enemy;
+                board[x][y] = turn;
+                if (isPartOfCrosscut(sx, sy)) {
+                    board[sx][sy] = null;
+                }
+                clearMessage();
+                setLastMoveMarker(x, y);
+                turn = turn === 0 ? 1 : 0;
+                const state = saveGameState();
+                state.initialX = sx;
+                state.initialY = sy;
+                state.swapX = x;
+                state.swapY = y;
+                state.isSkip = false;
+                if (currentMoveIndex < gameHistory.length - 1) {
+                    gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+                }
+                gameHistory.push(state);
+                currentMoveIndex++;
+                blackWins = state.blackWins;
+                whiteWins = state.whiteWins;
+                gameOver = state.gameOver;
+                swapTargets = null;
+
+                renderBoard();
+                updateStatus();
+
+                if (!gameOver && !hasValidMove(turn)) {
+                    turn = turn === 0 ? 1 : 0;
+                    const skipState = saveGameState();
+                    skipState.initialX = null;
+                    skipState.initialY = null;
+                    skipState.swapX = null;
+                    skipState.swapY = null;
+                    skipState.isSkip = true;
+                    gameHistory.push(skipState);
+                    currentMoveIndex++;
+                    renderBoard();
+                    updateStatus();
+                }
+
+                updateReplayButtons();
+                updateLastMoveDisplay();
+            } else {
+                setMessage("Please select a highlighted enemy stone to swap with.");
+            }
+            return;
+        }
+
+        if (board[x][y] !== null) return;
+
+        const oldBoard = board.map(row => [...row]);
+        board[x][y] = turn;
+
+        const enemies = getCrosscutEnemies(x, y, turn);
+        if (enemies.length > 0) {
+            const validTargets = enemies.filter(([ex, ey]) => {
+                const temp = board[x][y];
+                board[x][y] = board[ex][ey];
+                board[ex][ey] = temp;
+                const friendlyInCrosscut = isPartOfCrosscut(ex, ey);
+                board[ex][ey] = board[x][y];
+                board[x][y] = temp;
+                return !friendlyInCrosscut;
+            });
+
+            if (validTargets.length > 0) {
+                swapTargets = validTargets;
+                setLastMoveMarker(x, y);
+                renderBoard();
+                updateReplayButtons();
+                //updateLastMoveDisplay();
+            } else {
+                board = oldBoard;
+                setMessage("Placement forms a crosscut with no valid swap.");
+            }
+        } else {
+            clearMessage();
+            setLastMoveMarker(x, y);
+            turn = turn === 0 ? 1 : 0;
+            const state = saveGameState();
+            state.initialX = x;
+            state.initialY = y;
+            state.swapX = null;
+            state.swapY = null;
+            state.isSkip = false;
+            if (currentMoveIndex < gameHistory.length - 1) {
+                gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+            }
+            gameHistory.push(state);
+            currentMoveIndex++;
+            blackWins = state.blackWins;
+            whiteWins = state.whiteWins;
+            gameOver = state.gameOver;
+
+            renderBoard();
+            updateStatus();
+
+            if (!gameOver && !hasValidMove(turn)) {
+                turn = turn === 0 ? 1 : 0;
+                const skipState = saveGameState();
+                skipState.initialX = null;
+                skipState.initialY = null;
+                skipState.swapX = null;
+                skipState.swapY = null;
+                skipState.isSkip = true;
+                gameHistory.push(skipState);
+                currentMoveIndex++;
+                renderBoard();
+                updateStatus();
+            }
+
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+    }
+
+    function replayStart() {
+        currentMoveIndex = 0;
+        loadGameState(gameHistory[0]);
+        clearMessage();
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function replayBack() {
+        if (currentMoveIndex > 0) {
+            // Check if the current position is a skip move
+            const currentState = gameHistory[currentMoveIndex];
+            if (currentState.isSkip) {
+                // If current move is a skip, rewind past it and the previous real move
+                currentMoveIndex--; // Move past the skip
+                if (currentMoveIndex > 0) {
+                    currentMoveIndex--; // Move past the real move before it
+                }
+            } else {
+                // If current move is real, just rewind one step
+                currentMoveIndex--;
+            }
+            loadGameState(gameHistory[currentMoveIndex]);
+            clearMessage();
+            renderBoard();
+            updateStatus();
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+    }
+
+    function replayForward() {
+        if (currentMoveIndex < gameHistory.length - 1) {
+            currentMoveIndex++;
+            loadGameState(gameHistory[currentMoveIndex]);
+            clearMessage();
+            renderBoard();
+            updateStatus();
+
+            // Check if the next move exists and is a skip move
+            if (currentMoveIndex < gameHistory.length - 1 && gameHistory[currentMoveIndex + 1].isSkip) {
+                currentMoveIndex++;
+                loadGameState(gameHistory[currentMoveIndex]);
+                renderBoard();
+                updateStatus();
+            }
+
+            updateReplayButtons();
+
+            // Handle case where no valid moves remain after the current position
+            if (!gameOver && currentMoveIndex === gameHistory.length - 1 && !hasValidMove(turn)) {
+                turn = turn === 0 ? 1 : 0;
+                const skipState = saveGameState();
+                skipState.initialX = null;
+                skipState.initialY = null;
+                skipState.swapX = null;
+                skipState.swapY = null;
+                skipState.isSkip = true;
+                gameHistory.push(skipState);
+                currentMoveIndex++;
+                renderBoard();
+                updateStatus();
+                updateReplayButtons();
+            }
+            updateLastMoveDisplay();
+        }
+    }
+
+    function replayEnd() {
+        currentMoveIndex = gameHistory.length - 1;
+        loadGameState(gameHistory[currentMoveIndex]);
+        clearMessage();
+        updateReplayButtons();
+    }
+
+    function updateReplayButtons() {
+        const startBtn = document.querySelector('button[onmousedown="replayStart()"]');
+        const backBtn = document.querySelector('button[onmousedown="replayBack()"]');
+        const forwardBtn = document.querySelector('button[onmousedown="replayForward()"]');
+        const endBtn = document.querySelector('button[onmousedown="replayEnd()"]');
+        const randomBtn = document.getElementById('random-button');
+
+        if (isGenerating) {
+            startBtn.disabled = true;
+            backBtn.disabled = true;
+            forwardBtn.disabled = true;
+            endBtn.disabled = true;
+            randomBtn.disabled = false;
+        } else {
+            startBtn.disabled = currentMoveIndex === 0;
+            backBtn.disabled = currentMoveIndex === 0;
+            forwardBtn.disabled = currentMoveIndex === gameHistory.length - 1;
+            endBtn.disabled = currentMoveIndex === gameHistory.length - 1;
+            randomBtn.disabled = gameOver || swapTargets !== null;
+        }
+    }
+
+    function renderBoard() {
+        const points = document.getElementsByClassName('point');
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const point = points[i * SIZE + j];
+                const stone = point.firstChild;
+                stone.className = 'stone';
+                if (board[i][j] === 0) {
+                    stone.classList.add('black');
+                } else if (board[i][j] === 1) {
+                    stone.classList.add('white');
+                }
+                if (i === lastMoveX && j === lastMoveY) {
+                    stone.classList.add('last-move');
+                }
+                const existingDot = point.querySelector('.swap-dot');
+                if (existingDot) existingDot.remove();
+                if (swapTargets && swapTargets.some(([ex, ey]) => ex === i && ey === j)) {
+                    const dot = document.createElement('span');
+                    dot.className = 'swap-dot';
+                    if (board[i][j] === 0) {
+                        dot.classList.add('swap-black');
+                    } else if (board[i][j] === 1) {
+                        dot.classList.add('swap-white');
+                    }
+                    point.appendChild(dot);
+                }
+            }
+        }
+    }
+
+    function hasValidMove(player) {
+        for (let x = 0; x < SIZE; x++) {
+            for (let y = 0; y < SIZE; y++) {
+                if (board[x][y] !== null) continue;
+                const oldBoard = board.map(row => [...row]);
+                board[x][y] = player;
+                const enemies = getCrosscutEnemies(x, y, player);
+                if (enemies.length > 0) {
+                    const hasValidSwap = enemies.some(([ex, ey]) => {
+                        const temp = board[x][y];
+                        board[x][y] = board[ex][ey];
+                        board[ex][ey] = temp;
+                        const friendlyInCrosscut = isPartOfCrosscut(ex, ey);
+                        board[ex][ey] = board[x][y];
+                        board[x][y] = temp;
+                        return !friendlyInCrosscut;
+                    });
+                    if (hasValidSwap) {
+                        board = oldBoard;
+                        return true;
+                    }
+                } else {
+                    board = oldBoard;
+                    return true;
+                }
+                board = oldBoard;
+            }
+        }
+        return false;
+    }
+
+    function updateStatus() {
+        const turnStatus = document.getElementById('turn-status');
+        let statusText = "";
+
+        if (gameOver) {
+            statusText = `${blackWins ? blackStoneSVG : whiteStoneSVG} wins!`;
+        } else {
+            statusText = `${turn === 0 ? blackStoneSVG : whiteStoneSVG} to move`;
+            if (gameHistory[currentMoveIndex].isSkip) {
+                statusText += ` | Turn skipped`;
+            }
+        }
+
+        turnStatus.innerHTML = statusText;
+    }
+
+    function stopGeneration() {
+        if (generationInterval) {
+            clearInterval(generationInterval);
+            generationInterval = null;
+            isGenerating = false;
+            const randomBtn = document.getElementById('random-button');
+            randomBtn.textContent = 'Random game';
+            randomBtn.setAttribute('onmousedown', 'generateRandomGame()');
+            updateReplayButtons();
+            renderBoard();
+        }
+    }
+
+    function generateRandomGame() {
+        if (isGenerating) {
+            stopGeneration();
+            return;
+        }
+        if (gameOver) return;
+
+        isGenerating = true;
+        const randomBtn = document.getElementById('random-button');
+        randomBtn.textContent = 'Stop';
+        randomBtn.setAttribute('onmousedown', 'stopGeneration()');
+        updateReplayButtons();
+
+        generationInterval = setInterval(() => {
+            if (gameOver) {
+                stopGeneration();
+                return;
+            }
+
+            const validMoves = [];
+            for (let x = 0; x < SIZE; x++) {
+                for (let y = 0; y < SIZE; y++) {
+                    if (board[x][y] === null) {
+                        const oldBoard = board.map(row => [...row]);
+                        board[x][y] = turn;
+                        const enemies = getCrosscutEnemies(x, y, turn);
+                        let swapOptions = null;
+                        if (enemies.length > 0) {
+                            swapOptions = enemies.filter(([ex, ey]) => {
+                                const temp = board[x][y];
+                                board[x][y] = board[ex][ey];
+                                board[ex][ey] = temp;
+                                const friendlyInCrosscut = isPartOfCrosscut(ex, ey);
+                                board[ex][ey] = board[x][y];
+                                board[x][y] = temp;
+                                return !friendlyInCrosscut;
+                            });
+                            if (swapOptions.length > 0) {
+                                validMoves.push({ x, y, swapTargets: swapOptions });
+                            }
+                        } else {
+                            validMoves.push({ x, y, swapTargets: null });
+                        }
+                        board = oldBoard;
+                    }
+                }
+            }
+
+            if (validMoves.length === 0) {
+                turn = turn === 0 ? 1 : 0;
+                const skipState = saveGameState();
+                skipState.initialX = null;
+                skipState.initialY = null;
+                skipState.swapX = null;
+                skipState.swapY = null;
+                skipState.isSkip = true;
+                if (currentMoveIndex < gameHistory.length - 1) {
+                    gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+                }
+                gameHistory.push(skipState);
+                currentMoveIndex++;
+                updateStatus();
+                updateReplayButtons();
+                updateLastMoveDisplay();
+                if (!hasValidMove(turn)) {
+                    stopGeneration();
+                }
+                return;
+            }
+
+            const move = validMoves[Math.floor(Math.random() * validMoves.length)];
+            let initialX = move.x;
+            let initialY = move.y;
+            let swapX = null;
+            let swapY = null;
+
+            board[move.x][move.y] = turn;
+            if (move.swapTargets) {
+                const [ex, ey] = move.swapTargets[Math.floor(Math.random() * move.swapTargets.length)];
+                const enemy = board[ex][ey];
+                board[ex][ey] = turn;
+                board[move.x][move.y] = enemy;
+                if (isPartOfCrosscut(move.x, move.y)) {
+                    board[move.x][move.y] = null;
+                }
+                swapX = ex;
+                swapY = ey;
+                setLastMoveMarker(ex, ey);
+            } else {
+                setLastMoveMarker(move.x, move.y);
+            }
+
+            renderBoard();
+            const state = saveGameState();
+            state.initialX = initialX;
+            state.initialY = initialY;
+            state.swapX = swapX;
+            state.swapY = swapY;
+            state.isSkip = false;
+            if (currentMoveIndex < gameHistory.length - 1) {
+                gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+            }
+            gameHistory.push(state);
+            currentMoveIndex++;
+            blackWins = state.blackWins;
+            whiteWins = state.whiteWins;
+            gameOver = state.gameOver;
+            turn = turn === 0 ? 1 : 0;
+
+            updateStatus();
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }, 1);
+    }
+
+    function triggerLoadGame() {
+        document.getElementById('load-input').click();
+    }
+
+    function saveGame() {
+        const boardSizeStr = `${SIZE}x${SIZE}`;
+        const moveList = [boardSizeStr];
+        
+        for (let i = 1; i < gameHistory.length; i++) {
+            const state = gameHistory[i];
+            const player = (i - 1) % 2 === 0 ? 'B' : 'W';
+            
+            if (state.isSkip) {
+                moveList.push(`${player}-`);
+            } else {
+                if (state.initialX === undefined || state.initialY === undefined) continue;
+                const initialCol = String.fromCharCode(97 + state.initialY);
+                const initialRow = SIZE - state.initialX;
+                let moveStr = `${player}${initialCol}${initialRow}`;
+                if (state.swapX !== null && state.swapY !== null) {
+                    const swapCol = String.fromCharCode(97 + state.swapY);
+                    const swapRow = SIZE - state.swapX;
+                    const isCapture = state.board[state.initialX][state.initialY] === null;
+                    moveStr += `${isCapture ? 'x' : '-'}${swapCol}${swapRow}`;
+                }
+                moveList.push(moveStr);
+            }
+        }
+        const gameText = moveList.join(' ');
+        const blob = new Blob([gameText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'reneo_game.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function loadGame(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const moveText = e.target.result.trim();
+            if (!moveText) {
+                setMessage("Error: Empty file.");
+                return;
+            }
+
+            const moves = moveText.split(' ');
+            const sizeMatch = moves[0].match(/^(\d+)[-x×*�](\d+)$/);
+            if (!sizeMatch) {
+                setMessage("Error: File must start with board size (e.g., '19x19').");
+                return;
+            }
+            const [_, width, height] = sizeMatch;
+            const newSize = parseInt(width);
+            if (width !== height || newSize < 3 || newSize > 19) {
+                setMessage("Error: Invalid board size. Must be square and between 3x3 and 19x19.");
+                return;
+            }
+
+            resetGame(newSize);
+            const boardSizeSelect = document.getElementById('board-size');
+            boardSizeSelect.value = newSize;
+
+            let tempTurn = 0; // Start with Black
+            let lastMoveWasSkip = false;
+            let lastPlayer = null;
+
+            for (let i = 1; i < moves.length; i++) {
+                const move = moves[i];
+                const skipMatch = move.match(/^([BW])[-x×*�]$/);
+                const moveMatch = move.match(/^([BW])([a-z])(\d+)(?:[-x×*�]([a-z])(\d+))?$/);
+
+                let currentPlayer;
+                if (skipMatch) {
+                    currentPlayer = skipMatch[1];
+                } else if (moveMatch) {
+                    currentPlayer = moveMatch[1];
+                } else {
+                    setMessage(`Error: Invalid move format '${move}'.`);
+                    renderBoard(); // Ensure board reflects state before exiting
+                    return;
+                }
+
+                if (lastPlayer && lastPlayer === currentPlayer) {
+                    const opponent = lastPlayer === 'B' ? 'W' : 'B';
+                    const opponentTurn = opponent === 'B' ? 0 : 1;
+                    if (tempTurn !== opponentTurn) {
+                        setMessage(`Error: Turn mismatch before processing move '${move}'.`);
+                        renderBoard(); // Ensure board reflects state before exiting
+                        return;
+                    }
+
+                    // Check if the opponent had a valid move
+                    if (hasValidMove(opponentTurn)) {
+                        setMessage(`Error: Consecutive moves for ${lastPlayer} at '${move}' but ${opponent} had a valid move available.`);
+                        renderBoard(); // Ensure board reflects state up to last valid move
+                        updateStatus(); // Update turn indicator
+                        updateReplayButtons(); // Update button states
+                        updateLastMoveDisplay();
+                        return;
+                    }
+
+                    // If no valid move, insert a skip for the opponent
+                    tempTurn = tempTurn === 0 ? 1 : 0;
+                    const skipState = saveGameState();
+                    skipState.initialX = null;
+                    skipState.initialY = null;
+                    skipState.swapX = null;
+                    skipState.swapY = null;
+                    skipState.isSkip = true;
+                    if (currentMoveIndex < gameHistory.length - 1) {
+                        gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+                    }
+                    gameHistory.push(skipState);
+                    currentMoveIndex++;
+                }
+
+                if (skipMatch) {
+                    const [, player] = skipMatch;
+                    const expectedPlayer = tempTurn === 0 ? 'B' : 'W';
+                    if (player !== expectedPlayer) {
+                        setMessage(`Error: Wrong player turn in skip '${move}'.`);
+                        renderBoard(); // Ensure board reflects state before exiting
+                        return;
+                    }
+
+                    tempTurn = tempTurn === 0 ? 1 : 0;
+                    const skipState = saveGameState();
+                    skipState.initialX = null;
+                    skipState.initialY = null;
+                    skipState.swapX = null;
+                    skipState.swapY = null;
+                    skipState.isSkip = true;
+                    if (currentMoveIndex < gameHistory.length - 1) {
+                        gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+                    }
+                    gameHistory.push(skipState);
+                    currentMoveIndex++;
+                    lastMoveWasSkip = true;
+                    lastPlayer = player;
+                } else if (moveMatch) {
+                    const [, player, col, row, swapCol, swapRow] = moveMatch;
+                    const expectedPlayer = tempTurn === 0 ? 'B' : 'W';
+                    if (player !== expectedPlayer) {
+                        setMessage(`Error: Wrong player turn in move '${move}'.`);
+                        renderBoard(); // Ensure board reflects state before exiting
+                        return;
+                    }
+
+                    const x = SIZE - parseInt(row);
+                    const y = col.charCodeAt(0) - 97;
+                    if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) {
+                        setMessage(`Error: Move '${move}' out of bounds for ${SIZE}x${SIZE} board.`);
+                        renderBoard(); // Ensure board reflects state before exiting
+                        return;
+                    }
+
+                    if (board[x][y] !== null) {
+                        setMessage(`Error: Position already occupied in move '${move}'.`);
+                        renderBoard(); // Ensure board reflects state before exiting
+                        return;
+                    }
+
+                    board[x][y] = tempTurn;
+                    setLastMoveMarker(x, y);
+
+                    let state;
+                    if (swapCol && swapRow) {
+                        const swapX = SIZE - parseInt(swapRow);
+                        const swapY = swapCol.charCodeAt(0) - 97;
+                        if (swapX < 0 || swapX >= SIZE || swapY < 0 || swapY >= SIZE) {
+                            setMessage(`Error: Swap position '${swapCol}${swapRow}' out of bounds in move '${move}'.`);
+                            renderBoard(); // Ensure board reflects state before exiting
+                            return;
+                        }
+
+                        const enemy = tempTurn === 0 ? 1 : 0;
+                        if (board[swapX][swapY] !== enemy) {
+                            setMessage(`Error: Invalid swap target in move '${move}'.`);
+                            renderBoard(); // Ensure board reflects state before exiting
+                            return;
+                        }
+
+                        const enemies = getCrosscutEnemies(x, y, tempTurn);
+                        if (!enemies.some(([ex, ey]) => ex === swapX && ey === swapY)) {
+                            setMessage(`Error: Swap in '${move}' not part of a crosscut.`);
+                            renderBoard(); // Ensure board reflects state before exiting
+                            return;
+                        }
+
+                        board[swapX][swapY] = tempTurn;
+                        board[x][y] = enemy;
+                        if (isPartOfCrosscut(x, y)) {
+                            board[x][y] = null;
+                        }
+                        setLastMoveMarker(swapX, swapY);
+
+                        state = saveGameState();
+                        state.initialX = x;
+                        state.initialY = y;
+                        state.swapX = swapX;
+                        state.swapY = swapY;
+                        state.isSkip = false;
+                    } else {
+                        state = saveGameState();
+                        state.initialX = x;
+                        state.initialY = y;
+                        state.swapX = null;
+                        state.swapY = null;
+                        state.isSkip = false;
+                    }
+
+                    if (currentMoveIndex < gameHistory.length - 1) {
+                        gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+                    }
+                    gameHistory.push(state);
+                    currentMoveIndex++;
+                    blackWins = state.blackWins;
+                    whiteWins = state.whiteWins;
+                    gameOver = state.gameOver;
+
+                    tempTurn = tempTurn === 0 ? 1 : 0;
+                    lastMoveWasSkip = false;
+                    lastPlayer = player;
+                }
+            }
+
+            if (!gameOver && !lastMoveWasSkip && !hasValidMove(tempTurn)) {
+                tempTurn = tempTurn === 0 ? 1 : 0;
+                const skipState = saveGameState();
+                skipState.initialX = null;
+                skipState.initialY = null;
+                skipState.swapX = null;
+                skipState.swapY = null;
+                skipState.isSkip = true;
+                gameHistory.push(skipState);
+                currentMoveIndex++;
+            }
+
+            turn = tempTurn; // Sync turn with final state
+            renderBoard();
+            updateStatus();
+            updateReplayButtons();
+            clearMessage();
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    }
+
+    function updateLastMoveDisplay() {
+        const lastMoveText = document.getElementById('last-move-text');
+        const copyButton = document.getElementById('copy-move');
+        
+        if (currentMoveIndex <= 0 || gameHistory.length <= 1) {
+            lastMoveText.textContent = '';
+            copyButton.style.display = 'none';
+            return;
+        }
+
+        // Find the last non-skip move
+        let lastRealMoveIndex = currentMoveIndex;
+        while (lastRealMoveIndex > 0 && gameHistory[lastRealMoveIndex].isSkip) {
+            lastRealMoveIndex--;
+        }
+        
+        const state = gameHistory[lastRealMoveIndex];
+        const prevState = gameHistory[lastRealMoveIndex - 1];
+        const player = (lastRealMoveIndex - 1) % 2 === 0 ? 'B' : 'W';
+
+        if (state.isSkip || state.initialX === null || state.initialY === null) {
+            // If even the last move is a skip or invalid, show nothing
+            lastMoveText.textContent = '';
+            copyButton.style.display = 'none';
+        } else {
+            const initialCol = String.fromCharCode(97 + state.initialY);
+            const initialRow = SIZE - state.initialX;
+            let moveStr = `${player}${initialCol}${initialRow}`;
+            if (state.swapX !== null && state.swapY !== null) {
+                const swapCol = String.fromCharCode(97 + state.swapY);
+                const swapRow = SIZE - state.swapX;
+                const isCapture = state.board[state.initialX][state.initialY] === null;
+                moveStr += `${isCapture ? 'x' : '-'}${swapCol}${swapRow}`;
+            }
+            lastMoveText.textContent = moveStr;
+            copyButton.style.display = 'inline-flex'; // Show copy button for real moves
+        }
+    }
+
+    function copyLastMove() {
+        const lastMoveText = document.getElementById('last-move-text').textContent;
+        if (lastMoveText) {
+            navigator.clipboard.writeText(lastMoveText)
+                .then(() => {
+                    setMessage('Move copied!');
+                    setTimeout(() => {
+                        if (document.getElementById('message').textContent === 'Move copied!') {
+                            clearMessage();
+                        }
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error('Failed to copy: ', err);
+                    setMessage('Failed to copy move!');
+                    setTimeout(() => {
+                        if (document.getElementById('message').textContent === 'Failed to copy move!') {
+                            clearMessage();
+                        }
+                    }, 2000);
+                });
+        }
+    }
+
+    resetGame(SIZE);
+
+    document.getElementById('copy-move').addEventListener('click', copyLastMove);
+
+    const boardSizeSelect = document.getElementById('board-size');
+    boardSizeSelect.addEventListener('keydown', (event) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        initBoard();
+        renderBoard();
+    });
+
+    window.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        if (event.deltaY > 0) replayForward();
+        else if (event.deltaY < 0) replayBack();
+    }, { passive: false });
+
+    window.addEventListener('keydown', (event) => {
+        if (['s', 'e', 'b', 'f', 'r', 'i', 'o', 'c', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key.toLowerCase())) {
+            event.preventDefault();
+        }
+
+        const boardSizeSelect = document.getElementById('board-size');
+        switch (event.key.toLowerCase()) {
+            case 's':
+                replayStart();
+                break;
+            case 'e':
+                replayEnd();
+                break;
+            case 'b':
+                replayBack();
+                break;
+            case 'f':
+                replayForward();
+                break;
+            case 'r':
+                if (isGenerating) {
+                    stopGeneration();
+                } else {
+                    generateRandomGame();
+                }
+                break;
+            case 'i':
+                boardSizeSelect.selectedIndex = (boardSizeSelect.options.length + boardSizeSelect.selectedIndex - 1) % boardSizeSelect.options.length;
+                boardSizeSelect.dispatchEvent(new Event('change'));
+                break;
+            case 'o':
+                boardSizeSelect.selectedIndex = (boardSizeSelect.selectedIndex + 1) % boardSizeSelect.options.length;
+                boardSizeSelect.dispatchEvent(new Event('change'));
+                break;
+            case 'k':
+                saveGame();
+                break;
+            case 'l':
+                triggerLoadGame();
+                break;
+            case 'c':
+                copyLastMove();
+                break;
+        }
+        switch (event.key) {
+            case 'ArrowUp':
+                replayStart();
+                break;
+            case 'ArrowDown':
+                replayEnd();
+                break;
+            case 'ArrowLeft':
+                replayBack();
+                break;
+            case 'ArrowRight':
+                replayForward();
+                break;
+        }
+    });
+</script>
+</body>
+</html>

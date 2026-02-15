@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prodway</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            background-color: #f0f0f0;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .header {
+            width: 90vmin;
+            height: 8vh;
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0 auto;
+        }
+
+        .status-left {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+        }
+
+        .status-center {
+            font-family: Arial, sans-serif;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.2em;
+        }
+
+        .controls-right {
+            display: flex;
+            gap: 0.5vw;
+        }
+
+        .board-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background-color: #f0f0f0;
+        }
+
+        .board {
+            width: 90vmin;
+            height: 90vmin;
+            background-color: #d9a359;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .grid {
+            display: grid;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        .lines {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .point {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .stone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-sizing: border-box;
+            z-index: 2;
+        }
+
+        .black {
+            background: black;
+        }
+
+        .white {
+            background: white;
+            border: 2px solid black;
+        }
+
+        .last-move::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20%;
+            height: 20%;
+            border-radius: 50%;
+            background: red;
+            z-index: 3;
+        }
+        .swap-dot {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20%;
+            height: 20%;
+            border-radius: 50%;
+            z-index: 3;
+        }
+
+        .swap-dot.swap-black {
+            background: white;
+        }
+
+        .swap-dot.swap-white {
+            background: black;
+        }
+        .footer {
+            width: 90vmin;
+            height: 8vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+        }
+
+        .replay-controls {
+            display: flex;
+            gap: 0.5vw;
+        }
+
+        button, select {
+            font-size: 1em;
+            padding: 0.5vh 0.5vw;
+            border: 2px solid black;
+            background: white;
+            cursor: pointer;
+        }
+
+        select {
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .replay-controls button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .stone-icon {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+            margin-right: 0.5em;
+        }
+
+        #message {
+            font-family: Arial, sans-serif;
+            position: absolute;
+            left: calc(50% + 45vmin);
+            top: 50%;
+            transform: translateY(-50%);
+            margin-left: 1vw;
+            font-size: 1.2em;
+            color: #d32f2f;
+            width: 20vw;
+            text-align: left;
+        }
+
+        .left-spacing {
+            margin-left: 0.5em;
+        }
+
+        #random-button {
+            min-width: 8em;
+            text-align: center;
+        }
+
+        .status-center {
+            font-family: Arial, sans-serif;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.2em;
+            display: flex; /* Added for horizontal alignment of text and icon */
+            align-items: center; /* Vertically center text and icon */
+            gap: 0.5em; /* Space between text and copy button */
+        }
+
+        #last-move-text {
+            white-space: nowrap; /* Prevent text wrapping */
+        }
+
+        #copy-move {
+            padding: 0; /* Remove default padding for tight fit */
+            border: none; /* Remove border for a cleaner look */
+            background: none; /* Transparent background */
+            cursor: pointer;
+            display: flex; /* Ensure icon centers properly */
+            align-items: center;
+            justify-content: center;
+        }
+
+        .copy-icon {
+            width: 1em; /* Match stone-icon size */
+            height: 1em;
+            vertical-align: middle;
+        }
+
+        #copy-move:hover .copy-icon path {
+            fill: #555; /* Darken on hover for feedback */
+        }
+
+        .push-target::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20%;
+            height: 20%;
+            border-radius: 50%;
+            background: red;
+            z-index: 3;
+        }
+    </style>
+</head>
+<body>
+<!-- HTML structure unchanged -->
+<div class="game-container">
+    <div class="header">
+        <div class="status-left" id="turn-status"></div>
+        <div class="status-center" id="last-move-display">
+            <span id="last-move-text"></span>
+            <button id="copy-move" title="Copy last move" style="display: none;">
+                <svg class="copy-icon" viewBox="0 0 24 24">
+                    <path fill="black" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+                </svg>
+            </button>
+        </div>
+        <div class="controls-right">
+            <select id="board-size" onchange="changeBoardSize()">
+                <option value="3">3×3</option>
+                <option value="4">4×4</option>
+                <option value="5">5×5</option>
+                <option value="6">6×6</option>
+                <option value="7">7×7</option>
+                <option value="8">8×8</option>
+                <option value="9">9×9</option>
+                <option value="10">10×10</option>
+                <option value="11">11×11</option>
+                <option value="12">12×12</option>
+                <option value="13" selected>13×13</option>
+                <option value="14">14×14</option>
+                <option value="15">15×15</option>
+                <option value="16">16×16</option>
+                <option value="17">17×17</option>
+                <option value="18">18×18</option>
+                <option value="19">19×19</option>
+            </select>
+        </div>
+    </div>
+    <div class="board-container">
+        <div class="board" id="board">
+            <div class="lines" id="lines"></div>
+            <div class="grid" id="grid"></div>
+        </div>
+        <div id="message"></div>
+    </div>
+    <div class="footer">
+        <div class="replay-controls">
+            <button onmousedown="replayStart()">Start</button>
+            <button onmousedown="replayBack()">Back</button>
+            <button onmousedown="replayForward()">Forward</button>
+            <button onmousedown="replayEnd()">End</button>
+            <button id="random-button" onmousedown="generateRandomGame()">Random game</button>
+            <button id="save-button" onmousedown="saveGame()">Save</button>
+            <button id="load-button" onmousedown="triggerLoadGame()">Load</button>
+            <input type="file" id="load-input" style="display: none;" accept=".txt" onchange="loadGame(event)">
+        </div>
+    </div>
+</div>
+
+<script>
+    let SIZE = 13;
+    let board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+    let turn = 0; // 0 for Black, 1 for White
+    let lastMoveX = null;
+    let lastMoveY = null;
+    let gameHistory = [];
+    let currentMoveIndex = -1;
+    let isGenerating = false;
+    let generationInterval = null;
+    let gameOver = false;
+    let blackWins = false;
+    let whiteWins = false;
+    let pendingPush = null; // { x, y, directions }
+
+    const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
+    const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
+
+    function initBoard() {
+        const gridDiv = document.getElementById('grid');
+        gridDiv.innerHTML = '';
+        const linesDiv = document.getElementById('lines');
+        linesDiv.innerHTML = '';
+        
+        const canvas = document.createElement('canvas');
+        const boardSize = document.getElementById('board').offsetWidth;
+        canvas.width = boardSize;
+        canvas.height = boardSize;
+        const ctx = canvas.getContext('2d');
+        const cellSize = boardSize / SIZE;
+        
+        gridDiv.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+        gridDiv.style.gridTemplateRows = `repeat(${SIZE}, 1fr)`;
+
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const point = document.createElement('div');
+                point.className = 'point';
+                point.dataset.x = i;
+                point.dataset.y = j;
+                point.onmousedown = () => play(i, j);
+                const stone = document.createElement('div');
+                stone.className = 'stone';
+                point.appendChild(stone);
+                gridDiv.appendChild(point);
+            }
+        }
+
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < SIZE; i++) {
+            const pos = cellSize / 2 + i * cellSize;
+            ctx.beginPath();
+            ctx.moveTo(pos, cellSize / 2);
+            ctx.lineTo(pos, boardSize - cellSize / 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cellSize / 2, pos);
+            ctx.lineTo(boardSize - cellSize / 2, pos);
+            ctx.stroke();
+        }
+
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'black';
+        ctx.beginPath();
+        ctx.moveTo(cellSize / 2, cellSize / 2);
+        ctx.lineTo(boardSize - cellSize / 2, cellSize / 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cellSize / 2, boardSize - cellSize / 2);
+        ctx.lineTo(boardSize - cellSize / 2, boardSize - cellSize / 2);
+        ctx.stroke();
+        ctx.strokeStyle = 'white';
+        ctx.beginPath();
+        ctx.moveTo(cellSize / 2, cellSize / 2);
+        ctx.lineTo(cellSize / 2, boardSize - cellSize / 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(boardSize - cellSize / 2, cellSize / 2);
+        ctx.lineTo(boardSize - cellSize / 2, boardSize - cellSize / 2);
+        ctx.stroke();
+
+        linesDiv.appendChild(canvas);
+        updateStatus();
+        updateLastMoveDisplay();
+    }
+
+    function saveGameState() {
+        const blackWins = checkWin(0);
+        const whiteWins = checkWin(1);
+        return {
+            board: board.map(row => [...row]),
+            lastMoveX: lastMoveX,
+            lastMoveY: lastMoveY,
+            gameOver: blackWins || whiteWins,
+            blackWins: blackWins,
+            whiteWins: whiteWins
+        };
+    }
+
+    function loadGameState(state) {
+        board = state.board.map(row => [...row]);
+        turn = currentMoveIndex % 2 === 0 ? 0 : 1;
+        lastMoveX = state.lastMoveX;
+        lastMoveY = state.lastMoveY;
+        blackWins = state.blackWins;
+        whiteWins = state.whiteWins;
+        gameOver = state.gameOver;
+        pendingPush = null;
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+    }
+
+    function resetGame(newSize) {
+        SIZE = newSize;
+        board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+        turn = 0;
+        lastMoveX = null;
+        lastMoveY = null;
+        gameOver = false;
+        blackWins = false;
+        whiteWins = false;
+        pendingPush = null;
+        const initialState = saveGameState();
+        initialState.placeX = null;
+        initialState.placeY = null;
+        initialState.pushX = null;
+        initialState.pushY = null;
+        initialState.isSkip = false;
+        gameHistory = [initialState];
+        currentMoveIndex = 0;
+        clearMessage();
+        initBoard();
+        renderBoard();
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function changeBoardSize() {
+        const select = document.getElementById('board-size');
+        const newSize = parseInt(select.value);
+        resetGame(newSize);
+    }
+
+    function clearLastMoveMarker() {
+        if (lastMoveX !== null && lastMoveY !== null) {
+            const points = document.getElementsByClassName('point');
+            const stone = points[lastMoveX * SIZE + lastMoveY].firstChild;
+            stone.classList.remove('last-move');
+        }
+        lastMoveX = null;
+        lastMoveY = null;
+    }
+
+    function setLastMoveMarker(x, y) {
+        clearLastMoveMarker();
+        const points = document.getElementsByClassName('point');
+        const stone = points[x * SIZE + y].firstChild;
+        stone.classList.add('last-move');
+        lastMoveX = x;
+        lastMoveY = y;
+    }
+
+    function clearMessage() {
+        document.getElementById('message').textContent = '';
+    }
+
+    function setMessage(text) {
+        document.getElementById('message').textContent = text;
+    }
+
+    function isPartOfCrosscut(x, y) {
+        for (let i = Math.max(0, x-1); i <= x; i++) {
+            for (let j = Math.max(0, y-1); j <= y; j++) {
+                if (i >= SIZE - 1 || j >= SIZE - 1) continue;
+                const a = board[i][j];
+                const b = board[i][j+1];
+                const c = board[i+1][j];
+                const d = board[i+1][j+1];
+                if (a === d && b === c && a !== b && a !== null && b !== null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function getCrosscutFriends(x, y, player) {
+        const friends = [];
+        for (let i = Math.max(0, x-1); i <= x; i++) {
+            for (let j = Math.max(0, y-1); j <= y; j++) {
+                if (i >= SIZE - 1 || j >= SIZE - 1) continue;
+                const a = board[i][j];
+                const b = board[i][j+1];
+                const c = board[i+1][j];
+                const d = board[i+1][j+1];
+                if (a === d && b === c && a !== b && a !== null && b !== null) {
+                    if (a === player) {
+                        friends.push([i, j], [i+1, j+1]);
+                    } else if (b === player) {
+                        friends.push([i, j+1], [i+1, j]);
+                    }
+                }
+            }
+        }
+        return [...new Set(friends.map(pos => pos.join(',')))].map(pos => pos.split(',').map(Number));
+    }
+
+    function getChain(x, y, color, visited = new Set()) {
+        if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || visited.has(`${x},${y}`) || board[x][y] !== color) {
+            return [];
+        }
+        visited.add(`${x},${y}`);
+        const chain = [[x, y]];
+        for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+            chain.push(...getChain(x + dx, y + dy, color, visited));
+        }
+        return chain;
+    }
+
+    function checkWin(color) {
+        const visited = new Set();
+        let startEdge, endEdge;
+        if (color === 0) { // Black
+            startEdge = 0; // Top
+            endEdge = SIZE - 1; // Bottom
+            for (let y = 0; y < SIZE; y++) {
+                if (board[startEdge][y] === 0 && !visited.has(`${startEdge},${y}`)) {
+                    const chain = getChain(startEdge, y, 0, visited);
+                    if (chain.some(([x]) => x === endEdge)) return true;
+                }
+            }
+        } else { // White
+            startEdge = 0; // Left
+            endEdge = SIZE - 1; // Right
+            for (let x = 0; x < SIZE; x++) {
+                if (board[x][startEdge] === 1 && !visited.has(`${x},${startEdge}`)) {
+                    const chain = getChain(x, startEdge, 1, visited);
+                    if (chain.some(([, y]) => y === endEdge)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function getValidPushDirections(x, y) {
+        const enemy = turn === 0 ? 1 : 0;
+        if (board[x][y] !== enemy) return [];
+        const directions = [];
+        for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+            const newX = x + dx;
+            const newY = y + dy;
+            if (newX >= 0 && newX < SIZE && newY >= 0 && newY < SIZE && board[newX][newY] === null) {
+                const oldValue = board[x][y];
+                board[newX][newY] = oldValue;
+                board[x][y] = turn;
+                if (!isPartOfCrosscut(x, y)) {
+                    directions.push([newX, newY]);
+                }
+                board[x][y] = oldValue;
+                board[newX][newY] = null;
+            }
+        }
+        return directions;
+    }
+
+    function removeCrosscutFriends(x, y) {
+        const pushedColor = board[x][y]; // Color of the pushed stone
+        const friendsToRemove = getCrosscutFriends(x, y, pushedColor);
+        friendsToRemove.forEach(([fx, fy]) => {
+            if (!(fx === x && fy === y)) { // Exclude the pushed stone itself
+                board[fx][fy] = null;
+            }
+        });
+    }
+
+    function play(x, y) {
+        if (gameOver) {
+            setMessage("Game is over!");
+            return;
+        }
+
+        const enemy = turn === 0 ? 1 : 0;
+
+        if (pendingPush) {
+            const { x: origX, y: origY, directions } = pendingPush;
+            // Check if the clicked stone is the one pending a push
+            if (x === origX && y === origY) {
+                // Cancel the push
+                pendingPush = null;
+                clearMessage();
+                renderBoard();
+                updateReplayButtons();
+                // Restore the last-move marker if there was a previous move
+                if (currentMoveIndex > 0) {
+                    const lastState = gameHistory[currentMoveIndex];
+                    if (lastState.placeX !== null && lastState.placeY !== null) {
+                        setLastMoveMarker(lastState.placeX, lastState.placeY);
+                    }
+                }
+                return;
+            }
+
+            const target = directions.find(([dx, dy]) => dx === x && dy === y);
+            if (target) {
+                const [newX, newY] = target;
+                board[newX][newY] = enemy;
+                board[origX][origY] = turn;
+                if (isPartOfCrosscut(newX, newY)) {
+                    removeCrosscutFriends(newX, newY);
+                }
+                const placeX = origX;
+                const placeY = origY;
+                const pushX = newX;
+                const pushY = newY;
+
+                clearMessage();
+                setLastMoveMarker(placeX, placeY);
+                turn = turn === 0 ? 1 : 0;
+                const state = saveGameState();
+                state.placeX = placeX;
+                state.placeY = placeY;
+                state.pushX = pushX;
+                state.pushY = pushY;
+                state.isSkip = false;
+                if (currentMoveIndex < gameHistory.length - 1) {
+                    gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+                }
+                gameHistory.push(state);
+                currentMoveIndex++;
+                blackWins = state.blackWins;
+                whiteWins = state.whiteWins;
+                gameOver = state.gameOver;
+
+                pendingPush = null;
+                renderBoard();
+                updateStatus();
+
+                if (!gameOver && !hasValidMove(turn)) {
+                    turn = turn === 0 ? 1 : 0;
+                    const skipState = saveGameState();
+                    skipState.placeX = null;
+                    skipState.placeY = null;
+                    skipState.pushX = null;
+                    skipState.pushY = null;
+                    skipState.isSkip = true;
+                    gameHistory.push(skipState);
+                    currentMoveIndex++;
+                    renderBoard();
+                    updateStatus();
+                }
+
+                updateReplayButtons();
+                updateLastMoveDisplay();
+            }
+            return;
+        }
+
+        if (board[x][y] === null) {
+            board[x][y] = turn;
+            if (isPartOfCrosscut(x, y)) {
+                board[x][y] = null;
+                setMessage("Placement would form a crosscut, which is not allowed.");
+                return;
+            }
+            const placeX = x;
+            const placeY = y;
+
+            clearMessage();
+            setLastMoveMarker(placeX, placeY);
+            turn = turn === 0 ? 1 : 0;
+            const state = saveGameState();
+            state.placeX = placeX;
+            state.placeY = placeY;
+            state.pushX = null;
+            state.pushY = null;
+            state.isSkip = false;
+            if (currentMoveIndex < gameHistory.length - 1) {
+                gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+            }
+            gameHistory.push(state);
+            currentMoveIndex++;
+            blackWins = state.blackWins;
+            whiteWins = state.whiteWins;
+            gameOver = state.gameOver;
+
+            renderBoard();
+            updateStatus();
+
+            if (!gameOver && !hasValidMove(turn)) {
+                turn = turn === 0 ? 1 : 0;
+                const skipState = saveGameState();
+                skipState.placeX = null;
+                skipState.placeY = null;
+                skipState.pushX = null;
+                skipState.pushY = null;
+                skipState.isSkip = true;
+                gameHistory.push(skipState);
+                currentMoveIndex++;
+                renderBoard();
+                updateStatus();
+            }
+
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        } else if (board[x][y] === enemy) {
+            const directions = getValidPushDirections(x, y);
+            if (directions.length === 0) {
+                setMessage("No valid push destinations available that avoid a crosscut.");
+                return;
+            }
+
+            if (directions.length === 1) {
+                // Automatically perform the push if there's only one direction
+                const [newX, newY] = directions[0];
+                board[newX][newY] = enemy;
+                board[x][y] = turn;
+                if (isPartOfCrosscut(newX, newY)) {
+                    removeCrosscutFriends(newX, newY);
+                }
+                const placeX = x;
+                const placeY = y;
+                const pushX = newX;
+                const pushY = newY;
+
+                clearMessage();
+                clearLastMoveMarker();
+                setLastMoveMarker(placeX, placeY);
+                turn = turn === 0 ? 1 : 0;
+                const state = saveGameState();
+                state.placeX = placeX;
+                state.placeY = placeY;
+                state.pushX = pushX;
+                state.pushY = pushY;
+                state.isSkip = false;
+                if (currentMoveIndex < gameHistory.length - 1) {
+                    gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+                }
+                gameHistory.push(state);
+                currentMoveIndex++;
+                blackWins = state.blackWins;
+                whiteWins = state.whiteWins;
+                gameOver = state.gameOver;
+
+                renderBoard();
+                updateStatus();
+
+                if (!gameOver && !hasValidMove(turn)) {
+                    turn = turn === 0 ? 1 : 0;
+                    const skipState = saveGameState();
+                    skipState.placeX = null;
+                    skipState.placeY = null;
+                    skipState.pushX = null;
+                    skipState.pushY = null;
+                    skipState.isSkip = true;
+                    gameHistory.push(skipState);
+                    currentMoveIndex++;
+                    renderBoard();
+                    updateStatus();
+                }
+
+                updateReplayButtons();
+                updateLastMoveDisplay();
+            } else {
+                // Multiple directions: prompt user to choose
+                clearLastMoveMarker();
+                pendingPush = { x, y, directions };
+                renderBoard();
+                updateReplayButtons();
+            }
+        }
+    }
+
+    function replayStart() {
+        currentMoveIndex = 0;
+        loadGameState(gameHistory[0]);
+        clearMessage();
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function replayBack() {
+        if (currentMoveIndex > 0) {
+            if (gameHistory[currentMoveIndex].isSkip) {
+                if (currentMoveIndex > 1) {
+                    currentMoveIndex -= 2;
+                } else {
+                    currentMoveIndex = 0;
+                }
+            } else {
+                currentMoveIndex -= 1;
+            }
+            loadGameState(gameHistory[currentMoveIndex]);
+            clearMessage();
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+    }
+
+    function replayForward() {
+        if (currentMoveIndex < gameHistory.length - 1) {
+            currentMoveIndex++;
+            loadGameState(gameHistory[currentMoveIndex]);
+            clearMessage();
+            renderBoard();
+            updateStatus();
+            if (currentMoveIndex < gameHistory.length - 1 && gameHistory[currentMoveIndex + 1].isSkip) {
+                currentMoveIndex++;
+                loadGameState(gameHistory[currentMoveIndex]);
+                renderBoard();
+                updateStatus();
+            }
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+    }
+
+    function replayEnd() {
+        currentMoveIndex = gameHistory.length - 1;
+        loadGameState(gameHistory[currentMoveIndex]);
+        clearMessage();
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function updateReplayButtons() {
+        const startBtn = document.querySelector('button[onmousedown="replayStart()"]');
+        const backBtn = document.querySelector('button[onmousedown="replayBack()"]');
+        const forwardBtn = document.querySelector('button[onmousedown="replayForward()"]');
+        const endBtn = document.querySelector('button[onmousedown="replayEnd()"]');
+        const randomBtn = document.getElementById('random-button');
+
+        startBtn.disabled = currentMoveIndex === 0 || pendingPush !== null;
+        backBtn.disabled = currentMoveIndex === 0 || pendingPush !== null;
+        forwardBtn.disabled = currentMoveIndex === gameHistory.length - 1 || pendingPush !== null;
+        endBtn.disabled = currentMoveIndex === gameHistory.length - 1 || pendingPush !== null;
+        randomBtn.disabled = isGenerating || gameOver || pendingPush !== null;
+    }
+
+    function renderBoard() {
+        const points = document.getElementsByClassName('point');
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const point = points[i * SIZE + j];
+                const stone = point.firstChild;
+                stone.className = 'stone';
+                point.classList.remove('push-target');
+                if (board[i][j] === 0) {
+                    stone.classList.add('black');
+                } else if (board[i][j] === 1) {
+                    stone.classList.add('white');
+                }
+                if (i === lastMoveX && j === lastMoveY) {
+                    stone.classList.add('last-move');
+                }
+                if (pendingPush && pendingPush.directions.some(([dx, dy]) => dx === i && dy === j)) {
+                    point.classList.add('push-target');
+                }
+            }
+        }
+    }
+
+    function hasValidMove(player) {
+        for (let x = 0; x < SIZE; x++) {
+            for (let y = 0; y < SIZE; y++) {
+                if (board[x][y] === null) {
+                    board[x][y] = player;
+                    if (!isPartOfCrosscut(x, y)) {
+                        board[x][y] = null;
+                        return true;
+                    }
+                    board[x][y] = null;
+                } else if (board[x][y] === (player === 0 ? 1 : 0)) {
+                    if (getValidPushDirections(x, y).length > 0) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    function updateStatus() {
+        const turnStatus = document.getElementById('turn-status');
+        let statusText = gameOver
+            ? `${blackWins ? blackStoneSVG : whiteStoneSVG} wins!`
+            : `${turn === 0 ? blackStoneSVG : whiteStoneSVG} to move`;
+        if (gameHistory[currentMoveIndex].isSkip) {
+            statusText += ` | Turn skipped`;
+        }
+        turnStatus.innerHTML = statusText;
+    }
+
+    function stopGeneration() {
+        if (generationInterval) {
+            clearInterval(generationInterval);
+            generationInterval = null;
+            isGenerating = false;
+            const randomBtn = document.getElementById('random-button');
+            randomBtn.textContent = 'Random game';
+            randomBtn.setAttribute('onmousedown', 'generateRandomGame()');
+            updateReplayButtons();
+            renderBoard();
+        }
+    }
+
+    function generateRandomGame() {
+        if (isGenerating) {
+            stopGeneration();
+            return;
+        }
+        if (gameOver || pendingPush) return;
+
+        isGenerating = true;
+        const randomBtn = document.getElementById('random-button');
+        randomBtn.textContent = 'Stop';
+        randomBtn.setAttribute('onmousedown', 'stopGeneration()');
+        updateReplayButtons();
+
+        generationInterval = setInterval(() => {
+            if (gameOver) {
+                stopGeneration();
+                return;
+            }
+
+            const validMoves = [];
+            for (let x = 0; x < SIZE; x++) {
+                for (let y = 0; y < SIZE; y++) {
+                    if (board[x][y] === null) {
+                        board[x][y] = turn;
+                        if (!isPartOfCrosscut(x, y)) {
+                            validMoves.push({ x, y, isPush: false });
+                        }
+                        board[x][y] = null;
+                    } else if (board[x][y] === (turn === 0 ? 1 : 0)) {
+                        const directions = getValidPushDirections(x, y);
+                        if (directions.length > 0) {
+                            validMoves.push({ x, y, isPush: true, directions });
+                        }
+                    }
+                }
+            }
+
+            if (validMoves.length === 0) {
+                turn = turn === 0 ? 1 : 0;
+                const skipState = saveGameState();
+                skipState.placeX = null;
+                skipState.placeY = null;
+                skipState.pushX = null;
+                skipState.pushY = null;
+                skipState.isSkip = true;
+                gameHistory.push(skipState);
+                currentMoveIndex++;
+                updateStatus();
+                updateReplayButtons();
+                updateLastMoveDisplay();
+                if (!hasValidMove(turn)) {
+                    stopGeneration();
+                }
+                return;
+            }
+
+            const move = validMoves[Math.floor(Math.random() * validMoves.length)];
+            let placeX = move.x;
+            let placeY = move.y;
+            let pushX = null;
+            let pushY = null;
+
+            if (move.isPush) {
+                const [newX, newY] = move.directions[Math.floor(Math.random() * move.directions.length)];
+                board[newX][newY] = board[move.x][move.y];
+                board[move.x][move.y] = turn;
+                if (isPartOfCrosscut(newX, newY)) {
+                    removeCrosscutFriends(newX, newY);
+                }
+                pushX = newX;
+                pushY = newY;
+            } else {
+                board[move.x][move.y] = turn;
+            }
+
+            setLastMoveMarker(placeX, placeY);
+            renderBoard();
+            const state = saveGameState();
+            state.placeX = placeX;
+            state.placeY = placeY;
+            state.pushX = pushX;
+            state.pushY = pushY;
+            state.isSkip = false;
+            if (currentMoveIndex < gameHistory.length - 1) {
+                gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+            }
+            gameHistory.push(state);
+            currentMoveIndex++;
+            blackWins = state.blackWins;
+            whiteWins = state.whiteWins;
+            gameOver = state.gameOver;
+            turn = turn === 0 ? 1 : 0;
+
+            updateStatus();
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }, 1);
+    }
+
+    function triggerLoadGame() {
+        document.getElementById('load-input').click();
+    }
+
+    function saveGame() {
+        const boardSizeStr = `${SIZE}x${SIZE}`;
+        const moveList = [boardSizeStr];
+        
+        for (let i = 1; i < gameHistory.length; i++) {
+            const state = gameHistory[i];
+            const player = (i - 1) % 2 === 0 ? 'B' : 'W';
+            
+            if (state.isSkip) {
+                moveList.push(`${player}-`);
+            } else {
+                const placeCol = String.fromCharCode(97 + state.placeY);
+                const placeRow = SIZE - state.placeX;
+                let moveStr = `${player}${placeCol}${placeRow}`;
+                if (state.pushX !== null && state.pushY !== null) {
+                    const pushCol = String.fromCharCode(97 + state.pushY);
+                    const pushRow = SIZE - state.pushX;
+                    moveStr += `-${pushCol}${pushRow}`;
+                }
+                moveList.push(moveStr);
+            }
+        }
+        const gameText = moveList.join(' ');
+        const blob = new Blob([gameText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'prodway_game.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function loadGame(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const moveText = e.target.result.trim();
+            if (!moveText) {
+                setMessage("Error: Empty file.");
+                return;
+            }
+
+            const moves = moveText.split(' ');
+            const sizeMatch = moves[0].match(/^(\d+)[-x×*�](\d+)$/);
+            if (!sizeMatch) {
+                setMessage("Error: File must start with board size (e.g., '19x19').");
+                return;
+            }
+            const [_, width, height] = sizeMatch;
+            const newSize = parseInt(width);
+            if (width !== height || newSize < 3 || newSize > 19) {
+                setMessage("Error: Invalid board size.");
+                return;
+            }
+
+            resetGame(newSize);
+            document.getElementById('board-size').value = newSize;
+
+            let tempTurn = 0;
+            for (let i = 1; i < moves.length; i++) {
+                const move = moves[i];
+                const skipMatch = move.match(/^([BW])[-x×*�]$/);
+                const moveMatch = move.match(/^([BW])([a-z])(\d+)(?:[-x×*�]([a-z])(\d+))?$/);
+
+                if (skipMatch) {
+                    const [, player] = skipMatch;
+                    if ((tempTurn === 0 && player !== 'B') || (tempTurn === 1 && player !== 'W')) {
+                        setMessage(`Error: Wrong player turn in skip '${move}'.`);
+                        return;
+                    }
+                    tempTurn = tempTurn === 0 ? 1 : 0;
+                    const skipState = saveGameState();
+                    skipState.placeX = null;
+                    skipState.placeY = null;
+                    skipState.pushX = null;
+                    skipState.pushY = null;
+                    skipState.isSkip = true;
+                    gameHistory.push(skipState);
+                    currentMoveIndex++;
+                } else if (moveMatch) {
+                    const [, player, placeCol, placeRow, pushCol, pushRow] = moveMatch;
+                    const expectedPlayer = tempTurn === 0 ? 'B' : 'W';
+                    if (player !== expectedPlayer) {
+                        setMessage(`Error: Wrong player turn in move '${move}'.`);
+                        return;
+                    }
+
+                    const x = SIZE - parseInt(placeRow);
+                    const y = placeCol.charCodeAt(0) - 97;
+                    if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) {
+                        setMessage(`Error: Move '${move}' out of bounds.`);
+                        return;
+                    }
+
+                    let pushX = null, pushY = null;
+                    if (pushCol && pushRow) {
+                        pushX = SIZE - parseInt(pushRow);
+                        pushY = pushCol.charCodeAt(0) - 97;
+                        if (pushX < 0 || pushX >= SIZE || pushY < 0 || pushY >= SIZE) {
+                            setMessage(`Error: Push position out of bounds in '${move}'.`);
+                            return;
+                        }
+                        if (board[x][y] !== (tempTurn === 0 ? 1 : 0) || board[pushX][pushY] !== null) {
+                            setMessage(`Error: Invalid push setup in '${move}'.`);
+                            return;
+                        }
+                        board[pushX][pushY] = board[x][y];
+                        board[x][y] = tempTurn;
+                        if (isPartOfCrosscut(x, y)) {
+                            board[x][y] = board[pushX][pushY];
+                            board[pushX][pushY] = null;
+                            setMessage(`Error: Push in '${move}' creates a crosscut at placement.`);
+                            return;
+                        }
+                        if (isPartOfCrosscut(pushX, pushY)) {
+                            removeCrosscutFriends(pushX, pushY);
+                        }
+                    } else {
+                        if (board[x][y] !== null) {
+                            setMessage(`Error: Position occupied in '${move}'.`);
+                            return;
+                        }
+                        board[x][y] = tempTurn;
+                        if (isPartOfCrosscut(x, y)) {
+                            board[x][y] = null;
+                            setMessage(`Error: Placement in '${move}' forms a crosscut.`);
+                            return;
+                        }
+                    }
+
+                    setLastMoveMarker(x, y);
+                    const state = saveGameState();
+                    state.placeX = x;
+                    state.placeY = y;
+                    state.pushX = pushX;
+                    state.pushY = pushY;
+                    state.isSkip = false;
+                    gameHistory.push(state);
+                    currentMoveIndex++;
+                    blackWins = state.blackWins;
+                    whiteWins = state.whiteWins;
+                    gameOver = state.gameOver;
+                    tempTurn = tempTurn === 0 ? 1 : 0;
+                }
+            }
+
+            turn = tempTurn;
+            renderBoard();
+            updateStatus();
+            updateReplayButtons();
+            clearMessage();
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    }
+
+    function updateLastMoveDisplay() {
+        const lastMoveText = document.getElementById('last-move-text');
+        const copyButton = document.getElementById('copy-move');
+        
+        if (currentMoveIndex <= 0 || gameHistory[currentMoveIndex].isSkip) {
+            lastMoveText.textContent = '';
+            copyButton.style.display = 'none';
+            return;
+        }
+
+        const state = gameHistory[currentMoveIndex];
+        const player = (currentMoveIndex - 1) % 2 === 0 ? 'B' : 'W';
+        const placeCol = String.fromCharCode(97 + state.placeY);
+        const placeRow = SIZE - state.placeX;
+        let moveStr = `${player}${placeCol}${placeRow}`;
+        if (state.pushX !== null && state.pushY !== null) {
+            const pushCol = String.fromCharCode(97 + state.pushY);
+            const pushRow = SIZE - state.pushX;
+            moveStr += `-${pushCol}${pushRow}`;
+        }
+        lastMoveText.textContent = moveStr;
+        copyButton.style.display = 'inline-flex';
+    }
+
+    function copyLastMove() {
+        const lastMoveText = document.getElementById('last-move-text').textContent;
+        if (lastMoveText) {
+            navigator.clipboard.writeText(lastMoveText)
+                .then(() => {
+                    setMessage('Move copied!');
+                    setTimeout(clearMessage, 2000);
+                })
+                .catch(() => {
+                    setMessage('Failed to copy move!');
+                    setTimeout(clearMessage, 2000);
+                });
+        }
+    }
+
+    resetGame(SIZE);
+    document.getElementById('copy-move').addEventListener('click', copyLastMove);
+
+    window.addEventListener('resize', () => {
+        initBoard();
+        renderBoard();
+    });
+
+    window.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        if (event.deltaY > 0) replayForward();
+        else if (event.deltaY < 0) replayBack();
+    }, { passive: false });
+
+    window.addEventListener('keydown', (event) => {
+        if (['s', 'e', 'b', 'f', 'r', 'i', 'o', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key.toLowerCase())) {
+            event.preventDefault();
+        }
+        const boardSizeSelect = document.getElementById('board-size');
+        boardSizeSelect.addEventListener('keydown', (event) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                event.preventDefault();
+            }
+        });
+        switch (event.key.toLowerCase()) {
+            case 's': replayStart(); break;
+            case 'e': replayEnd(); break;
+            case 'b': replayBack(); break;
+            case 'f': replayForward(); break;
+            case 'r': isGenerating ? stopGeneration() : generateRandomGame(); break;
+            case 'i':
+                boardSizeSelect.selectedIndex = (boardSizeSelect.options.length + boardSizeSelect.selectedIndex - 1) % boardSizeSelect.options.length;
+                boardSizeSelect.dispatchEvent(new Event('change'));
+                break;
+            case 'o':
+                boardSizeSelect.selectedIndex = (boardSizeSelect.selectedIndex + 1) % boardSizeSelect.options.length;
+                boardSizeSelect.dispatchEvent(new Event('change'));
+                break;
+            case 'k': saveGame(); break;
+            case 'l': triggerLoadGame(); break;
+        }
+        switch (event.key) {
+            case 'ArrowUp': replayStart(); break;
+            case 'ArrowDown': replayEnd(); break;
+            case 'ArrowLeft': replayBack(); break;
+            case 'ArrowRight': replayForward(); break;
+        }
+    });
+</script>
+</body>
+</html>
