@@ -330,7 +330,7 @@
     let board = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
     let turn = 'black';
     let phase = 'player';
-    let komi = 7;
+    let komi = 0;
     let lastMoveX = null;
     let lastMoveY = null;
     let gameHistory = [];
@@ -461,7 +461,7 @@
             const option = document.createElement('option');
             option.value = i;
             option.text = `Komi ${i}`;
-            if (i === 7) option.selected = true;
+            if (i === komi) option.selected = true;
             komiSelect.appendChild(option);
         }
     }
@@ -1166,4 +1166,5 @@
     });
 </script>
 </body>
+
 </html>
