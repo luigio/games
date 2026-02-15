@@ -322,7 +322,7 @@
     let SIZE = 13;
     let board = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
     let turn = 'black';
-    let komi = 7;
+    let komi = 0;
     let lastMoveX = null;
     let lastMoveY = null;
     let lastShape = null;
@@ -451,7 +451,7 @@
             const option = document.createElement('option');
             option.value = i;
             option.text = `Komi ${i}`;
-            if (i === 7) option.selected = true;
+            if (i === 0) option.selected = true;
             komiSelect.appendChild(option);
         }
     }
@@ -1193,4 +1193,5 @@
     });
 </script>
 </body>
+
 </html>
