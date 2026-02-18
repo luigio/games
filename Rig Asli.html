@@ -580,17 +580,21 @@
         return territories;
     }
 
-    function hasDiagonalAdjacentEnemy(x, y, player) {
-        const enemy = player === 'black' ? 'white' : 'black';
+    // NEW
+    function hasUnsafeDiagonalCondition(x, y, player, ownTerrPoints) {
         const diagonals = [[-1,-1], [-1,1], [1,-1], [1,1]];
+        let unsafeCount = 0;
         for (const [dx, dy] of diagonals) {
             const nx = x + dx, ny = y + dy;
             if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
                 const cell = board[nx][ny];
-                if (cell && cell.color === enemy) return true;
+                const isUnsafe = (cell !== null && cell.color !== player) ||
+                                 (cell === null && !ownTerrPoints.has(`${nx},${ny}`));
+                if (isUnsafe) unsafeCount++;
             }
         }
-        return false;
+        const onEdge = (x === 0 || x === SIZE - 1 || y === 0 || y === SIZE - 1);
+        return (onEdge && unsafeCount >= 1) || unsafeCount >= 2;
     }
     // === END NEW HELPERS ===
 
@@ -1124,7 +1128,7 @@
                     if (isValid) {
                         const isOwnTerr = ownTerrPoints.has(`${x},${y}`);
                         if (!isOwnTerr || 
-                            hasDiagonalAdjacentEnemy(x, y, player) || 
+                            hasUnsafeDiagonalCondition(x, y, player, ownTerrPoints) || 
                             isGoodOwnTerritoryMove(x, y, player)) {
                             goodMoves.push({ type: 'play', x, y });
                         } else {
