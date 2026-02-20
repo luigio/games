@@ -467,54 +467,37 @@
             document.getElementById('message').textContent = text;
         }
 
-        function getGroup(x, y, color, visited = new Set()) {
-            if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || visited.has(`${x},${y}`) || board[x][y] !== color) {
-                return [];
-            }
-            visited.add(`${x},${y}`);
-            const group = [[x, y]];
-            for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
-                group.push(...getGroup(x + dx, y + dy, color, visited));
+        // --- OPTIMIZED CORE FUNCTIONS ---
+        // Uses integer position encoding (x*SIZE+y) and typed arrays instead of
+        // string-keyed Sets, iterative BFS/DFS instead of recursion.
+
+        // Iterative flood fill: finds all stones of `color` connected to (startX, startY).
+        // `visited` is a Uint8Array of length SIZE*SIZE, shared across calls in one sweep.
+        function getGroup(startX, startY, color, visited) {
+            const group = [];
+            const stack = [startX * SIZE + startY];
+            while (stack.length > 0) {
+                const p = stack.pop();
+                if (visited[p]) continue;
+                const x = (p / SIZE) | 0, y = p % SIZE;
+                if (board[x][y] !== color) continue;
+                visited[p] = 1;
+                group.push([x, y]);
+                if (x > 0)      stack.push(p - SIZE);
+                if (x < SIZE-1) stack.push(p + SIZE);
+                if (y > 0)      stack.push(p - 1);
+                if (y < SIZE-1) stack.push(p + 1);
             }
             return group;
         }
 
-        function isAlive(group, color) {
-            const allGroups = getAllGroups(color);
-            if (allGroups.length > 1) hasHadMultipleGroups[color] = true;
-            if (!hasHadMultipleGroups[color]) return true;
-            if (allGroups.length === 1) return false;
-
-            const groupSet = new Set(group.map(([x, y]) => `${x},${y}`));
-            for (const [x, y] of group) {
-                for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
-                    const nx = x + dx, ny = y + dy;
-                    if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && board[nx][ny] === null) {
-                        if (canReachOtherGroup(nx, ny, color, groupSet)) return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        function canReachOtherGroup(x, y, color, groupSet, visited = new Set()) {
-            if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || visited.has(`${x},${y}`)) return false;
-            const pos = `${x},${y}`;
-            visited.add(pos);
-            if (board[x][y] === color && !groupSet.has(pos)) return true;
-            if (board[x][y] !== null) return false;
-            for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
-                if (canReachOtherGroup(x + dx, y + dy, color, groupSet, visited)) return true;
-            }
-            return false;
-        }
-
         function getAllGroups(color) {
             const groups = [];
-            const visited = new Set();
+            const visited = new Uint8Array(SIZE * SIZE);
             for (let i = 0; i < SIZE; i++) {
                 for (let j = 0; j < SIZE; j++) {
-                    if (board[i][j] === color && !visited.has(`${i},${j}`)) {
+                    const p = i * SIZE + j;
+                    if (board[i][j] === color && !visited[p]) {
                         groups.push(getGroup(i, j, color, visited));
                     }
                 }
@@ -522,64 +505,163 @@
             return groups;
         }
 
-        function getTerritory(x, y, visited = new Set()) {
-            if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || visited.has(`${x},${y}`) || board[x][y] !== null) {
-                return [];
+        // isAlive accepts an optional pre-computed allGroups to avoid redundant getAllGroups calls.
+        function isAlive(group, color, allGroups) {
+            if (!allGroups) allGroups = getAllGroups(color);
+            if (allGroups.length > 1) hasHadMultipleGroups[color] = true;
+            if (!hasHadMultipleGroups[color]) return true;
+            if (allGroups.length === 1) return false;
+
+            // Mark all positions in this group
+            const groupSet = new Uint8Array(SIZE * SIZE);
+            for (const [x, y] of group) groupSet[x * SIZE + y] = 1;
+
+            // BFS from all liberties of this group; succeed if we reach another friendly stone
+            const visited = new Uint8Array(SIZE * SIZE);
+            const queue = [];
+            let qi = 0;
+
+            for (const [x, y] of group) {
+                const neighbors = [];
+                if (x > 0)      neighbors.push((x-1)*SIZE + y);
+                if (x < SIZE-1) neighbors.push((x+1)*SIZE + y);
+                if (y > 0)      neighbors.push(x*SIZE + y - 1);
+                if (y < SIZE-1) neighbors.push(x*SIZE + y + 1);
+                for (const np of neighbors) {
+                    const nx = (np / SIZE) | 0, ny = np % SIZE;
+                    if (board[nx][ny] === null && !visited[np]) {
+                        visited[np] = 1;
+                        queue.push(np);
+                    }
+                }
             }
-            visited.add(`${x},${y}`);
-            const territory = [[x, y]];
-            for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
-                territory.push(...getTerritory(x + dx, y + dy, visited));
+
+            while (qi < queue.length) {
+                const p = queue[qi++];
+                const x = (p / SIZE) | 0, y = p % SIZE;
+                const neighbors = [];
+                if (x > 0)      neighbors.push((x-1)*SIZE + y);
+                if (x < SIZE-1) neighbors.push((x+1)*SIZE + y);
+                if (y > 0)      neighbors.push(x*SIZE + y - 1);
+                if (y < SIZE-1) neighbors.push(x*SIZE + y + 1);
+                for (const np of neighbors) {
+                    const nx = (np / SIZE) | 0, ny = np % SIZE;
+                    if (board[nx][ny] === color && !groupSet[np]) return true;
+                    if (board[nx][ny] === null && !visited[np]) {
+                        visited[np] = 1;
+                        queue.push(np);
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Iterative territory flood fill.
+        function getTerritory(startX, startY, visited) {
+            const territory = [];
+            const stack = [startX * SIZE + startY];
+            while (stack.length > 0) {
+                const p = stack.pop();
+                if (visited[p]) continue;
+                const x = (p / SIZE) | 0, y = p % SIZE;
+                if (board[x][y] !== null) continue;
+                visited[p] = 1;
+                territory.push([x, y]);
+                if (x > 0)      stack.push(p - SIZE);
+                if (x < SIZE-1) stack.push(p + SIZE);
+                if (y > 0)      stack.push(p - 1);
+                if (y < SIZE-1) stack.push(p + 1);
             }
             return territory;
         }
 
-        function getOwner(territory) {
-            const adjacent = new Set();
-            for (const [x, y] of territory) {
-                for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
-                    const nx = x + dx, ny = y + dy;
-                    if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && board[nx][ny] !== null) {
-                        adjacent.add(board[nx][ny]);
+        function getAllTerritories() {
+            const territories = [];
+            const visited = new Uint8Array(SIZE * SIZE);
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    const p = i * SIZE + j;
+                    if (board[i][j] === null && !visited[p]) {
+                        territories.push(getTerritory(i, j, visited));
                     }
                 }
             }
-            return adjacent.size === 1 ? adjacent.values().next().value : null;
+            return territories;
+        }
+
+        function getOwner(territory) {
+            let hasBlack = false, hasWhite = false;
+            for (const [x, y] of territory) {
+                if (x > 0      && board[x-1][y] !== null) { if (board[x-1][y] === 'black') hasBlack = true; else hasWhite = true; }
+                if (x < SIZE-1 && board[x+1][y] !== null) { if (board[x+1][y] === 'black') hasBlack = true; else hasWhite = true; }
+                if (y > 0      && board[x][y-1] !== null) { if (board[x][y-1] === 'black') hasBlack = true; else hasWhite = true; }
+                if (y < SIZE-1 && board[x][y+1] !== null) { if (board[x][y+1] === 'black') hasBlack = true; else hasWhite = true; }
+                if (hasBlack && hasWhite) return null;
+            }
+            if (hasBlack) return 'black';
+            if (hasWhite) return 'white';
+            return null;
+        }
+
+        // Build a flat owner map once; ownerMap[x*SIZE+y] = owner of that empty cell (or null/undefined).
+        function buildOwnerMap() {
+            const ownerMap = new Array(SIZE * SIZE).fill(undefined);
+            const visited = new Uint8Array(SIZE * SIZE);
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    const p = i * SIZE + j;
+                    if (board[i][j] === null && !visited[p]) {
+                        const territory = getTerritory(i, j, visited);
+                        const owner = getOwner(territory);
+                        for (const [tx, ty] of territory) ownerMap[tx * SIZE + ty] = owner;
+                    }
+                }
+            }
+            return ownerMap;
         }
 
         function isMinimalIncursion(x, y, color) {
             const enemy = color === 'black' ? 'white' : 'black';
             const oldGroups = getAllGroups(enemy);
-            const oldLive = oldGroups.filter(g => isAlive(g, enemy));
-            const tempBoard = board.map(row => [...row]);
-            tempBoard[x][y] = color;
-            board = tempBoard;
+            const savedHHMG = hasHadMultipleGroups[enemy];
+            if (oldGroups.length > 1) hasHadMultipleGroups[enemy] = true;
+            const oldLiveCount = oldGroups.filter(g => isAlive(g, enemy, oldGroups)).length;
+            board[x][y] = color;
             const newGroups = getAllGroups(enemy);
-            const newLive = newGroups.filter(g => isAlive(g, enemy));
-            board = tempBoard.map(row => [...row]);
+            if (newGroups.length > 1) hasHadMultipleGroups[enemy] = true;
+            const newLiveCount = newGroups.filter(g => isAlive(g, enemy, newGroups)).length;
             board[x][y] = null;
-            return oldLive.length - newLive.length === 1;
+            hasHadMultipleGroups[enemy] = savedHHMG;
+            return oldLiveCount - newLiveCount === 1;
         }
 
         function play(x, y) {
             if (board[x][y] !== null) return;
             const enemy = turn === 'black' ? 'white' : 'black';
-            const territories = getAllTerritories();
-            const targetTerritory = territories.find(t => t.some(([tx, ty]) => tx === x && ty === y));
-            const owner = targetTerritory ? getOwner(targetTerritory) : null;
-            const isIncursion = owner === enemy;
-            const isMinimal = isIncursion && isMinimalIncursion(x, y, turn);
 
-            if (isMinimal && lastMinimalIncursion) {
-                setMessage("Cannot make a minimal incursion after opponent's minimal incursion!");
-                return;
+            // Fast owner lookup via pre-built map
+            const ownerMap = buildOwnerMap();
+            const owner = ownerMap[x * SIZE + y];
+            const isIncursion = owner === enemy;
+
+            // Only compute isMinimalIncursion when needed: if not an incursion it's false,
+            // and the consecutive-minimal rule only triggers when lastMinimalIncursion is set.
+            let isMinimalFull = false;
+            if (isIncursion) {
+                isMinimalFull = isMinimalIncursion(x, y, turn);
+                if (isMinimalFull && lastMinimalIncursion) {
+                    setMessage("Cannot make a minimal incursion after opponent's minimal incursion!");
+                    return;
+                }
             }
 
             const oldBoard = board.map(row => [...row]);
             board[x][y] = turn;
-            lastMinimalIncursion = isMinimal;
+            lastMinimalIncursion = isMinimalFull;
 
-            const deadGroups = getAllGroups(enemy).filter(g => !isAlive(g, enemy));
+            const enemyGroups = getAllGroups(enemy);
+            if (enemyGroups.length > 1) hasHadMultipleGroups[enemy] = true;
+            const deadGroups = enemyGroups.filter(g => !isAlive(g, enemy, enemyGroups));
             for (const group of deadGroups) {
                 for (const [gx, gy] of group) {
                     board[gx][gy] = null;
@@ -592,7 +674,9 @@
                 prison.white--;
             }
 
-            const friendlyDead = getAllGroups(turn).filter(g => !isAlive(g, turn));
+            const friendlyGroups = getAllGroups(turn);
+            if (friendlyGroups.length > 1) hasHadMultipleGroups[turn] = true;
+            const friendlyDead = friendlyGroups.filter(g => !isAlive(g, turn, friendlyGroups));
             if (friendlyDead.length > 0) {
                 setMessage("Invalid move: Cannot leave dead friendly groups!");
                 board = oldBoard;
@@ -730,46 +814,47 @@
             const enemy = player === 'black' ? 'white' : 'black';
             if (prison[enemy] > 0) return true;
 
+            // Build owner map ONCE (was previously built per cell — O(N^4) → O(N^2))
+            const ownerMap = buildOwnerMap();
+
             for (let x = 0; x < SIZE; x++) {
                 for (let y = 0; y < SIZE; y++) {
                     if (board[x][y] !== null) continue;
 
-                    const oldBoard = board.map(row => [...row]);
-                    const oldLastMinimalIncursion = lastMinimalIncursion;
-                    const oldHasHadMultipleGroups = { ...hasHadMultipleGroups };
-
-                    const enemy = player === 'black' ? 'white' : 'black';
-                    const territories = getAllTerritories();
-                    const targetTerritory = territories.find(t => t.some(([tx, ty]) => tx === x && ty === y));
-                    const owner = targetTerritory ? getOwner(targetTerritory) : null;
+                    const owner = ownerMap[x * SIZE + y];
                     const isIncursion = owner === enemy;
-                    const isMinimal = isIncursion && isMinimalIncursion(x, y, player);
 
-                    if (isMinimal && lastMinimalIncursion) {
-                        continue;
-                    }
-
-                    board[x][y] = player;
-                    lastMinimalIncursion = isMinimal;
-
-                    const deadGroups = getAllGroups(enemy).filter(g => !isAlive(g, enemy));
-                    for (const group of deadGroups) {
-                        for (const [gx, gy] of group) {
-                            board[gx][gy] = null;
+                    // Only compute isMinimalIncursion when it could cause a skip
+                    // (requires both isIncursion AND lastMinimalIncursion to be true)
+                    if (isIncursion && lastMinimalIncursion) {
+                        const savedHHMG_mi = hasHadMultipleGroups[enemy];
+                        if (isMinimalIncursion(x, y, player)) {
+                            hasHadMultipleGroups[enemy] = savedHHMG_mi;
+                            continue;
                         }
+                        hasHadMultipleGroups[enemy] = savedHHMG_mi;
                     }
 
-                    const allFriendlyGroups = getAllGroups(player);
-                    if (allFriendlyGroups.length > 1) {
-                        hasHadMultipleGroups[player] = true;
+                    const savedHHMG = { ...hasHadMultipleGroups };
+                    board[x][y] = player;
+
+                    const enemyGroups = getAllGroups(enemy);
+                    if (enemyGroups.length > 1) hasHadMultipleGroups[enemy] = true;
+                    const deadGroups = enemyGroups.filter(g => !isAlive(g, enemy, enemyGroups));
+                    for (const group of deadGroups) {
+                        for (const [gx, gy] of group) board[gx][gy] = null;
                     }
 
-                    const friendlyDead = allFriendlyGroups.filter(g => !isAlive(g, player));
-                    const isValid = friendlyDead.length === 0;
+                    const friendlyGroups = getAllGroups(player);
+                    if (friendlyGroups.length > 1) hasHadMultipleGroups[player] = true;
+                    const isValid = friendlyGroups.every(g => isAlive(g, player, friendlyGroups));
 
-                    board = oldBoard;
-                    lastMinimalIncursion = oldLastMinimalIncursion;
-                    hasHadMultipleGroups = oldHasHadMultipleGroups;
+                    // Restore board (undo placement and dead-group removal)
+                    board[x][y] = null;
+                    for (const group of deadGroups) {
+                        for (const [gx, gy] of group) board[gx][gy] = enemy;
+                    }
+                    hasHadMultipleGroups = savedHHMG;
 
                     if (isValid) return true;
                 }
@@ -821,6 +906,149 @@
             return width;
         }
 
+        // === HELPERS FOR SMART RANDOM MOVE CATEGORISATION ===
+
+        // Returns territories owned by `player`.
+        function getPlayerTerritories(player) {
+            const territories = [];
+            const visited = new Uint8Array(SIZE * SIZE);
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    const p = i * SIZE + j;
+                    if (board[i][j] === null && !visited[p]) {
+                        const territory = getTerritory(i, j, visited);
+                        if (getOwner(territory) === player) {
+                            territories.push(territory);
+                        }
+                    }
+                }
+            }
+            return territories;
+        }
+
+        // True if any orthogonal neighbour is a friendly stone.
+        function hasOrthogonalFriendly(x, y, player) {
+            if (x > 0      && board[x-1][y] === player) return true;
+            if (x < SIZE-1 && board[x+1][y] === player) return true;
+            if (y > 0      && board[x][y-1] === player) return true;
+            if (y < SIZE-1 && board[x][y+1] === player) return true;
+            return false;
+        }
+
+        // Returns the single friendly group touching `territory`, or null if there are 0 or 2+.
+        function getSingleAdjacentGroup(territory, player) {
+            let theGroup = null;
+            const visitedStones = new Set(); // keys: gx*SIZE + gy
+
+            for (const [tx, ty] of territory) {
+                for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+                    const nx = tx + dx, ny = ty + dy;
+                    if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE) continue;
+                    if (board[nx][ny] !== player) continue;
+
+                    const key = nx * SIZE + ny;
+                    if (visitedStones.has(key)) continue;
+
+                    if (theGroup !== null) return null; // touched by a second group
+
+                    theGroup = getGroup(nx, ny, player, new Uint8Array(SIZE * SIZE));
+                    for (const [gx, gy] of theGroup) {
+                        visitedStones.add(gx * SIZE + gy);
+                    }
+                }
+            }
+            return theGroup;
+        }
+
+        // Returns ONLY friendly-owned territories (getOwner === player) adjacent to the group
+        function getAdjacentFriendlyTerritoriesToGroup(group, player) {
+            const territories = [];
+            const visited = new Uint8Array(SIZE * SIZE);
+
+            // Mark group stones so we don't start territory flood inside them
+            for (const [gx, gy] of group) visited[gx * SIZE + gy] = 1;
+
+            for (const [gx, gy] of group) {
+                for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+                    const nx = gx + dx, ny = gy + dy;
+                    if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE) continue;
+                    const p = nx * SIZE + ny;
+                    if (board[nx][ny] === null && !visited[p]) {
+                        const terr = getTerritory(nx, ny, visited);
+                        if (getOwner(terr) === player) {   // ← only own territories
+                            territories.push(terr);
+                        }
+                    }
+                }
+            }
+            return territories;
+        }
+
+        // True if no friendly stone outside `targetGroupSet` touches `territory`.
+        function isTerritoryPrivateToGroup(territory, targetGroupSet, player) {
+            for (const [tx, ty] of territory) {
+                const neighbors = [];
+                if (tx > 0)      neighbors.push([tx-1, ty]);
+                if (tx < SIZE-1) neighbors.push([tx+1, ty]);
+                if (ty > 0)      neighbors.push([tx, ty-1]);
+                if (ty < SIZE-1) neighbors.push([tx, ty+1]);
+                for (const [nx, ny] of neighbors) {
+                    if (board[nx][ny] === player && !targetGroupSet.has(nx * SIZE + ny)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        // A move into own territory is "good" if it's isolated (no orthogonal friendly),
+        // only one group owns the whole territory region, and that group privately owns
+        // all adjacent territories (no other friendly group touches any of them).
+        function isGoodOwnTerritoryMove(x, y, player) {
+            // 1. Must not be adjacent to any friendly stone (will create a new group)
+            if (hasOrthogonalFriendly(x, y, player)) return false;
+
+            const visited = new Uint8Array(SIZE * SIZE);
+            const territory = getTerritory(x, y, visited);
+            if (territory.length === 0) return false;
+
+            // 2. The territory must be adjacent to exactly one friendly group
+            const singleGroup = getSingleAdjacentGroup(territory, player);
+            if (!singleGroup) return false;
+
+            const targetGroupSet = new Set(singleGroup.map(([gx, gy]) => gx * SIZE + gy));
+
+            // 3. All friendly territories adjacent to this group must be private to it only
+            const adjacentTerrs = getAdjacentFriendlyTerritoriesToGroup(singleGroup, player);
+            for (const terr of adjacentTerrs) {
+                if (!isTerritoryPrivateToGroup(terr, targetGroupSet, player)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // A position inside own territory is "unsafe" if it has diagonal enemy stones or
+        // diagonal empty cells that aren't also in own territory — signs of positional tension.
+        // "onEdge" positions are flagged with just one such diagonal.
+        function hasUnsafeDiagonalCondition(x, y, player, ownTerrPoints) {
+            let unsafeCount = 0;
+            for (const [dx, dy] of [[-1,-1], [-1,1], [1,-1], [1,1]]) {
+                const nx = x + dx, ny = y + dy;
+                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
+                    const cell = board[nx][ny];
+                    const isUnsafe = (cell !== null && cell !== player) ||
+                                     (cell === null && !ownTerrPoints.has(nx * SIZE + ny));
+                    if (isUnsafe) unsafeCount++;
+                }
+            }
+            const onEdge = (x === 0 || x === SIZE - 1 || y === 0 || y === SIZE - 1);
+            return (onEdge && unsafeCount >= 1) || unsafeCount >= 2;
+        }
+
+        // === END HELPERS ===
+
         async function generateRandomGame() {
             if (isGenerating) {
                 stopGeneration();
@@ -845,30 +1073,43 @@
                     return;
                 }
 
-                const enemy = turn === 'black' ? 'white' : 'black';
-                const validMoves = [];
+                const player = turn;
+                const enemy = player === 'black' ? 'white' : 'black';
+
+                // Precompute own-territory points ONCE for this turn (integer keys).
+                const ownTerrPoints = new Set();
+                for (const terr of getPlayerTerritories(player)) {
+                    for (const [tx, ty] of terr) ownTerrPoints.add(tx * SIZE + ty);
+                }
+
+                // Build owner map ONCE for this turn.
+                const ownerMap = buildOwnerMap();
+
+                const goodMoves = [];      // moves outside own territory, or "good" incursions into it
+                const desperateMoves = []; // moves purely inside own territory with no strategic value
 
                 for (let x = 0; x < SIZE; x++) {
                     for (let y = 0; y < SIZE; y++) {
                         if (board[x][y] !== null) continue;
 
-                        const oldBoard = board.map(row => [...row]);
-                        const oldPrison = { ...prison };
-                        const oldLastMinimalIncursion = lastMinimalIncursion;
-                        const oldHasHadMultipleGroups = { ...hasHadMultipleGroups };
-
-                        const territories = getAllTerritories();
-                        const targetTerritory = territories.find(t => t.some(([tx, ty]) => tx === x && ty === y));
-                        const owner = targetTerritory ? getOwner(targetTerritory) : null;
+                        const owner = ownerMap[x * SIZE + y];
                         const isIncursion = owner === enemy;
-                        const isMinimal = isIncursion && isMinimalIncursion(x, y, turn);
 
-                        if (isMinimal && lastMinimalIncursion) continue;
+                        // Skip minimal-after-minimal early.
+                        if (isIncursion && lastMinimalIncursion) {
+                            const savedHHMG_mi = hasHadMultipleGroups[enemy];
+                            const skip = isMinimalIncursion(x, y, player);
+                            hasHadMultipleGroups[enemy] = savedHHMG_mi;
+                            if (skip) continue;
+                        }
 
-                        board[x][y] = turn;
-                        lastMinimalIncursion = isMinimal;
+                        const savedHHMG = { ...hasHadMultipleGroups };
+                        const savedPrison = { ...prison };
+                        board[x][y] = player;
 
-                        const deadGroups = getAllGroups(enemy).filter(g => !isAlive(g, enemy));
+                        const enemyGroups = getAllGroups(enemy);
+                        if (enemyGroups.length > 1) hasHadMultipleGroups[enemy] = true;
+                        const deadGroups = enemyGroups.filter(g => !isAlive(g, enemy, enemyGroups));
                         for (const group of deadGroups) {
                             for (const [gx, gy] of group) {
                                 board[gx][gy] = null;
@@ -881,31 +1122,53 @@
                             prison.white--;
                         }
 
-                        const friendlyDead = getAllGroups(turn).filter(g => !isAlive(g, turn));
-                        const isValid = friendlyDead.length === 0;
+                        const friendlyGroups = getAllGroups(player);
+                        if (friendlyGroups.length > 1) hasHadMultipleGroups[player] = true;
+                        const isValid = friendlyGroups.every(g => isAlive(g, player, friendlyGroups));
 
-                        board = oldBoard;
-                        prison = oldPrison;
-                        lastMinimalIncursion = oldLastMinimalIncursion;
-                        hasHadMultipleGroups = oldHasHadMultipleGroups;
+                        // Restore board.
+                        board[x][y] = null;
+                        for (const group of deadGroups) {
+                            for (const [gx, gy] of group) board[gx][gy] = enemy;
+                        }
+                        prison = savedPrison;
+                        hasHadMultipleGroups = savedHHMG;
 
-                        if (isValid) validMoves.push({ type: 'play', x, y });
+                        if (isValid) {
+                            const isOwnTerr = ownTerrPoints.has(x * SIZE + y);
+                            if (!isOwnTerr ||
+                                hasUnsafeDiagonalCondition(x, y, player, ownTerrPoints) ||
+                                isGoodOwnTerritoryMove(x, y, player)) {
+                                goodMoves.push({ type: 'play', x, y });
+                            } else {
+                                desperateMoves.push({ type: 'play', x, y });
+                            }
+                        }
                     }
                 }
 
-                if (prison[enemy] > 0) {
-                    validMoves.push({ type: 'hold' });
+                const canHold = prison[enemy] > 0;
+
+                let selectedMove = null;
+                if (goodMoves.length > 0) {
+                    // Preferred: any move that isn't a pointless own-territory fill.
+                    selectedMove = goodMoves[Math.floor(Math.random() * goodMoves.length)];
+                } else if (canHold) {
+                    // Hold is better than desperate territory filling.
+                    selectedMove = { type: 'hold' };
+                } else if (desperateMoves.length > 0) {
+                    // Last resort: fill own territory.
+                    selectedMove = desperateMoves[Math.floor(Math.random() * desperateMoves.length)];
                 }
 
-                if (validMoves.length === 0) {
+                if (!selectedMove) {
                     stopGeneration();
                     return;
                 }
 
-                const move = validMoves[Math.floor(Math.random() * validMoves.length)];
-                if (move.type === 'play') {
-                    play(move.x, move.y);
-                } else if (move.type === 'hold') {
+                if (selectedMove.type === 'play') {
+                    play(selectedMove.x, selectedMove.y);
+                } else if (selectedMove.type === 'hold') {
                     hold();
                 }
 
