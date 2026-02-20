@@ -483,54 +483,68 @@
         document.getElementById('message').textContent = text;
     }
 
-    function getGroup(x, y, color, visited = new Set()) {
-        if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || visited.has(`${x},${y}`) || !board[x][y] || board[x][y].color !== color) {
-            return [];
-        }
-        visited.add(`${x},${y}`);
-        const group = [[x, y]];
-        for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
-            group.push(...getGroup(x + dx, y + dy, color, visited));
+    // OPTIMIZED: iterative flood fill with integer position encoding and Uint8Array
+    // visited is a Uint8Array of length SIZE*SIZE, shared across calls in one sweep.
+    function getGroup(startX, startY, color, visited) {
+        const group = [];
+        const stack = [startX * SIZE + startY];
+        while (stack.length > 0) {
+            const p = stack.pop();
+            if (visited[p]) continue;
+            const x = (p / SIZE) | 0, y = p % SIZE;
+            if (!board[x][y] || board[x][y].color !== color) continue;
+            visited[p] = 1;
+            group.push([x, y]);
+            if (x > 0)      stack.push(p - SIZE);
+            if (x < SIZE-1) stack.push(p + SIZE);
+            if (y > 0)      stack.push(p - 1);
+            if (y < SIZE-1) stack.push(p + 1);
         }
         return group;
     }
 
-    function isAlive(group, color) {
-        const allGroups = getAllGroups(color);
+    // OPTIMIZED: iterative BFS using Uint8Array; replaces both isAlive and canReachOtherGroup.
+    function isAlive(group, color, allGroups) {
+        if (!allGroups) allGroups = getAllGroups(color);
         if (allGroups.length > 1) hasHadMultipleGroups[color] = true;
         if (!hasHadMultipleGroups[color]) return true;
         if (allGroups.length === 1) return false;
 
-        const groupSet = new Set(group.map(([x, y]) => `${x},${y}`));
+        // Mark all positions in this group
+        const groupSet = new Uint8Array(SIZE * SIZE);
+        for (const [x, y] of group) groupSet[x * SIZE + y] = 1;
+
+        // BFS from all liberties of this group; succeed if we reach another friendly stone
+        const visited = new Uint8Array(SIZE * SIZE);
+        const queue = [];
+        let qi = 0;
+
         for (const [x, y] of group) {
-            for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
-                const nx = x + dx, ny = y + dy;
-                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && board[nx][ny] === null) {
-                    if (canReachOtherGroup(nx, ny, color, groupSet)) return true;
-                }
-            }
+            if (x > 0)      { const np = (x-1)*SIZE+y; if (board[x-1][y] === null && !visited[np]) { visited[np]=1; queue.push(np); } }
+            if (x < SIZE-1) { const np = (x+1)*SIZE+y; if (board[x+1][y] === null && !visited[np]) { visited[np]=1; queue.push(np); } }
+            if (y > 0)      { const np = x*SIZE+y-1;   if (board[x][y-1] === null && !visited[np]) { visited[np]=1; queue.push(np); } }
+            if (y < SIZE-1) { const np = x*SIZE+y+1;   if (board[x][y+1] === null && !visited[np]) { visited[np]=1; queue.push(np); } }
+        }
+
+        while (qi < queue.length) {
+            const p = queue[qi++];
+            const x = (p / SIZE) | 0, y = p % SIZE;
+            if (x > 0)      { const np=(x-1)*SIZE+y; const c=board[x-1][y]; if (c && c.color===color && !groupSet[np]) return true; if (c===null && !visited[np]) { visited[np]=1; queue.push(np); } }
+            if (x < SIZE-1) { const np=(x+1)*SIZE+y; const c=board[x+1][y]; if (c && c.color===color && !groupSet[np]) return true; if (c===null && !visited[np]) { visited[np]=1; queue.push(np); } }
+            if (y > 0)      { const np=x*SIZE+y-1;   const c=board[x][y-1]; if (c && c.color===color && !groupSet[np]) return true; if (c===null && !visited[np]) { visited[np]=1; queue.push(np); } }
+            if (y < SIZE-1) { const np=x*SIZE+y+1;   const c=board[x][y+1]; if (c && c.color===color && !groupSet[np]) return true; if (c===null && !visited[np]) { visited[np]=1; queue.push(np); } }
         }
         return false;
     }
 
-    function canReachOtherGroup(x, y, color, groupSet, visited = new Set()) {
-        if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || visited.has(`${x},${y}`)) return false;
-        const pos = `${x},${y}`;
-        visited.add(pos);
-        if (board[x][y] && board[x][y].color === color && !groupSet.has(pos)) return true;
-        if (board[x][y] !== null) return false;
-        for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
-            if (canReachOtherGroup(x + dx, y + dy, color, groupSet, visited)) return true;
-        }
-        return false;
-    }
-
+    // OPTIMIZED: Uint8Array for visited tracking
     function getAllGroups(color) {
         const groups = [];
-        const visited = new Set();
+        const visited = new Uint8Array(SIZE * SIZE);
         for (let i = 0; i < SIZE; i++) {
             for (let j = 0; j < SIZE; j++) {
-                if (board[i][j] && board[i][j].color === color && !visited.has(`${i},${j}`)) {
+                const p = i * SIZE + j;
+                if (board[i][j] && board[i][j].color === color && !visited[p]) {
                     groups.push(getGroup(i, j, color, visited));
                 }
             }
@@ -538,38 +552,65 @@
         return groups;
     }
 
-    function getTerritory(x, y, visited = new Set()) {
-        if (x < 0 || x >= SIZE || y < 0 || y >= SIZE || visited.has(`${x},${y}`) || board[x][y] !== null) {
-            return [];
-        }
-        visited.add(`${x},${y}`);
-        const territory = [[x, y]];
-        for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
-            territory.push(...getTerritory(x + dx, y + dy, visited));
+    // OPTIMIZED: iterative flood fill with Uint8Array
+    function getTerritory(startX, startY, visited) {
+        const territory = [];
+        const stack = [startX * SIZE + startY];
+        while (stack.length > 0) {
+            const p = stack.pop();
+            if (visited[p]) continue;
+            const x = (p / SIZE) | 0, y = p % SIZE;
+            if (board[x][y] !== null) continue;
+            visited[p] = 1;
+            territory.push([x, y]);
+            if (x > 0)      stack.push(p - SIZE);
+            if (x < SIZE-1) stack.push(p + SIZE);
+            if (y > 0)      stack.push(p - 1);
+            if (y < SIZE-1) stack.push(p + 1);
         }
         return territory;
     }
 
+    // OPTIMIZED: direct bounds checks and .color access instead of Set
     function getOwner(territory) {
-        const adjacent = new Set();
+        let hasBlack = false, hasWhite = false;
         for (const [x, y] of territory) {
-            for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
-                const nx = x + dx, ny = y + dy;
-                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && board[nx][ny] !== null) {
-                    adjacent.add(board[nx][ny].color);
+            if (x > 0      && board[x-1][y] !== null) { if (board[x-1][y].color === 'black') hasBlack = true; else hasWhite = true; }
+            if (x < SIZE-1 && board[x+1][y] !== null) { if (board[x+1][y].color === 'black') hasBlack = true; else hasWhite = true; }
+            if (y > 0      && board[x][y-1] !== null) { if (board[x][y-1].color === 'black') hasBlack = true; else hasWhite = true; }
+            if (y < SIZE-1 && board[x][y+1] !== null) { if (board[x][y+1].color === 'black') hasBlack = true; else hasWhite = true; }
+            if (hasBlack && hasWhite) return null;
+        }
+        if (hasBlack) return 'black';
+        if (hasWhite) return 'white';
+        return null;
+    }
+
+    // Build a flat owner map once; ownerMap[x*SIZE+y] = owner of that empty cell (or undefined).
+    function buildOwnerMap() {
+        const ownerMap = new Array(SIZE * SIZE).fill(undefined);
+        const visited = new Uint8Array(SIZE * SIZE);
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const p = i * SIZE + j;
+                if (board[i][j] === null && !visited[p]) {
+                    const territory = getTerritory(i, j, visited);
+                    const owner = getOwner(territory);
+                    for (const [tx, ty] of territory) ownerMap[tx * SIZE + ty] = owner;
                 }
             }
         }
-        return adjacent.size === 1 ? adjacent.values().next().value : null;
+        return ownerMap;
     }
 
-    // === NEW HELPERS FOR IMPROVED RANDOM GENERATION ===
+    // OPTIMIZED: Uint8Array for visited tracking
     function getPlayerTerritories(player) {
         const territories = [];
-        const visited = new Set();
+        const visited = new Uint8Array(SIZE * SIZE);
         for (let i = 0; i < SIZE; i++) {
             for (let j = 0; j < SIZE; j++) {
-                if (board[i][j] === null && !visited.has(`${i},${j}`)) {
+                const p = i * SIZE + j;
+                if (board[i][j] === null && !visited[p]) {
                     const territory = getTerritory(i, j, visited);
                     if (getOwner(territory) === player) {
                         territories.push(territory);
@@ -580,87 +621,184 @@
         return territories;
     }
 
-    // NEW
+    // OPTIMIZED: integer keys for ownTerrPoints (x*SIZE+y)
     function hasUnsafeDiagonalCondition(x, y, player, ownTerrPoints) {
-        const diagonals = [[-1,-1], [-1,1], [1,-1], [1,1]];
         let unsafeCount = 0;
-        for (const [dx, dy] of diagonals) {
+        for (const [dx, dy] of [[-1,-1], [-1,1], [1,-1], [1,1]]) {
             const nx = x + dx, ny = y + dy;
             if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
                 const cell = board[nx][ny];
                 const isUnsafe = (cell !== null && cell.color !== player) ||
-                                 (cell === null && !ownTerrPoints.has(`${nx},${ny}`));
+                                 (cell === null && !ownTerrPoints.has(nx * SIZE + ny));
                 if (isUnsafe) unsafeCount++;
             }
         }
         const onEdge = (x === 0 || x === SIZE - 1 || y === 0 || y === SIZE - 1);
         return (onEdge && unsafeCount >= 1) || unsafeCount >= 2;
     }
-    // === END NEW HELPERS ===
+    // === END HELPERS ===
 
+    // OPTIMIZED: precompute for entire board in one O(N²) sweep.
+    // Returns a Uint8Array where [x*SIZE+y]=1 means that empty cell can reach
+    // a friendly non-rig stone through empty space (equivalent to wouldReachFriendlyStone).
+    function buildWouldReachMap(player) {
+        const reachable = new Uint8Array(SIZE * SIZE);
+        if (isFirstTurnForPlayer(player)) return reachable; // none reachable on first turn
+        const visited = new Uint8Array(SIZE * SIZE);
+
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const startP = i * SIZE + j;
+                if (board[i][j] !== null || visited[startP]) continue;
+
+                // BFS this connected empty-space component
+                const component = [];
+                let touchesFriendly = false;
+                const stack = [startP];
+                while (stack.length > 0) {
+                    const p = stack.pop();
+                    if (visited[p]) continue;
+                    visited[p] = 1;
+                    component.push(p);
+                    const x = (p / SIZE) | 0, y = p % SIZE;
+                    if (x > 0)      { const np=p-SIZE; const c=board[x-1][y]; if (c===null && !visited[np]) stack.push(np); else if (c && c.color===player && !c.isRig) touchesFriendly=true; }
+                    if (x < SIZE-1) { const np=p+SIZE; const c=board[x+1][y]; if (c===null && !visited[np]) stack.push(np); else if (c && c.color===player && !c.isRig) touchesFriendly=true; }
+                    if (y > 0)      { const np=p-1;    const c=board[x][y-1]; if (c===null && !visited[np]) stack.push(np); else if (c && c.color===player && !c.isRig) touchesFriendly=true; }
+                    if (y < SIZE-1) { const np=p+1;    const c=board[x][y+1]; if (c===null && !visited[np]) stack.push(np); else if (c && c.color===player && !c.isRig) touchesFriendly=true; }
+                }
+                if (touchesFriendly) {
+                    for (const p of component) reachable[p] = 1;
+                }
+            }
+        }
+        return reachable;
+    }
+
+    // OPTIMIZED: Uint8Array BFS instead of string-keyed Set BFS
     function wouldReachFriendlyStone(x, y, player) {
         if (isFirstTurnForPlayer(player)) return false;
 
-        const visited = new Set();
-        const queue = [[x, y]];
-        visited.add(`${x},${y}`);
+        const visited = new Uint8Array(SIZE * SIZE);
+        const startP = x * SIZE + y;
+        visited[startP] = 1;
+        const queue = [startP];
+        let qi = 0;
 
-        while (queue.length > 0) {
-            const [cx, cy] = queue.shift();
+        while (qi < queue.length) {
+            const p = queue[qi++];
+            const cx = (p / SIZE) | 0, cy = p % SIZE;
 
-            for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
-                const nx = cx + dx, ny = cy + dy;
-                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
-                    const cell = board[nx][ny];
-                    if (cell && cell.color === player && !cell.isRig) {
-                        return true;
-                    }
-                }
+            const neighbors = [];
+            if (cx > 0)      neighbors.push((cx-1)*SIZE + cy);
+            if (cx < SIZE-1) neighbors.push((cx+1)*SIZE + cy);
+            if (cy > 0)      neighbors.push(cx*SIZE + cy - 1);
+            if (cy < SIZE-1) neighbors.push(cx*SIZE + cy + 1);
+
+            for (const np of neighbors) {
+                const nx = (np / SIZE) | 0, ny = np % SIZE;
+                const cell = board[nx][ny];
+                if (cell && cell.color === player && !cell.isRig) return true;
             }
-
-            for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
-                const nx = cx + dx, ny = cy + dy;
-                if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE || visited.has(`${nx},${ny}`)) continue;
-                if (board[nx][ny] === null) {
-                    visited.add(`${nx},${ny}`);
-                    queue.push([nx, ny]);
+            for (const np of neighbors) {
+                if (board[(np / SIZE) | 0][np % SIZE] === null && !visited[np]) {
+                    visited[np] = 1;
+                    queue.push(np);
                 }
             }
         }
         return false;
     }
 
-    function wouldCaptureAtLeastTwoGroups(x, y, player) {
-        const oldBoard = board.map(row => row.map(cell => cell ? {color: cell.color, isRig: cell.isRig} : null));
-        const oldHasHad = { ...hasHadMultipleGroups };
-        board[x][y] = {color: player, isRig: false};
+    // Combined: one board simulation, returns both flags at once.
+    // Used by play() for human moves (called only once per click, not in a loop).
+    function getCaptureInfo(x, y, player) {
         const enemy = player === 'black' ? 'white' : 'black';
-        const deadGroups = getAllGroups(enemy).filter(g => !isAlive(g, enemy));
+        const savedHHMG = { ...hasHadMultipleGroups };
+        board[x][y] = {color: player, isRig: false};
+        const enemyGroups = getAllGroups(enemy);
+        if (enemyGroups.length > 1) hasHadMultipleGroups[enemy] = true;
+        const deadGroups = enemyGroups.filter(g => !isAlive(g, enemy, enemyGroups));
         const capturesTwoOrMore = deadGroups.length >= 2;
-        board = oldBoard;
-        hasHadMultipleGroups = oldHasHad;
-        return capturesTwoOrMore;
+        let capturesAnyRig = false;
+        if (!capturesTwoOrMore) { // only need to check rig flag when not already capturing 2
+            for (const group of deadGroups) {
+                for (const [gx, gy] of group) {
+                    if (board[gx][gy] && board[gx][gy].isRig) { capturesAnyRig = true; break; }
+                }
+                if (capturesAnyRig) break;
+            }
+        }
+        board[x][y] = null;
+        hasHadMultipleGroups = savedHHMG;
+        return { capturesTwoOrMore, capturesAnyRig };
     }
 
+    // Keep individual wrappers for call-sites in play() that need just one flag.
+    function wouldCaptureAtLeastTwoGroups(x, y, player) {
+        return getCaptureInfo(x, y, player).capturesTwoOrMore;
+    }
     function wouldCaptureAnyRig(x, y, player) {
-        const oldBoard = board.map(row => row.map(cell => cell ? {color: cell.color, isRig: cell.isRig} : null));
-        const oldHasHad = { ...hasHadMultipleGroups };
+        return getCaptureInfo(x, y, player).capturesAnyRig;
+    }
+
+    // OPTIMIZED inner-loop simulation used by hasValidMove and generateRandomGame.
+    // Uses precomputed wouldReachMap (Uint8Array) and isFirstForPlayer flag to avoid
+    // redundant per-cell BFS/simulations. Does ONE simulation per cell with targeted undo
+    // (no full board copy). Returns {isValid, isRigPlaced, capturesAnyRig}.
+    function simulatePlacement(x, y, player, enemy, wouldReachMap, isFirstForPlayer) {
+        const p = x * SIZE + y;
+        const wouldReach = wouldReachMap[p] === 1;
+
+        // Tentatively place as non-rig to find dead groups
         board[x][y] = {color: player, isRig: false};
-        const enemy = player === 'black' ? 'white' : 'black';
-        const deadGroups = getAllGroups(enemy).filter(g => !isAlive(g, enemy));
-        let hasRig = false;
-        for (const group of deadGroups) {
-            for (const [gx, gy] of group) {
-                if (board[gx][gy] && board[gx][gy].isRig) {
-                    hasRig = true;
-                    break;
+        const savedHHMG = { ...hasHadMultipleGroups };
+        const savedPrison = { ...prison };
+
+        const enemyGroups = getAllGroups(enemy);
+        if (enemyGroups.length > 1) hasHadMultipleGroups[enemy] = true;
+        const deadGroups = enemyGroups.filter(g => !isAlive(g, enemy, enemyGroups));
+
+        const capturesTwoOrMore = deadGroups.length >= 2;
+        const isRigPlaced = !isFirstForPlayer && !(wouldReach || capturesTwoOrMore);
+
+        // Check if any dead group has a rig (only matters when isRigPlaced)
+        let capturesAnyRig = false;
+        if (isRigPlaced) {
+            outer: for (const group of deadGroups) {
+                for (const [gx, gy] of group) {
+                    if (board[gx][gy] && board[gx][gy].isRig) { capturesAnyRig = true; break outer; }
                 }
             }
-            if (hasRig) break;
         }
-        board = oldBoard;
-        hasHadMultipleGroups = oldHasHad;
-        return hasRig;
+
+        // Apply isRig to placed stone
+        board[x][y].isRig = isRigPlaced;
+
+        // Remove dead groups (targeted — only track what we change)
+        const deadCells = [];
+        for (const group of deadGroups) {
+            for (const [gx, gy] of group) {
+                deadCells.push({x: gx, y: gy, cell: board[gx][gy]});
+                board[gx][gy] = null;
+                prison[enemy]++;
+            }
+        }
+        while (prison.black > 0 && prison.white > 0) { prison.black--; prison.white--; }
+
+        let isValid = false;
+        {
+            const friendlyGroups = getAllGroups(player);
+            if (friendlyGroups.length > 1) hasHadMultipleGroups[player] = true;
+            isValid = friendlyGroups.every(g => isAlive(g, player, friendlyGroups));
+        }
+
+        // Undo — restore only changed cells (no full board copy)
+        board[x][y] = null;
+        for (const {x: gx, y: gy, cell} of deadCells) board[gx][gy] = cell;
+        hasHadMultipleGroups = savedHHMG;
+        prison = savedPrison;
+
+        return { isValid, isRigPlaced, capturesAnyRig };
     }
 
     function convertMixedRigsToStones(color) {
@@ -711,7 +849,9 @@
 
         board[x][y] = {color: player, isRig: isRig};
 
-        const deadGroups = getAllGroups(enemy).filter(g => !isAlive(g, enemy));
+        const enemyGroups = getAllGroups(enemy);
+        if (enemyGroups.length > 1) hasHadMultipleGroups[enemy] = true;
+        const deadGroups = enemyGroups.filter(g => !isAlive(g, enemy, enemyGroups));
         for (const group of deadGroups) {
             for (const [gx, gy] of group) {
                 board[gx][gy] = null;
@@ -724,7 +864,9 @@
             prison.white--;
         }
 
-        const friendlyDead = getAllGroups(player).filter(g => !isAlive(g, player));
+        const friendlyGroups = getAllGroups(player);
+        if (friendlyGroups.length > 1) hasHadMultipleGroups[player] = true;
+        const friendlyDead = friendlyGroups.filter(g => !isAlive(g, player, friendlyGroups));
         if (friendlyDead.length > 0) {
             setMessage("Invalid move: Cannot leave dead friendly groups!");
             board = oldBoard;
@@ -834,12 +976,14 @@
         }
     }
 
+    // OPTIMIZED: Uint8Array for visited tracking
     function getAllTerritories() {
         const territories = [];
-        const visited = new Set();
+        const visited = new Uint8Array(SIZE * SIZE);
         for (let i = 0; i < SIZE; i++) {
             for (let j = 0; j < SIZE; j++) {
-                if (board[i][j] === null && !visited.has(`${i},${j}`)) {
+                const p = i * SIZE + j;
+                if (board[i][j] === null && !visited[p]) {
                     territories.push(getTerritory(i, j, visited));
                 }
             }
@@ -873,44 +1017,19 @@
         const enemy = player === 'black' ? 'white' : 'black';
         if (prison[enemy] > 0) return true;
 
+        // Precompute once for all cells — O(N²) instead of O(N⁴)
+        const wouldReachMap = buildWouldReachMap(player);
+        const isFirstForPlayer = isFirstTurnForPlayer(player);
+
         for (let x = 0; x < SIZE; x++) {
             for (let y = 0; y < SIZE; y++) {
                 if (board[x][y] !== null) continue;
 
-                const oldBoard = board.map(row => row.map(cell => cell ? {color: cell.color, isRig: cell.isRig} : null));
-                const oldHasHad = { ...hasHadMultipleGroups };
-                const oldLastMove = lastMoveWasRig;
+                const { isValid, isRigPlaced, capturesAnyRig } =
+                    simulatePlacement(x, y, player, enemy, wouldReachMap, isFirstForPlayer);
 
-                const isFirstForPlayer = isFirstTurnForPlayer(player);
-                let isRigPlaced = false;
-                if (!isFirstForPlayer) {
-                    const wouldReach = wouldReachFriendlyStone(x, y, player);
-                    const wouldCaptureTwo = wouldCaptureAtLeastTwoGroups(x, y, player);
-                    isRigPlaced = !(wouldReach || wouldCaptureTwo);
-                }
-
-                if (isRigPlaced && lastMoveWasRig) {
-                    if (wouldCaptureAnyRig(x, y, player)) {
-                        board = oldBoard;
-                        hasHadMultipleGroups = oldHasHad;
-                        continue;
-                    }
-                }
-
-                board[x][y] = {color: player, isRig: isRigPlaced};
-
-                const deadGroups = getAllGroups(enemy).filter(g => !isAlive(g, enemy));
-                for (const group of deadGroups) {
-                    for (const [gx, gy] of group) {
-                        board[gx][gy] = null;
-                    }
-                }
-
-                const friendlyDead = getAllGroups(player).filter(g => !isAlive(g, player));
-                const isValid = friendlyDead.length === 0;
-
-                board = oldBoard;
-                hasHadMultipleGroups = oldHasHad;
+                // Rig-after-rig constraint: skip if rig captures a rig on consecutive rig turn
+                if (isRigPlaced && lastMoveWasRig && capturesAnyRig) continue;
 
                 if (isValid) return true;
             }
@@ -961,80 +1080,102 @@
         return width;
     }
 
+    // OPTIMIZED: direct neighbor checks instead of loop
     function hasOrthogonalFriendly(x, y, player) {
-        for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
-            const nx = x + dx, ny = y + dy;
-            if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
-                if (board[nx][ny] && board[nx][ny].color === player) return true;
-            }
-        }
+        if (x > 0      && board[x-1][y] && board[x-1][y].color === player) return true;
+        if (x < SIZE-1 && board[x+1][y] && board[x+1][y].color === player) return true;
+        if (y > 0      && board[x][y-1] && board[x][y-1].color === player) return true;
+        if (y < SIZE-1 && board[x][y+1] && board[x][y+1].color === player) return true;
         return false;
     }
 
+    // OPTIMIZED: integer keys for visitedStones
     function getSingleAdjacentGroup(territory, player) {
-        const visitedStones = new Set();
+        const visitedStones = new Set(); // integer keys: nx*SIZE + ny
         let theGroup = null;
 
         for (const [tx, ty] of territory) {
-            for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
-                const nx = tx + dx, ny = ty + dy;
+            for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+                const nx = tx + dx;
+                const ny = ty + dy;
+
                 if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE) continue;
+
                 const cell = board[nx][ny];
-                if (cell && cell.color === player && !visitedStones.has(`${nx},${ny}`)) {
-                    if (theGroup !== null) return null; // more than one group
-                    theGroup = getGroup(nx, ny, player);
-                    for (const [gx, gy] of theGroup) visitedStones.add(`${gx},${gy}`);
+                if (cell && cell.color === player && !visitedStones.has(nx * SIZE + ny)) {
+                    if (theGroup !== null) return null; // more than one distinct friendly group
+                    theGroup = getGroup(nx, ny, player, new Uint8Array(SIZE * SIZE));
+                    for (const [gx, gy] of theGroup) {
+                        visitedStones.add(gx * SIZE + gy);
+                    }
                 }
             }
         }
         return theGroup;
     }
 
-    function getAdjacentTerritoriesToGroup(group, player) {
+    // OPTIMIZED: Uint8Array for visited territory tracking
+    function getAdjacentFriendlyTerritoriesToGroup(group, player) {
         const territories = [];
-        const visited = new Set();
+        const visitedTerr = new Uint8Array(SIZE * SIZE);
+        
+        // Pre-mark group cells so they won't be treated as territory starts
         for (const [gx, gy] of group) {
-            for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
-                const nx = gx + dx, ny = gy + dy;
-                if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE || board[nx][ny] !== null) continue;
-                const key = `${nx},${ny}`;
-                if (!visited.has(key)) {
-                    const terr = getTerritory(nx, ny);
-                    territories.push(terr);
-                    for (const [px, py] of terr) visited.add(`${px},${py}`);
+            visitedTerr[gx * SIZE + gy] = 1;
+        }
+        
+        for (const [gx, gy] of group) {
+            const neighbors = [];
+            if (gx > 0)      neighbors.push([gx-1, gy]);
+            if (gx < SIZE-1) neighbors.push([gx+1, gy]);
+            if (gy > 0)      neighbors.push([gx, gy-1]);
+            if (gy < SIZE-1) neighbors.push([gx, gy+1]);
+            
+            for (const [nx, ny] of neighbors) {
+                const p = nx * SIZE + ny;
+                if (board[nx][ny] === null && !visitedTerr[p]) {
+                    const territory = getTerritory(nx, ny, visitedTerr);
+                    // ← ONLY friendly territories are kept
+                    if (getOwner(territory) === player) {
+                        territories.push(territory);
+                    }
                 }
             }
         }
         return territories;
     }
 
+    // OPTIMIZED: integer keys for targetGroupSet
     function isTerritoryPrivateToGroup(territory, targetGroupSet, player) {
         for (const [tx, ty] of territory) {
-            for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
-                const nx = tx + dx, ny = ty + dy;
-                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
-                    const cell = board[nx][ny];
-                    if (cell && cell.color === player && !targetGroupSet.has(`${nx},${ny}`)) {
-                        return false;
-                    }
+            const neighbors = [];
+            if (tx > 0)      neighbors.push([tx-1, ty]);
+            if (tx < SIZE-1) neighbors.push([tx+1, ty]);
+            if (ty > 0)      neighbors.push([tx, ty-1]);
+            if (ty < SIZE-1) neighbors.push([tx, ty+1]);
+            for (const [nx, ny] of neighbors) {
+                const cell = board[nx][ny];
+                if (cell && cell.color === player && !targetGroupSet.has(nx * SIZE + ny)) {
+                    return false;
                 }
             }
         }
         return true;
     }
 
+    // OPTIMIZED: uses Uint8Array for getTerritory, integer keys for targetGroupSet
     function isGoodOwnTerritoryMove(x, y, player) {
         if (hasOrthogonalFriendly(x, y, player)) return false;
 
-        const territory = getTerritory(x, y);
+        const territory = getTerritory(x, y, new Uint8Array(SIZE * SIZE));
         if (territory.length === 0) return false;
 
         const singleGroup = getSingleAdjacentGroup(territory, player);
         if (!singleGroup) return false;
 
-        const targetGroupSet = new Set(singleGroup.map(([gx, gy]) => `${gx},${gy}`));
+        const targetGroupSet = new Set(singleGroup.map(([gx, gy]) => gx * SIZE + gy));
 
-        const adjacentTerrs = getAdjacentTerritoriesToGroup(singleGroup, player);
+        const adjacentTerrs = getAdjacentFriendlyTerritoriesToGroup(singleGroup);
 
         for (const terr of adjacentTerrs) {
             if (!isTerritoryPrivateToGroup(terr, targetGroupSet, player)) {
@@ -1059,16 +1200,23 @@
         updateReplayButtons();
 
         generationInterval = setInterval(() => {
+            if (!hasValidMove(turn)) {
+                stopGeneration();
+                return;
+            }
+
             const player = turn;
             const enemy = player === 'black' ? 'white' : 'black';
 
-            // Precompute own territory points (exact match to game definition)
+            // Precompute once per tick: O(N²) each instead of O(N⁴) from per-cell calls
+            const wouldReachMap = buildWouldReachMap(player);
+            const isFirstForPlayer = isFirstTurnForPlayer(player);
+
+            // Precompute own territory points ONCE for this turn (integer keys: x*SIZE+y)
             const ownTerrPoints = new Set();
             const playerTerrs = getPlayerTerritories(player);
             for (const terr of playerTerrs) {
-                for (const [tx, ty] of terr) {
-                    ownTerrPoints.add(`${tx},${ty}`);
-                }
+                for (const [tx, ty] of terr) ownTerrPoints.add(tx * SIZE + ty);
             }
 
             // === REFINED MOVE CATEGORISATION + HOLD PRIORITY ===
@@ -1079,54 +1227,16 @@
                 for (let y = 0; y < SIZE; y++) {
                     if (board[x][y] !== null) continue;
 
-                    const oldBoard = board.map(row => row.map(cell => cell ? {color: cell.color, isRig: cell.isRig} : null));
-                    const oldPrison = { ...prison };
-                    const oldHasHad = { ...hasHadMultipleGroups };
-                    const oldLastMove = lastMoveWasRig;
+                    // Single simulation pass: determines isRig, capturesAnyRig, and validity
+                    // with only targeted cell undo — no full board copy.
+                    const { isValid, isRigPlaced, capturesAnyRig } =
+                        simulatePlacement(x, y, player, enemy, wouldReachMap, isFirstForPlayer);
 
-                    const isFirstForPlayer = isFirstTurnForPlayer(turn);
-                    let isRigPlaced = false;
-                    if (!isFirstForPlayer) {
-                        const wouldReach = wouldReachFriendlyStone(x, y, turn);
-                        const wouldCaptureTwo = wouldCaptureAtLeastTwoGroups(x, y, turn);
-                        isRigPlaced = !(wouldReach || wouldCaptureTwo);
-                    }
-
-                    if (isRigPlaced && lastMoveWasRig) {
-                        if (wouldCaptureAnyRig(x, y, turn)) {
-                            board = oldBoard;
-                            prison = oldPrison;
-                            hasHadMultipleGroups = oldHasHad;
-                            lastMoveWasRig = oldLastMove;
-                            continue;
-                        }
-                    }
-
-                    board[x][y] = {color: turn, isRig: isRigPlaced};
-
-                    const deadGroups = getAllGroups(enemy).filter(g => !isAlive(g, enemy));
-                    for (const group of deadGroups) {
-                        for (const [gx, gy] of group) {
-                            board[gx][gy] = null;
-                            prison[enemy]++;
-                        }
-                    }
-
-                    while (prison.black > 0 && prison.white > 0) {
-                        prison.black--;
-                        prison.white--;
-                    }
-
-                    const friendlyDead = getAllGroups(turn).filter(g => !isAlive(g, turn));
-                    const isValid = friendlyDead.length === 0;
-
-                    board = oldBoard;
-                    prison = oldPrison;
-                    hasHadMultipleGroups = oldHasHad;
-                    lastMoveWasRig = oldLastMove;
+                    // Rig-after-rig constraint
+                    if (isRigPlaced && lastMoveWasRig && capturesAnyRig) continue;
 
                     if (isValid) {
-                        const isOwnTerr = ownTerrPoints.has(`${x},${y}`);
+                        const isOwnTerr = ownTerrPoints.has(x * SIZE + y);
                         if (!isOwnTerr || 
                             hasUnsafeDiagonalCondition(x, y, player, ownTerrPoints) || 
                             isGoodOwnTerritoryMove(x, y, player)) {
