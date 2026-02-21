@@ -1,0 +1,1759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meigo</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            width: 100vw;
+            max-width: 100%;
+        }
+
+        .header {
+            width: min(100vw, calc(100vh - 100px));
+            height: 50px;
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0 auto;
+            overflow: visible;
+        }
+
+        .status-left {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            position: absolute;
+            left: 0;
+            z-index: 1;
+            padding-right: 0.5em;
+        }
+
+        .status-center {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            white-space: nowrap;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1;
+        }
+
+        .controls-right {
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            position: absolute;
+            right: 0;
+            z-index: 1;
+            gap: 0.5em;
+        }
+
+        .board-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            background-color: #f0f0f0;
+        }
+
+        .footer {
+            width: 100%;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .board {
+            width: min(100vw, calc(100vh - 100px));
+            height: min(100vw, calc(100vh - 100px));
+            background-color: #d9a359;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #last-move-text {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            white-space: nowrap;
+        }
+
+        #copy-move {
+            font-size: 1.2em;
+            padding: 0;
+            border: none;
+            background: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .copy-icon {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+        }
+
+        #copy-move:hover .copy-icon path {
+            fill: #555;
+        }
+
+        .grid {
+            display: grid;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        .lines {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .point {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .stone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-sizing: border-box;
+            z-index: 2;
+        }
+
+        /* marked stones are shown as squares */
+        .marked {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 88.62%;
+            height: 88.62%;
+            border-radius: 0;
+            box-sizing: border-box;
+            z-index: 2;
+        }
+
+        .black {
+            background: black;
+        }
+
+        .white {
+            background: white;
+            border: 2px solid black;
+        }
+
+        .last-move::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 22%;
+            height: 22%;
+            border-radius: 50%;
+            background: red;
+            z-index: 3;
+        }
+
+        .replay-controls {
+            display: flex;
+            flex-wrap: nowrap;
+            width: 100%;
+            gap: 0.5em;
+            overflow: hidden;
+            justify-content: center;
+        }
+
+        .replay-controls button,
+        .replay-controls select {
+            flex: 0 1 auto;
+            padding: 0.3em 0.5em;
+            font-size: 1em;
+            border: 2px solid black;
+            background: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            min-width: 0;
+            text-overflow: clip;
+            overflow: hidden;
+            white-space: nowrap;
+            max-width: 100px;
+        }
+
+        button, select {
+            font-size: 1em;
+            padding: 0.3em 0.5em;
+            border: 2px solid black;
+            background: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:not(:disabled):hover, select:hover {
+            background: #FFF5E9;
+        }
+
+        select {
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .replay-controls button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .stone-icon {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+            margin-right: 0.5em;
+        }
+
+        #message {
+            font-family: Arial, sans-serif;
+            position: absolute;
+            left: calc(50vw + 50vh - 30px);
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2em;
+            color: #d32f2f;
+            width: 20vw;
+            text-align: left;
+        }
+
+        .left-spacing {
+            margin-left: 0.5em;
+        }
+
+        #random-button {
+            flex: 0 1 auto;
+            min-width: 0;
+            text-align: center;
+            max-width: 8em;
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div class="header">
+        <div class="status-left" id="turn-status"></div>
+        <div class="status-center" id="prison-status"></div>
+        <div class="controls-right">
+            <div id="last-move-display" style="display: flex; align-items: center; gap: 0.5em;">
+                <span id="last-move-text"></span>
+                <button id="copy-move" title="Copy last move" style="display: none;">
+                    <svg class="copy-icon" viewBox="0 0 24 24">
+                        <path fill="black" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+                    </svg>
+                </button>
+            </div>
+            <button id="hold-button" onmousedown="hold()">Hold</button>
+        </div>
+    </div>
+    <div class="board-container">
+        <div class="board" id="board">
+            <div class="lines" id="lines"></div>
+            <div class="grid" id="grid"></div>
+        </div>
+        <div id="message"></div>
+    </div>
+    <div class="footer">
+        <div class="replay-controls">
+            <button onmousedown="replayStart()">Start</button>
+            <button onmousedown="replayBack()">Back</button>
+            <button onmousedown="replayForward()">Forward</button>
+            <button onmousedown="replayEnd()">End</button>
+            <button id="random-button" onmousedown="generateRandomGame()">Random game</button>
+            <select id="save-options" onchange="handleSave()">
+                <option value="" disabled selected hidden>Save</option>
+                <option value="file">To file</option>
+                <option value="clipboard">To clipboard</option>
+            </select>
+            <select id="load-options" onchange="handleLoad()">
+                <option value="" disabled selected hidden>Load</option>
+                <option value="file">From file</option>
+                <option value="clipboard">From clipboard</option>
+            </select>
+            <select id="komi" onchange="changeKomi()">
+                <!-- Options will be populated by JavaScript -->
+            </select>
+            <select id="board-size" onchange="changeBoardSize()">
+                <option value="7">7×7</option>
+                <option value="9">9×9</option>
+                <option value="11">11×11</option>
+                <option value="13" selected>13×13</option>
+                <option value="15">15×15</option>
+                <option value="17">17×17</option>
+                <option value="19">19×19</option>
+                <option value="21">21×21</option>
+            </select>
+            <input type="file" id="load-input" style="display: none;" accept=".txt" onchange="loadGame(event)">
+        </div>
+    </div>
+</div>
+
+<script>
+    let SIZE = 13;
+    let board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+    let turn = 'black';
+    let prison = { black: 0, white: 0 };
+    let firstStonePlaced = { black: false, white: false };
+    // True if the immediately preceding move was a marked stone placement.
+    // Cleared to false when a hold is played or an unmarked stone is placed.
+    let lastMoveWasMarkedPlacement = false;
+    let lastMoveX = null;
+    let lastMoveY = null;
+    let gameHistory = [];
+    let currentMoveIndex = -1;
+    let isGenerating = false;
+    let generationInterval = null;
+    let komi = 0;
+
+    const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
+    const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
+
+    function initBoard() {
+        const gridDiv = document.getElementById('grid');
+        gridDiv.innerHTML = '';
+        const linesDiv = document.getElementById('lines');
+        linesDiv.innerHTML = '';
+
+        const canvas = document.createElement('canvas');
+        const boardSize = document.getElementById('board').offsetWidth;
+        canvas.width = boardSize;
+        canvas.height = boardSize;
+        const ctx = canvas.getContext('2d');
+        ctx.strokeStyle = 'black';
+        const cellSize = boardSize / SIZE;
+
+        gridDiv.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+        gridDiv.style.gridTemplateRows = `repeat(${SIZE}, 1fr)`;
+
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const point = document.createElement('div');
+                point.className = 'point';
+                point.dataset.x = i;
+                point.dataset.y = j;
+                point.onmousedown = () => play(i, j);
+                const piece = document.createElement('div');
+                piece.className = 'stone';
+                point.appendChild(piece);
+                gridDiv.appendChild(point);
+            }
+        }
+
+        for (let i = 0; i < SIZE; i++) {
+            const pos = cellSize / 2 + i * cellSize;
+            ctx.beginPath();
+            ctx.lineWidth = (i === 0 || i === SIZE - 1) ? 2 : 1;
+            ctx.moveTo(pos, cellSize / 2);
+            ctx.lineTo(pos, boardSize - cellSize / 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.lineWidth = (i === 0 || i === SIZE - 1) ? 2 : 1;
+            ctx.moveTo(cellSize / 2, pos);
+            ctx.lineTo(boardSize - cellSize / 2, pos);
+            ctx.stroke();
+        }
+        linesDiv.appendChild(canvas);
+
+        updateStatus();
+        updateLastMoveDisplay();
+        updateButtonTooltips();
+    }
+
+    function saveGameState() {
+        return {
+            board: board.map(row => row.map(cell => cell ? {color: cell.color, isRig: cell.isRig} : null)),
+            turn: turn,
+            prison: { ...prison },
+            firstStonePlaced: { ...firstStonePlaced },
+            lastMoveWasMarkedPlacement: lastMoveWasMarkedPlacement,
+            lastMoveX: lastMoveX,
+            lastMoveY: lastMoveY,
+            komi: komi
+        };
+    }
+
+    function loadGameState(state) {
+        board = state.board.map(row => row.map(cell => cell ? {color: cell.color, isRig: cell.isRig} : null));
+        turn = state.turn;
+        prison = { ...state.prison };
+        firstStonePlaced = { ...(state.firstStonePlaced || {black: false, white: false}) };
+        lastMoveWasMarkedPlacement = state.lastMoveWasMarkedPlacement || false;
+        lastMoveX = state.lastMoveX;
+        lastMoveY = state.lastMoveY;
+        komi = state.komi;
+        renderBoard();
+        updateStatus();
+    }
+
+    function resetGame(newSize) {
+        SIZE = newSize;
+        board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+        turn = 'black';
+        prison = { black: komi, white: 0 };
+        firstStonePlaced = { black: false, white: false };
+        lastMoveWasMarkedPlacement = false;
+        lastMoveX = null;
+        lastMoveY = null;
+        gameHistory = [saveGameState()];
+        currentMoveIndex = 0;
+        clearMessage();
+        initBoard();
+        updateReplayButtons();
+        renderBoard();
+        updateLastMoveDisplay();
+    }
+
+    function changeBoardSize() {
+        const select = document.getElementById('board-size');
+        const newSize = parseInt(select.value);
+        resetGame(newSize);
+        select.blur();
+    }
+
+    function changeKomi() {
+        const select = document.getElementById('komi');
+        komi = parseInt(select.value);
+        resetGame(SIZE);
+        select.blur();
+    }
+
+    function clearLastMoveMarker() {
+        if (lastMoveX !== null && lastMoveY !== null) {
+            const points = document.getElementsByClassName('point');
+            const piece = points[lastMoveX * SIZE + lastMoveY].firstChild;
+            piece.classList.remove('last-move');
+        }
+        lastMoveX = null;
+        lastMoveY = null;
+    }
+
+    function setLastMoveMarker(x, y) {
+        clearLastMoveMarker();
+        const points = document.getElementsByClassName('point');
+        const piece = points[x * SIZE + y].firstChild;
+        piece.classList.add('last-move');
+        lastMoveX = x;
+        lastMoveY = y;
+    }
+
+    function clearMessage() {
+        document.getElementById('message').textContent = '';
+    }
+
+    function setMessage(text) {
+        document.getElementById('message').textContent = text;
+    }
+
+    // === BOARD HELPERS ===
+
+    // Iterative flood fill: returns all stones in a connected chain of given color
+    function getGroup(startX, startY, color, visited) {
+        const group = [];
+        const stack = [startX * SIZE + startY];
+        while (stack.length > 0) {
+            const p = stack.pop();
+            if (visited[p]) continue;
+            const x = (p / SIZE) | 0, y = p % SIZE;
+            if (!board[x][y] || board[x][y].color !== color) continue;
+            visited[p] = 1;
+            group.push([x, y]);
+            if (x > 0)      stack.push(p - SIZE);
+            if (x < SIZE-1) stack.push(p + SIZE);
+            if (y > 0)      stack.push(p - 1);
+            if (y < SIZE-1) stack.push(p + 1);
+        }
+        return group;
+    }
+
+    function getAllGroups(color) {
+        const groups = [];
+        const visited = new Uint8Array(SIZE * SIZE);
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const p = i * SIZE + j;
+                if (board[i][j] && board[i][j].color === color && !visited[p]) {
+                    groups.push(getGroup(i, j, color, visited));
+                }
+            }
+        }
+        return groups;
+    }
+
+    // A chain has liberties if any of its stones has an empty orthogonal neighbour.
+    function hasLiberties(group) {
+        for (const [x, y] of group) {
+            if (x > 0      && board[x-1][y] === null) return true;
+            if (x < SIZE-1 && board[x+1][y] === null) return true;
+            if (y > 0      && board[x][y-1] === null) return true;
+            if (y < SIZE-1 && board[x][y+1] === null) return true;
+        }
+        return false;
+    }
+
+    // Returns true if (x,y) is orthogonally adjacent to an unmarked friendly stone.
+    function adjacentToUnmarkedFriendly(x, y, player) {
+        if (x > 0      && board[x-1][y] && board[x-1][y].color === player && !board[x-1][y].isRig) return true;
+        if (x < SIZE-1 && board[x+1][y] && board[x+1][y].color === player && !board[x+1][y].isRig) return true;
+        if (y > 0      && board[x][y-1] && board[x][y-1].color === player && !board[x][y-1].isRig) return true;
+        if (y < SIZE-1 && board[x][y+1] && board[x][y+1].color === player && !board[x][y+1].isRig) return true;
+        return false;
+    }
+
+    // BFS through empty space from (x,y): returns true if we can reach any marked stone of either color.
+    function wouldReachMarkedStone(x, y) {
+        const visited = new Uint8Array(SIZE * SIZE);
+        const startP = x * SIZE + y;
+        visited[startP] = 1;
+        const queue = [startP];
+        let qi = 0;
+
+        while (qi < queue.length) {
+            const p = queue[qi++];
+            const cx = (p / SIZE) | 0, cy = p % SIZE;
+
+            const neighbors = [];
+            if (cx > 0)      neighbors.push((cx-1)*SIZE + cy);
+            if (cx < SIZE-1) neighbors.push((cx+1)*SIZE + cy);
+            if (cy > 0)      neighbors.push(cx*SIZE + cy - 1);
+            if (cy < SIZE-1) neighbors.push(cx*SIZE + cy + 1);
+
+            for (const np of neighbors) {
+                const nx = (np / SIZE) | 0, ny = np % SIZE;
+                const cell = board[nx][ny];
+                if (cell && cell.isRig) return true;
+            }
+            for (const np of neighbors) {
+                if (board[(np / SIZE) | 0][np % SIZE] === null && !visited[np]) {
+                    visited[np] = 1;
+                    queue.push(np);
+                }
+            }
+        }
+        return false;
+    }
+
+    // Precomputes for every empty cell whether it can reach any marked stone through empty space.
+    function buildWouldReachMarkedMap() {
+        const reachesMarked = new Uint8Array(SIZE * SIZE);
+        const visited = new Uint8Array(SIZE * SIZE);
+
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const startP = i * SIZE + j;
+                if (board[i][j] !== null || visited[startP]) continue;
+
+                const component = [];
+                let touchesMarked = false;
+                const stack = [startP];
+                while (stack.length > 0) {
+                    const p = stack.pop();
+                    if (visited[p]) continue;
+                    visited[p] = 1;
+                    component.push(p);
+                    const x = (p / SIZE) | 0, y = p % SIZE;
+                    if (x > 0)      { const np=p-SIZE; const c=board[x-1][y]; if (c===null && !visited[np]) stack.push(np); else if (c && c.isRig) touchesMarked=true; }
+                    if (x < SIZE-1) { const np=p+SIZE; const c=board[x+1][y]; if (c===null && !visited[np]) stack.push(np); else if (c && c.isRig) touchesMarked=true; }
+                    if (y > 0)      { const np=p-1;    const c=board[x][y-1]; if (c===null && !visited[np]) stack.push(np); else if (c && c.isRig) touchesMarked=true; }
+                    if (y < SIZE-1) { const np=p+1;    const c=board[x][y+1]; if (c===null && !visited[np]) stack.push(np); else if (c && c.isRig) touchesMarked=true; }
+                }
+                if (touchesMarked) {
+                    for (const p of component) reachesMarked[p] = 1;
+                }
+            }
+        }
+        return reachesMarked;
+    }
+
+    // Iterative territory flood fill
+    function getTerritory(startX, startY, visited) {
+        const territory = [];
+        const stack = [startX * SIZE + startY];
+        while (stack.length > 0) {
+            const p = stack.pop();
+            if (visited[p]) continue;
+            const x = (p / SIZE) | 0, y = p % SIZE;
+            if (board[x][y] !== null) continue;
+            visited[p] = 1;
+            territory.push([x, y]);
+            if (x > 0)      stack.push(p - SIZE);
+            if (x < SIZE-1) stack.push(p + SIZE);
+            if (y > 0)      stack.push(p - 1);
+            if (y < SIZE-1) stack.push(p + 1);
+        }
+        return territory;
+    }
+
+    function getOwner(territory) {
+        let hasBlack = false, hasWhite = false;
+        for (const [x, y] of territory) {
+            if (x > 0      && board[x-1][y] !== null) { if (board[x-1][y].color === 'black') hasBlack = true; else hasWhite = true; }
+            if (x < SIZE-1 && board[x+1][y] !== null) { if (board[x+1][y].color === 'black') hasBlack = true; else hasWhite = true; }
+            if (y > 0      && board[x][y-1] !== null) { if (board[x][y-1].color === 'black') hasBlack = true; else hasWhite = true; }
+            if (y < SIZE-1 && board[x][y+1] !== null) { if (board[x][y+1].color === 'black') hasBlack = true; else hasWhite = true; }
+            if (hasBlack && hasWhite) return null;
+        }
+        if (hasBlack) return 'black';
+        if (hasWhite) return 'white';
+        return null;
+    }
+
+    function getPlayerTerritories(player) {
+        const territories = [];
+        const visited = new Uint8Array(SIZE * SIZE);
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const p = i * SIZE + j;
+                if (board[i][j] === null && !visited[p]) {
+                    const territory = getTerritory(i, j, visited);
+                    if (getOwner(territory) === player) {
+                        territories.push(territory);
+                    }
+                }
+            }
+        }
+        return territories;
+    }
+
+    // BFS through empty space from (x,y): returns true if we can reach an unmarked friendly stone.
+    function wouldReachFriendlyStone(x, y, player) {
+        if (!firstStonePlaced[player]) return false;
+
+        const visited = new Uint8Array(SIZE * SIZE);
+        const startP = x * SIZE + y;
+        visited[startP] = 1;
+        const queue = [startP];
+        let qi = 0;
+
+        while (qi < queue.length) {
+            const p = queue[qi++];
+            const cx = (p / SIZE) | 0, cy = p % SIZE;
+
+            const neighbors = [];
+            if (cx > 0)      neighbors.push((cx-1)*SIZE + cy);
+            if (cx < SIZE-1) neighbors.push((cx+1)*SIZE + cy);
+            if (cy > 0)      neighbors.push(cx*SIZE + cy - 1);
+            if (cy < SIZE-1) neighbors.push(cx*SIZE + cy + 1);
+
+            for (const np of neighbors) {
+                const nx = (np / SIZE) | 0, ny = np % SIZE;
+                const cell = board[nx][ny];
+                if (cell && cell.color === player && !cell.isRig) return true;
+            }
+            for (const np of neighbors) {
+                if (board[(np / SIZE) | 0][np % SIZE] === null && !visited[np]) {
+                    visited[np] = 1;
+                    queue.push(np);
+                }
+            }
+        }
+        return false;
+    }
+
+    // Precomputes for every empty cell whether it can reach an unmarked friendly stone.
+    function buildWouldReachMap(player) {
+        const reachable = new Uint8Array(SIZE * SIZE);
+        if (!firstStonePlaced[player]) return reachable;
+        const visited = new Uint8Array(SIZE * SIZE);
+
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const startP = i * SIZE + j;
+                if (board[i][j] !== null || visited[startP]) continue;
+
+                const component = [];
+                let touchesFriendly = false;
+                const stack = [startP];
+                while (stack.length > 0) {
+                    const p = stack.pop();
+                    if (visited[p]) continue;
+                    visited[p] = 1;
+                    component.push(p);
+                    const x = (p / SIZE) | 0, y = p % SIZE;
+                    if (x > 0)      { const np=p-SIZE; const c=board[x-1][y]; if (c===null && !visited[np]) stack.push(np); else if (c && c.color===player && !c.isRig) touchesFriendly=true; }
+                    if (x < SIZE-1) { const np=p+SIZE; const c=board[x+1][y]; if (c===null && !visited[np]) stack.push(np); else if (c && c.color===player && !c.isRig) touchesFriendly=true; }
+                    if (y > 0)      { const np=p-1;    const c=board[x][y-1]; if (c===null && !visited[np]) stack.push(np); else if (c && c.color===player && !c.isRig) touchesFriendly=true; }
+                    if (y < SIZE-1) { const np=p+1;    const c=board[x][y+1]; if (c===null && !visited[np]) stack.push(np); else if (c && c.color===player && !c.isRig) touchesFriendly=true; }
+                }
+                if (touchesFriendly) {
+                    for (const p of component) reachable[p] = 1;
+                }
+            }
+        }
+        return reachable;
+    }
+
+    // Step 3: if the chain containing (x,y) has both marked and unmarked stones, unmark all marked ones.
+    function convertMixedRigsInChain(x, y, color) {
+        if (!board[x][y]) return;
+        const group = getGroup(x, y, color, new Uint8Array(SIZE * SIZE));
+        let hasUnmarked = false, hasMarked = false;
+        for (const [gx, gy] of group) {
+            if (!board[gx][gy].isRig) hasUnmarked = true;
+            else hasMarked = true;
+        }
+        if (hasUnmarked && hasMarked) {
+            for (const [gx, gy] of group) {
+                board[gx][gy].isRig = false;
+            }
+        }
+    }
+
+    // === MAIN GAME ACTIONS ===
+
+    function play(x, y) {
+        if (board[x][y] !== null) return;
+
+        const player = turn;
+        const enemy = player === 'black' ? 'white' : 'black';
+        const isFirstForPlayer = !firstStonePlaced[player];
+
+        // Step 2: place unmarked iff:
+        //   (a) point reaches an unmarked friendly stone AND does not reach any marked stone, OR
+        //   (b) point is orthogonally adjacent to an unmarked friendly stone.
+        let isMarked = false;
+        if (!isFirstForPlayer) {
+            const adjUnmarked = adjacentToUnmarkedFriendly(x, y, player);
+            if (!adjUnmarked) {
+                const wouldReach = wouldReachFriendlyStone(x, y, player);
+                const wouldReachMarked = wouldReachMarkedStone(x, y);
+                isMarked = !(wouldReach && !wouldReachMarked);
+            }
+            // if adjUnmarked, isMarked stays false
+        }
+
+        // Marked-after-marked constraint:
+        // Cannot place a marked stone AND capture a marked enemy stone on the same turn
+        // if the opponent's immediately preceding move was a marked stone placement.
+        if (isMarked && lastMoveWasMarkedPlacement) {
+            board[x][y] = {color: player, isRig: true};
+            const enemyGroups = getAllGroups(enemy);
+            const deadGroups = enemyGroups.filter(g => !hasLiberties(g));
+            let capturesMarked = false;
+            outer: for (const group of deadGroups) {
+                for (const [gx, gy] of group) {
+                    if (board[gx][gy] && board[gx][gy].isRig) { capturesMarked = true; break outer; }
+                }
+            }
+            board[x][y] = null;
+            if (capturesMarked) {
+                setMessage("Cannot place a marked stone and capture a marked stone when the opponent just placed a marked stone!");
+                return;
+            }
+        }
+
+        // Save state for potential rollback
+        const savedBoard = board.map(row => row.map(cell => cell ? {color: cell.color, isRig: cell.isRig} : null));
+        const savedPrison = { ...prison };
+
+        // Place the stone
+        board[x][y] = {color: player, isRig: isMarked};
+
+        // Step 4: remove all enemy chains without liberties
+        const enemyGroups = getAllGroups(enemy);
+        const deadGroups = enemyGroups.filter(g => !hasLiberties(g));
+        for (const group of deadGroups) {
+            for (const [gx, gy] of group) {
+                board[gx][gy] = null;
+                prison[enemy]++;
+            }
+        }
+        while (prison.black > 0 && prison.white > 0) {
+            prison.black--;
+            prison.white--;
+        }
+
+        // End-of-turn validity: placed stone's chain must have at least one liberty.
+        const placedGroup = getGroup(x, y, player, new Uint8Array(SIZE * SIZE));
+        if (!hasLiberties(placedGroup)) {
+            board = savedBoard;
+            prison = savedPrison;
+            renderBoard();
+            updateStatus();
+            setMessage("Invalid move: placed stone would have no liberties!");
+            return;
+        }
+
+        // Step 3: unmark mixed chains
+        convertMixedRigsInChain(x, y, player);
+
+        if (isFirstForPlayer) firstStonePlaced[player] = true;
+        // Record whether the actually-placed stone ended up marked (step 3 may have unmarked it).
+        lastMoveWasMarkedPlacement = board[x][y] ? board[x][y].isRig : false;
+
+        clearMessage();
+        setLastMoveMarker(x, y);
+        turn = enemy;
+        if (currentMoveIndex < gameHistory.length - 1) {
+            gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+        }
+        gameHistory.push(saveGameState());
+        currentMoveIndex++;
+        updateReplayButtons();
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+    }
+
+    function hold() {
+        const enemy = turn === 'black' ? 'white' : 'black';
+        if (prison[enemy] === 0) {
+            setMessage("No enemy stones in prison to remove!");
+            return;
+        }
+        clearMessage();
+        clearLastMoveMarker();
+        prison[enemy]--;
+        turn = turn === 'black' ? 'white' : 'black';
+        lastMoveWasMarkedPlacement = false; // a hold is not a marked placement
+        if (currentMoveIndex < gameHistory.length - 1) {
+            gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+        }
+        gameHistory.push(saveGameState());
+        currentMoveIndex++;
+        updateStatus();
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    // === SIMULATION (for hasValidMove and generateRandomGame) ===
+
+    // Simulates placing at (x,y) for player and returns {isValid, isRigPlaced, capturesAnyMarked}.
+    // Uses targeted undo (no full board copy) for performance.
+    function simulatePlacement(x, y, player, enemy, wouldReachMap, wouldReachMarkedMap, isFirstForPlayer) {
+        const p = x * SIZE + y;
+        // Determine if placed stone would be marked:
+        // Unmarked if adjacent to an unmarked friendly, OR (reaches unmarked friendly AND not reaches marked).
+        const adjUnmarked = adjacentToUnmarkedFriendly(x, y, player);
+        let isRigPlaced;
+        if (isFirstForPlayer) {
+            isRigPlaced = false;
+        } else if (adjUnmarked) {
+            isRigPlaced = false;
+        } else {
+            const wouldReach = wouldReachMap[p] === 1;
+            const wouldReachMarked = wouldReachMarkedMap[p] === 1;
+            isRigPlaced = !wouldReach || wouldReachMarked;
+        }
+
+        board[x][y] = {color: player, isRig: isRigPlaced};
+
+        // Find and remove enemy chains without liberties
+        const enemyGroups = getAllGroups(enemy);
+        const deadGroups = enemyGroups.filter(g => !hasLiberties(g));
+
+        // Check if any captured stone is marked (only relevant when placing marked)
+        let capturesAnyMarked = false;
+        if (isRigPlaced) {
+            outer: for (const group of deadGroups) {
+                for (const [gx, gy] of group) {
+                    if (board[gx][gy] && board[gx][gy].isRig) { capturesAnyMarked = true; break outer; }
+                }
+            }
+        }
+
+        const deadCells = [];
+        const savedPrison = { ...prison };
+        for (const group of deadGroups) {
+            for (const [gx, gy] of group) {
+                deadCells.push({x: gx, y: gy, cell: board[gx][gy]});
+                board[gx][gy] = null;
+                prison[enemy]++;
+            }
+        }
+        while (prison.black > 0 && prison.white > 0) { prison.black--; prison.white--; }
+
+        // Validity: placed chain must have a liberty
+        const placedGroup = getGroup(x, y, player, new Uint8Array(SIZE * SIZE));
+        const isValid = hasLiberties(placedGroup);
+
+        // Undo targeted changes
+        board[x][y] = null;
+        for (const {x: gx, y: gy, cell} of deadCells) board[gx][gy] = cell;
+        prison = savedPrison;
+
+        return { isValid, isRigPlaced, capturesAnyMarked };
+    }
+
+    function hasValidMove(player) {
+        const enemy = player === 'black' ? 'white' : 'black';
+        if (prison[enemy] > 0) return true;
+
+        const wouldReachMap = buildWouldReachMap(player);
+        const wouldReachMarkedMap = buildWouldReachMarkedMap();
+        const isFirstForPlayer = !firstStonePlaced[player];
+
+        for (let x = 0; x < SIZE; x++) {
+            for (let y = 0; y < SIZE; y++) {
+                if (board[x][y] !== null) continue;
+
+                const { isValid, isRigPlaced, capturesAnyMarked } =
+                    simulatePlacement(x, y, player, enemy, wouldReachMap, wouldReachMarkedMap, isFirstForPlayer);
+
+                // Marked-after-marked constraint
+                if (isRigPlaced && lastMoveWasMarkedPlacement && capturesAnyMarked) continue;
+
+                if (isValid) return true;
+            }
+        }
+        return false;
+    }
+
+    // === REPLAY ===
+
+    function replayStart() {
+        currentMoveIndex = 0;
+        loadGameState(gameHistory[0]);
+        clearMessage();
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function replayBack() {
+        if (currentMoveIndex > 0) {
+            currentMoveIndex--;
+            loadGameState(gameHistory[currentMoveIndex]);
+            clearMessage();
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+    }
+
+    function replayForward() {
+        if (currentMoveIndex < gameHistory.length - 1) {
+            currentMoveIndex++;
+            loadGameState(gameHistory[currentMoveIndex]);
+            clearMessage();
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+    }
+
+    function replayEnd() {
+        currentMoveIndex = gameHistory.length - 1;
+        loadGameState(gameHistory[currentMoveIndex]);
+        clearMessage();
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function updateReplayButtons() {
+        const startBtn = document.querySelector('button[onmousedown="replayStart()"]');
+        const backBtn = document.querySelector('button[onmousedown="replayBack()"]');
+        const forwardBtn = document.querySelector('button[onmousedown="replayForward()"]');
+        const endBtn = document.querySelector('button[onmousedown="replayEnd()"]');
+        const randomBtn = document.getElementById('random-button');
+
+        if (isGenerating) {
+            startBtn.disabled = true;
+            backBtn.disabled = true;
+            forwardBtn.disabled = true;
+            endBtn.disabled = true;
+            randomBtn.disabled = false;
+        } else {
+            startBtn.disabled = currentMoveIndex === 0;
+            backBtn.disabled = currentMoveIndex === 0;
+            forwardBtn.disabled = currentMoveIndex === gameHistory.length - 1;
+            endBtn.disabled = currentMoveIndex === gameHistory.length - 1;
+            randomBtn.disabled = !hasValidMove(turn);
+        }
+    }
+
+    // === RENDERING ===
+
+    function renderBoard() {
+        const points = document.getElementsByClassName('point');
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const piece = points[i * SIZE + j].firstChild;
+                // Reset classes
+                piece.className = 'stone';
+                const cell = board[i][j];
+                if (cell) {
+                    if (cell.isRig) {
+                        // Marked stones are shown as squares
+                        piece.classList.remove('stone');
+                        piece.classList.add('marked');
+                    }
+                    piece.classList.add(cell.color);
+                }
+                if (i === lastMoveX && j === lastMoveY) {
+                    piece.classList.add('last-move');
+                }
+            }
+        }
+        updateButtonTooltips();
+    }
+
+    function updateStatus() {
+        const turnStatus = document.getElementById('turn-status');
+        const prisonStatus = document.getElementById('prison-status');
+        turnStatus.innerHTML = `${turn === 'black' ? blackStoneSVG : whiteStoneSVG} to move`;
+        const movesAvailable = hasValidMove(turn);
+        if (!movesAvailable) {
+            const winnerIcon = turn === 'black' ? whiteStoneSVG : blackStoneSVG;
+            turnStatus.innerHTML = `${winnerIcon} wins!`;
+        }
+        prisonStatus.innerHTML = prison.black > 0 ? `Prison: ${prison.black}<span class="left-spacing">${blackStoneSVG}</span>` :
+                                 prison.white > 0 ? `Prison: ${prison.white}<span class="left-spacing">${whiteStoneSVG}</span>` : '';
+        adjustHeaderLayout();
+    }
+
+    // === RANDOM GAME GENERATOR ===
+
+    // Returns the single friendly group adjacent to a territory, or null if 0 or 2+ distinct groups touch it.
+    function getSingleAdjacentGroup(territory, player) {
+        const visitedStones = new Set();
+        let theGroup = null;
+        for (const [tx, ty] of territory) {
+            for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+                const nx = tx + dx, ny = ty + dy;
+                if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE) continue;
+                const cell = board[nx][ny];
+                if (cell && cell.color === player && !visitedStones.has(nx * SIZE + ny)) {
+                    if (theGroup !== null) return null;
+                    theGroup = getGroup(nx, ny, player, new Uint8Array(SIZE * SIZE));
+                    for (const [gx, gy] of theGroup) visitedStones.add(gx * SIZE + gy);
+                }
+            }
+        }
+        return theGroup;
+    }
+
+    // Precomputes the set of own-territory points that are "desperate" to play in.
+    // A move inside own territory is desperate if the territory is adjacent to only one group
+    // (necessarily the player's) AND either:
+    //   (a) the territory is a single point, OR
+    //   (b) another own territory exists that is also adjacent only to that same group.
+    function buildDesperateTerritoryPoints(player) {
+        const desperatePoints = new Set();
+        const ownTerritories = getPlayerTerritories(player);
+
+        // For each own territory find its single adjacent group, identified by its minimum position integer.
+        const terrInfos = [];
+        for (const terr of ownTerritories) {
+            const group = getSingleAdjacentGroup(terr, player);
+            if (!group) { terrInfos.push({ terr, groupId: null }); continue; }
+            let minPos = Infinity;
+            for (const [gx, gy] of group) { const p = gx * SIZE + gy; if (p < minPos) minPos = p; }
+            terrInfos.push({ terr, groupId: minPos });
+        }
+
+        // Count how many own territories share each groupId.
+        const groupIdCount = new Map();
+        for (const { groupId } of terrInfos) {
+            if (groupId !== null) groupIdCount.set(groupId, (groupIdCount.get(groupId) || 0) + 1);
+        }
+
+        for (const { terr, groupId } of terrInfos) {
+            if (groupId === null) continue;
+            if (terr.length === 1 || groupIdCount.get(groupId) > 1) {
+                for (const [tx, ty] of terr) desperatePoints.add(tx * SIZE + ty);
+            }
+        }
+        return desperatePoints;
+    }
+
+    function stopGeneration() {
+        if (generationInterval) {
+            clearInterval(generationInterval);
+            generationInterval = null;
+            isGenerating = false;
+            const randomBtn = document.getElementById('random-button');
+            randomBtn.style.width = '';
+            randomBtn.textContent = 'Random game';
+            randomBtn.setAttribute('onmousedown', 'generateRandomGame()');
+            updateReplayButtons();
+            updateStatus();
+            renderBoard();
+        }
+    }
+
+    function measureRandomGameWidth() {
+        const randomBtn = document.getElementById('random-button');
+        const clone = randomBtn.cloneNode(true);
+        clone.textContent = 'Random game';
+        clone.style.width = '';
+        clone.style.visibility = 'hidden';
+        clone.style.position = 'absolute';
+        clone.removeAttribute('onmousedown');
+        document.body.appendChild(clone);
+        const width = clone.offsetWidth;
+        document.body.removeChild(clone);
+        return width;
+    }
+
+    function generateRandomGame() {
+        if (isGenerating) {
+            stopGeneration();
+            return;
+        }
+
+        isGenerating = true;
+        const randomBtn = document.getElementById('random-button');
+        const randomGameWidth = measureRandomGameWidth();
+        randomBtn.style.width = `${randomGameWidth}px`;
+        randomBtn.textContent = 'Stop';
+        randomBtn.setAttribute('onmousedown', 'stopGeneration()');
+        updateReplayButtons();
+
+        generationInterval = setInterval(() => {
+            if (!hasValidMove(turn)) {
+                stopGeneration();
+                return;
+            }
+
+            const player = turn;
+            const enemy = player === 'black' ? 'white' : 'black';
+
+            const wouldReachMap = buildWouldReachMap(player);
+            const wouldReachMarkedMap = buildWouldReachMarkedMap();
+            const isFirstForPlayer = !firstStonePlaced[player];
+            const desperatePoints = buildDesperateTerritoryPoints(player);
+
+            const goodMoves = [];
+            const desperateMoves = [];
+
+            for (let x = 0; x < SIZE; x++) {
+                for (let y = 0; y < SIZE; y++) {
+                    if (board[x][y] !== null) continue;
+
+                    const { isValid, isRigPlaced, capturesAnyMarked } =
+                        simulatePlacement(x, y, player, enemy, wouldReachMap, wouldReachMarkedMap, isFirstForPlayer);
+
+                    if (isRigPlaced && lastMoveWasMarkedPlacement && capturesAnyMarked) continue;
+
+                    if (isValid) {
+                        if (desperatePoints.has(x * SIZE + y)) {
+                            desperateMoves.push({ type: 'play', x, y });
+                        } else {
+                            goodMoves.push({ type: 'play', x, y });
+                        }
+                    }
+                }
+            }
+
+            const canHold = prison[enemy] > 0;
+
+            let selectedMove = null;
+
+            if (goodMoves.length > 0) {
+                selectedMove = goodMoves[Math.floor(Math.random() * goodMoves.length)];
+            } else if (canHold) {
+                selectedMove = { type: 'hold' };
+            } else if (desperateMoves.length > 0) {
+                selectedMove = desperateMoves[Math.floor(Math.random() * desperateMoves.length)];
+            }
+
+            if (!selectedMove) {
+                stopGeneration();
+                return;
+            }
+
+            if (selectedMove.type === 'play') {
+                play(selectedMove.x, selectedMove.y);
+            } else if (selectedMove.type === 'hold') {
+                hold();
+            }
+
+            renderBoard();
+            updateStatus();
+            updateLastMoveDisplay();
+        }, 1);
+    }
+
+    // === KOMI / UI ===
+
+    function initKomiSelect() {
+        const komiSelect = document.getElementById('komi');
+        for (let i = 0; i <= 20; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.text = `Komi ${i}`;
+            if (i === 7) option.selected = true;
+            komiSelect.appendChild(option);
+        }
+    }
+
+    function updateLastMoveDisplay() {
+        const lastMoveText = document.getElementById('last-move-text');
+        const copyButton = document.getElementById('copy-move');
+
+        if (currentMoveIndex <= 0 || gameHistory.length <= 1) {
+            lastMoveText.textContent = '';
+            copyButton.style.display = 'none';
+            return;
+        }
+
+        const state = gameHistory[currentMoveIndex];
+        const prevState = gameHistory[currentMoveIndex - 1];
+        const player = state.turn === 'black' ? 'W' : 'B';
+
+        if (state.lastMoveX === null && state.lastMoveY === null &&
+            (state.prison.black !== prevState.prison.black || state.prison.white !== prevState.prison.white)) {
+            lastMoveText.textContent = `${player}-`;
+        } else if (state.lastMoveX !== null && state.lastMoveY !== null) {
+            const col = String.fromCharCode(97 + state.lastMoveY);
+            const row = SIZE - state.lastMoveX;
+            lastMoveText.textContent = `${player}${col}${row}`;
+        } else {
+            lastMoveText.textContent = '';
+            copyButton.style.display = 'none';
+            return;
+        }
+
+        copyButton.style.display = 'inline-flex';
+    }
+
+    function copyLastMove() {
+        const lastMoveText = document.getElementById('last-move-text').textContent;
+        if (lastMoveText) {
+            navigator.clipboard.writeText(lastMoveText)
+                .then(() => {
+                    setMessage('Move copied!');
+                    setTimeout(() => {
+                        if (document.getElementById('message').textContent === 'Move copied!') {
+                            clearMessage();
+                        }
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error('Failed to copy: ', err);
+                    setMessage('Failed to copy move!');
+                    setTimeout(() => {
+                        if (document.getElementById('message').textContent === 'Failed to copy move!') {
+                            clearMessage();
+                        }
+                    }, 2000);
+                });
+        }
+    }
+
+    function triggerLoadGame() {
+        document.getElementById('load-input').click();
+    }
+
+    function getTotalMaxWidth() {
+        const controls = document.querySelector('.replay-controls');
+        const elements = controls.querySelectorAll('button, select');
+        const numElements = elements.length;
+        const numGaps = numElements - 1;
+
+        const sampleElement = elements[0];
+        const styles = getComputedStyle(sampleElement);
+        const maxWidth = parseFloat(styles.maxWidth);
+        const paddingLeft = parseFloat(styles.paddingLeft);
+        const paddingRight = parseFloat(styles.paddingRight);
+        const borderLeft = parseFloat(styles.borderLeftWidth);
+        const borderRight = parseFloat(styles.borderRightWidth);
+        const gap = parseFloat(getComputedStyle(controls).gap);
+
+        const elementWidth = maxWidth + paddingLeft + paddingRight + borderLeft + borderRight;
+        const totalMaxWidth = (elementWidth * numElements) + (gap * numGaps);
+
+        return totalMaxWidth;
+    }
+
+    function updateButtonTooltips() {
+        const buttons = document.querySelectorAll('.replay-controls button');
+        const selects = document.querySelectorAll('.replay-controls select');
+        const elements = [...buttons, ...selects];
+        const totalMaxWidth = getTotalMaxWidth();
+        const windowWidth = window.innerWidth;
+
+        elements.forEach(element => {
+            let fullText = '';
+            if (element.tagName === 'BUTTON') {
+                fullText = element.textContent.trim();
+            } else if (element.tagName === 'SELECT' && element.selectedIndex >= 0) {
+                fullText = element.options[element.selectedIndex].text.trim();
+            }
+
+            if (windowWidth < totalMaxWidth) {
+                element.setAttribute('title', fullText);
+            } else {
+                element.removeAttribute('title');
+            }
+        });
+    }
+
+    function adjustHeaderLayout() {
+        const header = document.querySelector('.header');
+        const statusLeft = document.querySelector('.status-left');
+        const statusCenter = document.querySelector('.status-center');
+        const controlsRight = document.querySelector('.controls-right');
+        const board = document.querySelector('.board');
+
+        const headerWidth = header.offsetWidth;
+        const boardWidth = board.offsetWidth;
+        const leftWidth = statusLeft.offsetWidth;
+        const centerWidth = statusCenter.offsetWidth;
+        const rightWidth = controlsRight.offsetWidth;
+
+        statusCenter.style.position = 'absolute';
+        statusCenter.style.left = '50%';
+        statusCenter.style.transform = 'translateX(-50%)';
+
+        statusLeft.style.position = 'absolute';
+        controlsRight.style.position = 'absolute';
+        statusLeft.style.left = '0';
+        controlsRight.style.right = '0';
+
+        const centerLeft = (headerWidth - centerWidth) / 2;
+        const centerRight = centerLeft + centerWidth;
+
+        const leftOverlap = leftWidth > centerLeft;
+        const rightOverlap = rightWidth > (headerWidth - centerRight);
+
+        if (leftOverlap || rightOverlap) {
+            const leftPush = leftOverlap ? leftWidth - centerLeft : 0;
+            const rightPush = rightOverlap ? rightWidth - (headerWidth - centerRight) : 0;
+
+            if (leftPush > 0) {
+                statusLeft.style.left = `-${leftPush}px`;
+            }
+            if (rightPush > 0) {
+                controlsRight.style.right = `-${rightPush}px`;
+            }
+        } else {
+            statusLeft.style.left = '0';
+            controlsRight.style.right = '0';
+        }
+    }
+
+    // === GAME RECORD SAVE / LOAD ===
+
+    function generateGameRecordText(history, currentBoardSize, currentKomiValue) {
+        const boardSizeStr = `${currentBoardSize}x${currentBoardSize}`;
+        const moveList = [`${boardSizeStr} ${currentKomiValue}`];
+
+        for (let i = 1; i < history.length; i++) {
+            const state = history[i];
+            const prevState = history[i - 1];
+
+            const playerWhoMoved = prevState.turn;
+            const playerSymbol = playerWhoMoved === 'black' ? 'B' : 'W';
+
+            if (state.lastMoveX !== null && state.lastMoveY !== null) {
+                const col = String.fromCharCode(97 + state.lastMoveY);
+                const row = currentBoardSize - state.lastMoveX;
+                moveList.push(`${playerSymbol}${col}${row}`);
+            } else {
+                moveList.push(`${playerSymbol}-`);
+            }
+        }
+        return moveList.join(' ');
+    }
+
+    function processGameRecordText(moveText) {
+        moveText = moveText.trim();
+        if (!moveText) {
+            setMessage("Error: Input data is empty.");
+            renderBoard(); updateReplayButtons(); updateStatus();
+            return false;
+        }
+
+        const moves = moveText.split(' ');
+        const sizeMatch = moves[0].match(/^(\d+)[-x×*](\d+)$/);
+        if (!sizeMatch) {
+            setMessage("Error: Input data must start with board size (e.g., '9x9').");
+            renderBoard(); updateReplayButtons(); updateStatus();
+            return false;
+        }
+        const [_, widthStr, heightStr] = sizeMatch;
+        const newSize = parseInt(widthStr);
+        const newHeight = parseInt(heightStr);
+
+        const boardSizeSelect = document.getElementById('board-size');
+        let isValidSize = false;
+        for (let i = 0; i < boardSizeSelect.options.length; i++) {
+            if (parseInt(boardSizeSelect.options[i].value) === newSize) {
+                isValidSize = true;
+                break;
+            }
+        }
+
+        if (newSize !== newHeight || !isValidSize) {
+            const availableSizes = Array.from(boardSizeSelect.options).map(opt => `${opt.value}x${opt.value}`).join(', ');
+            setMessage(`Error: Invalid board size '${widthStr}x${heightStr}'. Supported sizes: ${availableSizes}.`);
+            renderBoard(); updateReplayButtons(); updateStatus();
+            return false;
+        }
+
+        let komiValue = 0;
+        let moveStartIndex = 1;
+        if (moves.length > 1) {
+            const potentialKomi = parseInt(moves[1]);
+            if (!isNaN(potentialKomi) && potentialKomi >= 0 && potentialKomi <= 20) {
+                komiValue = potentialKomi;
+                moveStartIndex = 2;
+            }
+        }
+
+        komi = komiValue;
+        resetGame(newSize);
+
+        boardSizeSelect.value = newSize;
+        const komiSelect = document.getElementById('komi');
+        komiSelect.value = komiValue;
+
+        let lastPlayerSymbolFromFile = null;
+
+        for (let i = moveStartIndex; i < moves.length; i++) {
+            const currentMoveStr = moves[i];
+            const holdMatch = currentMoveStr.match(/^([BW])[-x×*]$/);
+            const playMatch = currentMoveStr.match(/^([BW])([a-z])(\d+)$/);
+
+            let currentPlayerSymbolFromFile;
+            let isHoldAction = false;
+            let playX = -1, playY = -1;
+
+            if (holdMatch) {
+                currentPlayerSymbolFromFile = holdMatch[1];
+                isHoldAction = true;
+            } else if (playMatch) {
+                currentPlayerSymbolFromFile = playMatch[1];
+                const [, , colChar, rowNumStr] = playMatch;
+                playX = SIZE - parseInt(rowNumStr);
+                playY = colChar.charCodeAt(0) - 97;
+            } else {
+                setMessage(`Error: Invalid move format '${currentMoveStr}' at move ${i - moveStartIndex + 1}.`);
+                renderBoard(); updateReplayButtons(); updateStatus(); return false;
+            }
+
+            if (lastPlayerSymbolFromFile && lastPlayerSymbolFromFile === currentPlayerSymbolFromFile) {
+                const enemyOfCurrentTurnPlayer = turn === 'black' ? 'white' : 'black';
+                if (prison[enemyOfCurrentTurnPlayer] > 0) {
+                    hold();
+                } else {
+                    setMessage(`Error: Consecutive moves by ${currentPlayerSymbolFromFile} (at '${currentMoveStr}'), but no prisoners for implicit hold by opponent.`);
+                    renderBoard(); updateReplayButtons(); updateStatus(); return false;
+                }
+            }
+
+            const expectedPlayerSymbolForGameTurn = turn === 'black' ? 'B' : 'W';
+            if (currentPlayerSymbolFromFile !== expectedPlayerSymbolForGameTurn) {
+                setMessage(`Error: Turn mismatch for move '${currentMoveStr}'. Game expects ${expectedPlayerSymbolForGameTurn}, file has ${currentPlayerSymbolFromFile}.`);
+                renderBoard(); updateReplayButtons(); updateStatus(); return false;
+            }
+
+            if (isHoldAction) {
+                const enemyOfPlayerHolding = turn === 'black' ? 'white' : 'black';
+                if (prison[enemyOfPlayerHolding] === 0) {
+                    setMessage(`Error: No enemy stones in prison for hold move '${currentMoveStr}'.`);
+                    renderBoard(); updateReplayButtons(); updateStatus(); return false;
+                }
+                hold();
+            } else {
+                if (playX < 0 || playX >= SIZE || playY < 0 || playY >= SIZE) {
+                    setMessage(`Error: Move '${currentMoveStr}' is out of bounds for ${SIZE}x${SIZE} board.`);
+                    renderBoard(); updateReplayButtons(); updateStatus(); return false;
+                }
+                if (board[playX][playY] !== null) {
+                    setMessage(`Error: Position for '${currentMoveStr}' is already occupied.`);
+                    renderBoard(); updateReplayButtons(); updateStatus(); return false;
+                }
+
+                clearMessage();
+                play(playX, playY);
+
+                if (document.getElementById('message').textContent) {
+                    renderBoard(); updateReplayButtons(); updateStatus(); return false;
+                }
+            }
+            lastPlayerSymbolFromFile = currentPlayerSymbolFromFile;
+        }
+
+        updateReplayButtons();
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+        clearMessage();
+        return true;
+    }
+
+    function handleSave() {
+        const saveSelect = document.getElementById('save-options');
+        const option = saveSelect.value;
+
+        if (option === 'file' || option === 'clipboard') {
+            const gameText = generateGameRecordText(gameHistory, SIZE, komi);
+
+            if (option === 'file') {
+                const blob = new Blob([gameText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'meigo_game.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } else if (option === 'clipboard') {
+                navigator.clipboard.writeText(gameText)
+                    .then(() => {
+                        setMessage('Game copied to clipboard!');
+                        setTimeout(() => {
+                            if (document.getElementById('message').textContent === 'Game copied to clipboard!') {
+                                clearMessage();
+                            }
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy game to clipboard: ', err);
+                        setMessage('Failed to copy game!');
+                        setTimeout(() => {
+                            if (document.getElementById('message').textContent === 'Failed to copy game!') {
+                                clearMessage();
+                            }
+                        }, 2000);
+                    });
+            }
+        }
+        saveSelect.value = '';
+        saveSelect.blur();
+    }
+
+    function loadGame(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const moveText = e.target.result;
+            if (!processGameRecordText(moveText)) {
+                console.error("Failed to process game record from file.");
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    }
+
+    function handleLoad() {
+        const loadSelect = document.getElementById('load-options');
+        const option = loadSelect.value;
+
+        if (option === 'file') {
+            triggerLoadGame();
+        } else if (option === 'clipboard') {
+            navigator.clipboard.readText()
+                .then(moveText => {
+                    if (!processGameRecordText(moveText)) {
+                        console.error("Failed to process game record from clipboard.");
+                    }
+                })
+                .catch(err => {
+                    console.error('Failed to read from clipboard: ', err);
+                    setMessage('Failed to read from clipboard!');
+                    setTimeout(() => {
+                        if (document.getElementById('message').textContent === 'Failed to read from clipboard!') {
+                            clearMessage();
+                        }
+                    }, 2000);
+                    renderBoard();
+                    updateStatus();
+                    updateReplayButtons();
+                });
+        }
+        loadSelect.value = '';
+        loadSelect.blur();
+    }
+
+    // === INIT ===
+
+    resetGame(SIZE);
+    initKomiSelect();
+    changeKomi();
+    updateButtonTooltips();
+    adjustHeaderLayout();
+
+    document.getElementById('copy-move').addEventListener('mousedown', copyLastMove);
+
+    const komiSelect = document.getElementById('komi');
+    const boardSizeSelect = document.getElementById('board-size');
+    const saveSelect = document.getElementById('save-options');
+    const loadSelect = document.getElementById('load-options');
+
+    komiSelect.addEventListener('keydown', (event) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+        }
+    });
+    boardSizeSelect.addEventListener('keydown', (event) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+        }
+    });
+    saveSelect.addEventListener('keydown', (event) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+        }
+    });
+    loadSelect.addEventListener('keydown', (event) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        initBoard();
+        renderBoard();
+        updateButtonTooltips();
+        if (isGenerating) {
+            const randomBtn = document.getElementById('random-button');
+            const randomGameWidth = measureRandomGameWidth();
+            randomBtn.style.width = `${randomGameWidth}px`;
+        }
+        adjustHeaderLayout();
+    });
+
+    window.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        if (event.deltaY > 0) replayForward();
+        else if (event.deltaY < 0) replayBack();
+    }, { passive: false });
+
+    document.addEventListener('DOMContentLoaded', updateButtonTooltips);
+    document.querySelectorAll('.replay-controls select').forEach(select => {
+        select.addEventListener('change', () => {
+            updateButtonTooltips();
+            if (select.id === 'save-options' || select.id === 'load-options') {
+                select.value = '';
+            }
+            select.blur();
+        });
+    });
+
+    window.addEventListener('keydown', (event) => {
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT' || activeElement.tagName === 'TEXTAREA';
+
+        const keysToPrevent = ['r', 'h', 'k', 'l', 'i', 'o', 'a', 's', 'z', 'x', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+
+        if (isInputFocused && activeElement.tagName === 'SELECT' && ['ArrowUp', 'ArrowDown', 'Space'].includes(event.key)) {
+        } else if (isInputFocused && (event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey))) {
+        } else if (isInputFocused && (event.key.toLowerCase() === 'x' && (event.metaKey || event.ctrlKey))) {
+        } else if (isInputFocused && (event.key.toLowerCase() === 'z' && (event.metaKey || event.ctrlKey))) {
+        } else if (keysToPrevent.includes(event.key.toLowerCase())) {
+            event.preventDefault();
+        } else {
+            return;
+        }
+
+        const boardSizeSelectEl = document.getElementById('board-size');
+        const komiSelectEl = document.getElementById('komi');
+        const saveSelectEl = document.getElementById('save-options');
+        const loadSelectEl = document.getElementById('load-options');
+
+        switch (event.key.toLowerCase()) {
+            case 'r':
+                if (isGenerating) stopGeneration(); else generateRandomGame();
+                break;
+            case 'h': hold(); break;
+            case 'k':
+                if (komiSelectEl && document.activeElement !== komiSelectEl) {
+                    komiSelectEl.selectedIndex = Math.max(0, komiSelectEl.selectedIndex - 1);
+                    komiSelectEl.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'l':
+                if (komiSelectEl && document.activeElement !== komiSelectEl) {
+                    komiSelectEl.selectedIndex = Math.min(komiSelectEl.options.length - 1, komiSelectEl.selectedIndex + 1);
+                    komiSelectEl.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'i':
+                if (boardSizeSelectEl && document.activeElement !== boardSizeSelectEl) {
+                    boardSizeSelectEl.selectedIndex = Math.max(0, boardSizeSelectEl.selectedIndex - 1);
+                    boardSizeSelectEl.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'o':
+                if (boardSizeSelectEl && document.activeElement !== boardSizeSelectEl) {
+                    boardSizeSelectEl.selectedIndex = Math.min(boardSizeSelectEl.options.length - 1, boardSizeSelectEl.selectedIndex + 1);
+                    boardSizeSelectEl.dispatchEvent(new Event('change'));
+                }
+                break;
+
+            case 'a':
+                if (loadSelectEl) {
+                    loadSelectEl.value = 'file';
+                    loadSelectEl.dispatchEvent(new Event('change'));
+                }
+                break;
+
+            case 's':
+                if (saveSelectEl) {
+                    saveSelectEl.value = 'file';
+                    saveSelectEl.dispatchEvent(new Event('change'));
+                }
+                break;
+
+            case 'c':
+                copyLastMove();
+                break;
+
+            case 'z':
+                if (loadSelectEl) {
+                    loadSelectEl.value = 'clipboard';
+                    loadSelectEl.dispatchEvent(new Event('change'));
+                }
+                break;
+
+            case 'x':
+                if (saveSelectEl) {
+                    saveSelectEl.value = 'clipboard';
+                    saveSelectEl.dispatchEvent(new Event('change'));
+                }
+                break;
+        }
+
+        if (document.activeElement.tagName !== 'SELECT' && !isInputFocused) {
+            switch (event.key) {
+                case 'ArrowUp': replayStart(); break;
+                case 'ArrowDown': replayEnd(); break;
+                case 'ArrowLeft': replayBack(); break;
+                case 'ArrowRight': replayForward(); break;
+            }
+        }
+    });
+</script>
+</body>
+</html>
