@@ -1041,6 +1041,9 @@
             stopGeneration();
             return;
         }
+        if (gameOver) {
+            resetGame(SIZE);
+        }
         isGenerating = true;
         const randomBtn = document.getElementById('random-button');
         randomBtn.style.width = `${measureRandomGameWidth()}px`;
