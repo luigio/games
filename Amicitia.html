@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amicitia</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            width: 100vw;
+            max-width: 100%;
+        }
+
+        .header {
+            width: min(100vw, calc(100vh - 100px));
+            height: 50px;
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0 auto;
+            overflow: visible;
+        }
+
+        .status-left {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            position: absolute;
+            left: 0;
+            z-index: 1;
+            padding-right: 0.5em;
+        }
+
+        .status-center {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            white-space: nowrap;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1;
+        }
+
+        .controls-right {
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            position: absolute;
+            right: 0;
+            z-index: 1;
+            gap: 0.5em;
+        }
+
+        .board-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            background-color: #f0f0f0;
+        }
+
+        .footer {
+            width: 100%;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .board {
+            width: min(100vw, calc(100vh - 100px));
+            height: min(100vw, calc(100vh - 100px));
+            background-color: #d9a359;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #last-move-text {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            white-space: nowrap;
+        }
+
+        #copy-move {
+            font-size: 1.2em;
+            padding: 0;
+            border: none;
+            background: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .copy-icon {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+        }
+
+        #copy-move:hover .copy-icon path {
+            fill: #555;
+        }
+
+        .grid {
+            display: grid;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        .lines {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .point {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .stone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-sizing: border-box;
+            z-index: 2;
+        }
+
+        .black {
+            background: black;
+        }
+
+        .white {
+            background: white;
+            border: 2px solid black;
+        }
+
+        .square {
+            border-radius: 0;
+            width: 88.62%;
+            height: 88.62%;
+        }
+
+        /* Custom colors for square pieces only */
+        .black.square {
+            background: rgb(80, 96, 128);
+            border: 2px solid black;   /* same black outline as white stones */
+        }
+
+        .white.square {
+            background: rgb(208, 224, 255);
+            border: 2px solid black;
+        }
+
+        .last-move::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 22%;
+            height: 22%;
+            border-radius: 50%;
+            background: red;
+            z-index: 3;
+        }
+
+        .replay-controls {
+            display: flex;
+            flex-wrap: nowrap;
+            width: 100%;
+            gap: 0.5em;
+            overflow: hidden;
+            justify-content: center;
+        }
+
+        .replay-controls button,
+        .replay-controls select {
+            flex: 0 1 auto;
+            padding: 0.3em 0.5em;
+            font-size: 1em;
+            border: 2px solid black;
+            background: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            min-width: 0;
+            text-overflow: clip;
+            overflow: hidden;
+            white-space: nowrap;
+            max-width: 100px;
+        }
+
+        button, select {
+            font-size: 1em;
+            padding: 0.3em 0.5em;
+            border: 2px solid black;
+            background: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:not(:disabled):hover, select:hover {
+            background: #FFF5E9;
+        }
+
+        select {
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .replay-controls button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .stone-icon {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+            margin-right: 0.5em;
+        }
+
+        #message {
+            font-family: Arial, sans-serif;
+            position: absolute;
+            left: calc(50vw + 50vh - 30px);
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2em;
+            color: #d32f2f;
+            width: 20vw;
+            text-align: left;
+        }
+
+        .left-spacing {
+            margin-left: 0.5em;
+        }
+
+        #random-button {
+            flex: 0 1 auto;
+            min-width: 0;
+            text-align: center;
+            max-width: 8em;
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div class="header">
+        <div class="status-left" id="turn-status"></div>
+        <div class="status-center" id="score-status"></div>
+        <div class="controls-right">
+            <div id="last-move-display" style="display: flex; align-items: center; gap: 0.5em;">
+                <span id="last-move-text"></span>
+                <button id="copy-move" title="Copy last move" style="display: none;">
+                    <svg class="copy-icon" viewBox="0 0 23 24">
+                        <path fill="black" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="board-container">
+        <div class="board" id="board">
+            <div class="lines" id="lines"></div>
+            <div class="grid" id="grid"></div>
+        </div>
+        <div id="message"></div>
+    </div>
+    <div class="footer">
+        <div class="replay-controls">
+            <button onmousedown="replayStart()">Start</button>
+            <button onmousedown="replayBack()">Back</button>
+            <button onmousedown="replayForward()">Forward</button>
+            <button onmousedown="replayEnd()">End</button>
+            <button id="random-button" onmousedown="generateRandomGame()">Random game</button>
+            <select id="save-options" onchange="handleSave()">
+                <option value="" disabled selected hidden>Save</option>
+                <option value="file">To file</option>
+                <option value="clipboard">To clipboard</option>
+            </select>
+            <select id="load-options" onchange="handleLoad()">
+                <option value="" disabled selected hidden>Load</option>
+                <option value="file">From file</option>
+                <option value="clipboard">From clipboard</option>
+            </select>
+            <select id="komi" onchange="changeKomi()">
+                <!-- Options will be populated by JavaScript -->
+            </select>
+            <select id="board-size" onchange="changeBoardSize()">
+                <option value="7">7×7</option>
+                <option value="9">9×9</option>
+                <option value="11">11×11</option>
+                <option value="13" selected>13×13</option>
+                <option value="15">15×15</option>
+                <option value="17">17×17</option>
+                <option value="19">19×19</option>
+                <option value="21">21×21</option>
+            </select>
+            <input type="file" id="load-input" style="display: none;" accept=".txt" onchange="loadGame(event)">
+        </div>
+    </div>
+</div>
+
+<script>
+    let SIZE = 13;
+    let board = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
+    let turn = 'black';
+    let komi = 7;
+    let lastMoveX = null;
+    let lastMoveY = null;
+    let lastShape = null;
+    let lastWasFlip = false;
+    let gameHistory = [];
+    let currentMoveIndex = -1;
+    let isGenerating = false;
+    let generationInterval = null;
+    let passesInRow = 0;
+    let gameOver = false;
+
+    const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
+    const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
+
+    function initBoard() {
+        const gridDiv = document.getElementById('grid');
+        gridDiv.innerHTML = '';
+        const linesDiv = document.getElementById('lines');
+        linesDiv.innerHTML = '';
+        
+        const canvas = document.createElement('canvas');
+        const boardSize = document.getElementById('board').offsetWidth;
+        canvas.width = boardSize;
+        canvas.height = boardSize;
+        const ctx = canvas.getContext('2d');
+        ctx.strokeStyle = 'black';
+        const cellSize = boardSize / SIZE;
+        
+        gridDiv.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+        gridDiv.style.gridTemplateRows = `repeat(${SIZE}, 1fr)`;
+
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const point = document.createElement('div');
+                point.className = 'point';
+                point.dataset.x = i;
+                point.dataset.y = j;
+                
+                point.addEventListener('mousedown', (e) => {
+                    if (gameOver) return;
+                    const x = i;
+                    const y = j;
+
+                    if (board[x][y] === null) {
+                        const shape = e.button === 0 ? 'circle' : (e.button === 2 ? 'square' : null);
+                        if (shape) performPlacement(x, y, shape);
+                    } else if (board[x][y].color !== turn) {
+                        performFlip(x, y);
+                    } else {
+                        setMessage("Cannot interact with your own stone.");
+                    }
+                });
+                
+                point.addEventListener('contextmenu', (e) => e.preventDefault());
+                
+                const stone = document.createElement('div');
+                stone.className = 'stone';
+                point.appendChild(stone);
+                gridDiv.appendChild(point);
+            }
+        }
+
+        for (let i = 0; i < SIZE; i++) {
+            const pos = cellSize / 2 + i * cellSize;
+            ctx.beginPath();
+            ctx.lineWidth = (i === 0 || i === SIZE - 1) ? 2 : 1;
+            ctx.moveTo(pos, cellSize / 2);
+            ctx.lineTo(pos, boardSize - cellSize / 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.lineWidth = (i === 0 || i === SIZE - 1) ? 2 : 1;
+            ctx.moveTo(cellSize / 2, pos);
+            ctx.lineTo(boardSize - cellSize / 2, pos);
+            ctx.stroke();
+        }
+        linesDiv.appendChild(canvas);
+
+        updateStatus();
+        updateLastMoveDisplay();
+        updateButtonTooltips();
+    }
+
+    function getGroup(x, y) {
+        if (!board[x][y]) return [];
+        const color = board[x][y].color;
+        const shape = board[x][y].shape;
+        const visited = Array.from({length: SIZE}, () => Array(SIZE).fill(false));
+        const group = [];
+        const queue = [[x, y]];
+        visited[x][y] = true;
+        group.push([x, y]);
+
+        while (queue.length > 0) {
+            const [cx, cy] = queue.shift();
+            for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
+                const nx = cx + dx;
+                const ny = cy + dy;
+                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && !visited[nx][ny] &&
+                    board[nx][ny] && board[nx][ny].color === color && board[nx][ny].shape === shape) {
+                    visited[nx][ny] = true;
+                    queue.push([nx, ny]);
+                    group.push([nx, ny]);
+                }
+            }
+        }
+        return group;
+    }
+
+    function isGroupBounded(group) {
+        for (const [gx, gy] of group) {
+            for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
+                const nx = gx + dx;
+                const ny = gy + dy;
+                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
+                    if (board[nx][ny] === null) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Centralized logic to validate if a flip is legal.
+     * @param {number} x - x coordinate of a stone in the target group
+     * @param {number} y - y coordinate of a stone in the target group
+     * @param {string} actorColor - The color of the player attempting the flip
+     * @returns {object} { valid: boolean, reason: string, group: Array }
+     */
+    function getFlipValidation(x, y, actorColor) {
+        if (!board[x][y]) {
+            return { valid: false, reason: "Empty cell", group: [] };
+        }
+        if (board[x][y].color === actorColor) {
+            return { valid: false, reason: "Own stone", group: [] };
+        }
+
+        const group = getGroup(x, y);
+        if (group.length === 0) {
+            return { valid: false, reason: "No group found", group: [] };
+        }
+
+        // Rule 1: Bounded Group
+        if (!isGroupBounded(group)) {
+            return { valid: false, reason: "Group must be bounded (no empty neighbors)", group: group };
+        }
+
+        // Rule 2: Adjacency Majority/Half
+        const groupShape = board[x][y].shape;
+        const otherShape = groupShape === 'circle' ? 'square' : 'circle';
+
+        const adjSet = new Set();
+        for (const [gx, gy] of group) {
+            for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
+                const nx = gx + dx;
+                const ny = gy + dy;
+                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && board[nx][ny] && board[nx][ny].shape === otherShape) {
+                    adjSet.add(`${nx}-${ny}`);
+                }
+            }
+        }
+
+        if (adjSet.size === 0) {
+            return { valid: false, reason: "No adjacent pieces of the other type", group: group };
+        }
+
+        let myCount = 0;
+        for (const key of adjSet) {
+            const [ax, ay] = key.split('-').map(Number);
+            if (board[ax][ay].color === actorColor) myCount++;
+        }
+
+        // Strict Majority rule: myCount > adjSet.size / 2
+        if (myCount * 2 <= adjSet.size) {
+            return { valid: false, reason: `Need strict majority (${myCount}/${adjSet.size})`, group: group };
+        }
+
+        return { valid: true, group: group };
+    }
+
+    function performPlacement(x, y, shape) {
+        if (board[x][y] !== null) {
+            setMessage("Position occupied!");
+            return;
+        }
+        board[x][y] = {color: turn, shape: shape};
+        successfulMove(x, y, shape, false);
+    }
+
+    function performFlip(x, y) {
+        // Use centralized validation
+        const result = getFlipValidation(x, y, turn);
+        
+        if (!result.valid) {
+            setMessage(result.reason);
+            return;
+        }
+
+        const groupShape = board[x][y].shape;
+        for (const [gx, gy] of result.group) {
+            board[gx][gy].color = turn;
+        }
+
+        successfulMove(x, y, groupShape, true);
+    }
+
+    function successfulMove(x, y, shape, isFlip) {
+        lastWasFlip = isFlip;
+        setLastMoveMarker(x, y);
+        lastShape = shape;
+
+        // Switch turn immediately after the move
+        turn = turn === 'black' ? 'white' : 'black';
+
+        // Reset consecutive passes counter (real move resets it)
+        passesInRow = 0;
+
+        // Handle history branching if we're not at the end
+        if (currentMoveIndex < gameHistory.length - 1) {
+            gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+        }
+
+        // Check if the next player (or players) cannot move → auto-skip until someone can or game ends
+        while (!hasLegalMove() && !gameOver) {
+            passesInRow++;
+            turn = turn === 'black' ? 'white' : 'black';
+
+            if (passesInRow >= 2) {
+                gameOver = true;
+                setMessage("Game over: neither player can move.");
+            } else {
+                setMessage(`${turn === 'black' ? 'Black' : 'White'} has no moves — turn skipped.`);
+            }
+        }
+
+        // Save the state after the move (and after any auto-skips)
+        gameHistory.push(saveGameState());
+        currentMoveIndex++;
+
+        // Update UI
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+        updateReplayButtons();
+    }
+
+
+    function hasLegalMove() {
+        // Quick check: any empty cell → yes (can always place)
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                if (board[i][j] === null) return true;
+            }
+        }
+
+        // No empties → check for flippable enemy groups using centralized validation
+        const seenGroups = new Set();
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                if (board[i][j] && board[i][j].color !== turn) {
+                    
+                    // Optimization: if we've already checked this group (valid or invalid), skip
+                    // Note: getGroup logic traverses, so we need to be careful. 
+                    // Simpler: Just check validation.
+                    
+                    // To avoid re-calculating the same group repeatedly, we can check seenGroups first
+                    // but we need the group to form the key. 
+                    // We'll trust getFlipValidation to be fast enough or we can optimize later.
+                    // For now, let's just check validation.
+                    
+                    const result = getFlipValidation(i, j, turn);
+                    if (result.valid) return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    function saveGameState() {
+        return {
+            board: board.map(row => row.map(cell => cell ? {...cell} : null)),
+            turn: turn,
+            lastMoveX: lastMoveX,
+            lastMoveY: lastMoveY,
+            lastShape: lastShape,
+            lastWasFlip: lastWasFlip
+        };
+    }
+
+    function loadGameState(state) {
+        board = state.board.map(row => row.map(cell => cell ? {...cell} : null));
+        turn = state.turn;
+        lastMoveX = state.lastMoveX;
+        lastMoveY = state.lastMoveY;
+        lastShape = state.lastShape;
+        lastWasFlip = state.lastWasFlip || false;
+        
+        gameOver = false;
+        passesInRow = 0;
+        
+        if (!hasLegalMove()) {
+            turn = turn === 'black' ? 'white' : 'black';
+            if (!hasLegalMove()) {
+                gameOver = true;
+            }
+            turn = turn === 'black' ? 'white' : 'black';
+        }
+        
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+    }
+
+    function resetGame(newSize) {
+        SIZE = newSize;
+        board = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
+        turn = 'black';
+        lastMoveX = lastMoveY = lastShape = null;
+        lastWasFlip = false;
+        gameHistory = [saveGameState()];
+        currentMoveIndex = 0;
+        passesInRow = 0;
+        gameOver = false;
+        clearMessage();
+        initBoard();
+        updateReplayButtons();
+        renderBoard();
+        updateLastMoveDisplay();
+    }
+
+    function changeBoardSize() {
+        const select = document.getElementById('board-size');
+        const newSize = parseInt(select.value);
+        resetGame(newSize);
+        select.blur();
+    }
+
+    function changeKomi() {
+        const select = document.getElementById('komi');
+        komi = parseInt(select.value);
+        updateStatus();
+        select.blur();
+    }
+
+    function initKomiSelect() {
+        const komiSelect = document.getElementById('komi');
+        for (let i = 0; i <= 20; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.text = `Komi ${i}`;
+            if (i === 7) option.selected = true;
+            komiSelect.appendChild(option);
+        }
+    }
+
+    function clearLastMoveMarker() {
+        if (lastMoveX !== null && lastMoveY !== null) {
+            const points = document.getElementsByClassName('point');
+            const stone = points[lastMoveX * SIZE + lastMoveY].firstChild;
+            stone.classList.remove('last-move');
+        }
+    }
+
+    function setLastMoveMarker(x, y) {
+        clearLastMoveMarker();
+        const points = document.getElementsByClassName('point');
+        const stone = points[x * SIZE + y].firstChild;
+        stone.classList.add('last-move');
+        lastMoveX = x;
+        lastMoveY = y;
+    }
+
+    function clearMessage() {
+        document.getElementById('message').textContent = '';
+    }
+
+    function setMessage(text) {
+        document.getElementById('message').textContent = text;
+        setTimeout(clearMessage, 3000);
+    }
+
+    function replayStart() {
+        currentMoveIndex = 0;
+        loadGameState(gameHistory[0]);
+        while (currentMoveIndex < gameHistory.length - 1 && !gameOver && !hasLegalMove()) {
+            currentMoveIndex++;
+            loadGameState(gameHistory[currentMoveIndex]);
+        }
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function replayBack() {
+        if (currentMoveIndex > 0) {
+            currentMoveIndex--;
+            loadGameState(gameHistory[currentMoveIndex]);
+            while (currentMoveIndex > 0 && !gameOver && !hasLegalMove()) {
+                currentMoveIndex--;
+                loadGameState(gameHistory[currentMoveIndex]);
+            }
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+    }
+
+    function replayForward() {
+        if (currentMoveIndex < gameHistory.length - 1) {
+            currentMoveIndex++;
+            loadGameState(gameHistory[currentMoveIndex]);
+            while (currentMoveIndex < gameHistory.length - 1 && !gameOver && !hasLegalMove()) {
+                currentMoveIndex++;
+                loadGameState(gameHistory[currentMoveIndex]);
+            }
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+    }
+
+    function replayEnd() {
+        currentMoveIndex = gameHistory.length - 1;
+        loadGameState(gameHistory[currentMoveIndex]);
+        while (currentMoveIndex > 0 && !gameOver && !hasLegalMove()) {
+            currentMoveIndex--;
+            loadGameState(gameHistory[currentMoveIndex]);
+        }
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function updateReplayButtons() {
+        const buttons = document.querySelectorAll('.replay-controls button');
+        const startBtn   = buttons[0];
+        const backBtn    = buttons[1];
+        const forwardBtn = buttons[2];
+        const endBtn     = buttons[3];
+        const randomBtn  = document.getElementById('random-button');
+
+        const isAtStart = currentMoveIndex === 0;
+        const isAtEnd   = currentMoveIndex === gameHistory.length - 1;
+
+        randomBtn.disabled = isGenerating ? false : (!gameOver && !hasLegalMove());
+
+        startBtn.disabled   = isAtStart   || isGenerating;
+        backBtn.disabled    = isAtStart   || isGenerating;
+        forwardBtn.disabled = isAtEnd     || isGenerating;
+        endBtn.disabled     = isAtEnd     || isGenerating;
+    }
+
+    function renderBoard() {
+        const points = document.getElementsByClassName('point');
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const stone = points[i * SIZE + j].firstChild;
+                stone.className = 'stone';
+                if (board[i][j]) {
+                    if (board[i][j].color === 'black') stone.classList.add('black');
+                    else stone.classList.add('white');
+                    if (board[i][j].shape === 'square') stone.classList.add('square');
+                }
+                if (i === lastMoveX && j === lastMoveY) {
+                    stone.classList.add('last-move');
+                }
+            }
+        }
+        updateButtonTooltips();
+    }
+
+    function getCounts() {
+        let black = 0, white = 0;
+        for (let row of board) {
+            for (let cell of row) {
+                if (cell) {
+                    if (cell.color === 'black') black++;
+                    else white++;
+                }
+            }
+        }
+        return {black, white};
+    }
+
+    function updateStatus() {
+        const turnStatus = document.getElementById('turn-status');
+        const scoreStatus = document.getElementById('score-status');
+        const {black: bCount, white: wCount} = getCounts();
+        const effectiveWhite = wCount + komi;
+        const turnSVG = turn === 'black' ? blackStoneSVG : whiteStoneSVG;
+
+        scoreStatus.innerHTML = `${bCount}<span class="left-spacing">${blackStoneSVG}</span> ${effectiveWhite}<span class="left-spacing">${whiteStoneSVG}</span>`;
+
+        const isAtEnd = currentMoveIndex === gameHistory.length - 1;
+        
+        if (gameOver && isAtEnd) {
+            const diff = bCount - effectiveWhite;
+            let result = diff > 0 ? `${blackStoneSVG} wins by ${diff}!`
+                        : diff < 0 ? `${whiteStoneSVG} wins by ${-diff}!`
+                        : 'Tie!';
+            turnStatus.innerHTML = `${result}`;
+        } else {
+            turnStatus.innerHTML = `${turnSVG} to move`;
+        }
+
+        adjustHeaderLayout();
+    }
+
+    function stopGeneration() {
+        if (generationInterval) {
+            clearInterval(generationInterval);
+            generationInterval = null;
+            isGenerating = false;
+            const randomBtn = document.getElementById('random-button');
+            randomBtn.textContent = 'Random game';
+            randomBtn.setAttribute('onmousedown', 'generateRandomGame()');
+            updateReplayButtons();
+            updateStatus();
+            renderBoard();
+        }
+    }
+
+    function measureRandomGameWidth() {
+        const randomBtn = document.getElementById('random-button');
+        const clone = randomBtn.cloneNode(true);
+        clone.textContent = 'Random game';
+        clone.style.visibility = 'hidden';
+        clone.style.position = 'absolute';
+        document.body.appendChild(clone);
+        const width = clone.offsetWidth;
+        document.body.removeChild(clone);
+        return width;
+    }
+
+    function generateRandomGame() {
+        if (isGenerating) {
+            stopGeneration();
+            return;
+        }
+        if (gameOver) {
+            resetGame(SIZE);
+        }
+        isGenerating = true;
+        const randomBtn = document.getElementById('random-button');
+        const width = measureRandomGameWidth();
+        randomBtn.style.width = `${width}px`;
+        randomBtn.textContent = 'Stop';
+        randomBtn.setAttribute('onmousedown', 'stopGeneration()');
+        updateReplayButtons();
+
+        generationInterval = setInterval(() => {
+            // Step 1: Collect ALL legal moves
+            const legalMoves = [];
+
+            // A. All empty cells → placement (circle or square = 2 options each)
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (board[i][j] === null) {
+                        legalMoves.push({type: 'place', x: i, y: j, shape: 'circle'});
+                        legalMoves.push({type: 'place', x: i, y: j, shape: 'square'});
+                    }
+                }
+            }
+
+            // B. All flippable enemy groups (using centralized validation)
+            const seenGroups = new Set();
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (board[i][j] && board[i][j].color !== turn) {
+                        const result = getFlipValidation(i, j, turn);
+                        
+                        if (result.valid) {
+                            // Only add one move per unique group
+                            const groupKey = result.group.map(([gx, gy]) => `${gx},${gy}`).sort().join(';');
+                            if (!seenGroups.has(groupKey)) {
+                                seenGroups.add(groupKey);
+                                // Pick representative
+                                const [rx, ry] = result.group[0];
+                                legalMoves.push({type: 'flip', x: rx, y: ry});
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Step 2: If no legal moves left → stop
+            if (legalMoves.length === 0) {
+                stopGeneration();
+                return;
+            }
+
+            // Step 3: Pick one uniformly at random
+            const move = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+
+            if (move.type === 'place') {
+                performPlacement(move.x, move.y, move.shape);
+            } else if (move.type === 'flip') {
+                performFlip(move.x, move.y);
+            }
+
+        }, 1); 
+    }
+
+    function updateLastMoveDisplay() {
+        const lastMoveText = document.getElementById('last-move-text');
+        const copyButton = document.getElementById('copy-move');
+        
+        if (currentMoveIndex < 1) {
+            lastMoveText.textContent = '';
+            copyButton.style.display = 'none';
+            return;
+        }
+
+        const state = gameHistory[currentMoveIndex];
+        const playerSymbol = state.turn === 'black' ? 'W' : 'B';
+
+        if (state.lastMoveX === null || state.lastShape === null) {
+            lastMoveText.textContent = '';
+            copyButton.style.display = 'none';
+            return;
+        }
+
+        const flipChar = state.lastWasFlip ? 'F' : '';
+        const shapeChar = state.lastWasFlip ? '' : (state.lastShape === 'circle' ? 'C' : 'S');
+        const col = String.fromCharCode(97 + state.lastMoveY);
+        const row = SIZE - state.lastMoveX;
+        lastMoveText.textContent = `${playerSymbol}${flipChar}${shapeChar}${col}${row}`;
+        copyButton.style.display = 'inline-flex';
+    }
+
+    function copyLastMove() {
+        const text = document.getElementById('last-move-text').textContent;
+        if (text) {
+            navigator.clipboard.writeText(text).then(() => setMessage('Copied!'));
+        }
+    }
+
+    function generateGameRecordText(history, currentBoardSize, currentKomi) {
+        const header = `${currentBoardSize}x${currentBoardSize} ${currentKomi}`;
+        const moves = [header];
+        for (let i = 1; i < history.length; i++) {
+            const state = history[i];
+            const prevTurn = history[i-1].turn;
+            const playerSymbol = prevTurn === 'black' ? 'B' : 'W';
+            if (state.lastMoveX !== null && state.lastShape !== null) {
+                const flipChar = state.lastWasFlip ? 'F' : '';
+                const shapeChar = state.lastWasFlip ? '' : (state.lastShape === 'circle' ? 'C' : 'S');
+                const col = String.fromCharCode(97 + state.lastMoveY);
+                const row = currentBoardSize - state.lastMoveX;
+                moves.push(`${playerSymbol}${flipChar}${shapeChar}${col}${row}`);
+            }
+        }
+        return moves.join(' ');
+    }
+
+    function processGameRecordText(text) {
+        text = text.trim();
+        if (!text) return false;
+        const parts = text.split(/\s+/);
+        const sizeMatch = parts[0].match(/^(\d+)x(\d+)$/i);
+        if (!sizeMatch || sizeMatch[1] !== sizeMatch[2]) {
+            setMessage("Invalid board size.");
+            return false;
+        }
+        const newSize = parseInt(sizeMatch[1]);
+
+        let komiValue = 7;
+        let startIdx = 1;
+        if (parts.length > 1 && !isNaN(parseInt(parts[1])) && parseInt(parts[1]) >= 0 && parseInt(parts[1]) <= 20) {
+            komiValue = parseInt(parts[1]);
+            startIdx = 2;
+        }
+
+        komi = komiValue;
+        document.getElementById('komi').value = komiValue;
+        resetGame(newSize);
+
+        let expectedPlayer = 'black';
+        for (let i = startIdx; i < parts.length; i++) {
+            const m = parts[i].match(/^([BW])(F)?([CS])?([a-z])(\d+)$/i);
+            if (!m) {
+                setMessage(`Invalid move: ${parts[i]}`);
+                return false;
+            }
+            const [, pSym, fStr, sChar, colChar, rowStr] = m;
+            const isFlip = !!fStr;
+            const player = pSym.toUpperCase() === 'B' ? 'black' : 'white';
+            const y = colChar.toLowerCase().charCodeAt(0) - 97;
+            const x = newSize - parseInt(rowStr);
+
+            if (player !== expectedPlayer) {
+                setMessage("Turn mismatch.");
+                return false;
+            }
+            if (x < 0 || x >= newSize || y < 0 || y >= newSize) {
+                setMessage("Move out of bounds.");
+                return false;
+            }
+
+            if (isFlip) {
+                // Centralized validation for import as well
+                const result = getFlipValidation(x, y, player);
+                if (!result.valid) {
+                    setMessage(`Invalid Flip: ${result.reason} at ${parts[i]}`);
+                    return false;
+                }
+                
+                // Extra check: if format includes shape char, validate it matches
+                const groupShape = board[x][y].shape;
+                if (sChar) {
+                    const specifiedShape = sChar.toUpperCase() === 'C' ? 'circle' : 'square';
+                    if (groupShape !== specifiedShape) {
+                        setMessage("Shape mismatch in flip.");
+                        return false;
+                    }
+                }
+
+                for (const [gx, gy] of result.group) {
+                    board[gx][gy].color = player;
+                }
+                lastMoveX = x;
+                lastMoveY = y;
+                lastShape = groupShape;
+                lastWasFlip = true;
+            } else {
+                if (!sChar) {
+                    setMessage("Shape missing for placement.");
+                    return false;
+                }
+                const shape = sChar.toUpperCase() === 'C' ? 'circle' : 'square';
+                if (board[x][y] !== null) {
+                    setMessage("Position occupied.");
+                    return false;
+                }
+                board[x][y] = {color: player, shape: shape};
+                lastMoveX = x;
+                lastMoveY = y;
+                lastShape = shape;
+                lastWasFlip = false;
+            }
+
+            gameHistory.push(saveGameState());
+            currentMoveIndex++;
+            expectedPlayer = expectedPlayer === 'black' ? 'white' : 'black';
+        }
+
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+        updateReplayButtons();
+        clearMessage();
+        return true;
+    }
+
+    function handleSave() {
+        const select = document.getElementById('save-options');
+        const option = select.value;
+        if (!option) return;
+        const text = generateGameRecordText(gameHistory, SIZE, komi);
+        if (option === 'file') {
+            const blob = new Blob([text], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'amicitia_game.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        } else if (option === 'clipboard') {
+            navigator.clipboard.writeText(text).then(() => setMessage('Copied to clipboard!'));
+        }
+        select.value = '';
+    }
+
+    function loadGame(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => processGameRecordText(e.target.result);
+        reader.readAsText(file);
+        event.target.value = '';
+    }
+
+    function handleLoad() {
+        const select = document.getElementById('load-options');
+        const option = select.value;
+        if (option === 'file') {
+            document.getElementById('load-input').click();
+        } else if (option === 'clipboard') {
+            navigator.clipboard.readText().then(text => processGameRecordText(text));
+        }
+        select.value = '';
+    }
+
+    function getTotalMaxWidth() {}
+    function updateButtonTooltips() {}
+    function adjustHeaderLayout() {}
+
+    resetGame(SIZE);
+    initKomiSelect();
+    updateButtonTooltips();
+    adjustHeaderLayout();
+
+    document.getElementById('copy-move').addEventListener('mousedown', copyLastMove);
+
+    const komiSelect = document.getElementById('komi');
+    const boardSizeSelect = document.getElementById('board-size');
+    const saveSelect = document.getElementById('save-options');
+    const loadSelect = document.getElementById('load-options');
+
+    komiSelect.addEventListener('keydown', (event) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+        }
+    });
+    boardSizeSelect.addEventListener('keydown', (event) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+        }
+    });
+    saveSelect.addEventListener('keydown', (event) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+        }
+    });
+    loadSelect.addEventListener('keydown', (event) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        initBoard();
+        renderBoard();
+        updateButtonTooltips();
+        if (isGenerating) {
+            const randomBtn = document.getElementById('random-button');
+            const randomGameWidth = measureRandomGameWidth();
+            randomBtn.style.width = `${randomGameWidth}px`;
+        }
+        adjustHeaderLayout();
+    });
+
+    window.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        if (event.deltaY > 0) replayForward();
+        else if (event.deltaY < 0) replayBack();
+    }, { passive: false });
+
+    document.addEventListener('DOMContentLoaded', updateButtonTooltips);
+    document.querySelectorAll('.replay-controls select').forEach(select => {
+        select.addEventListener('change', () => {
+            updateButtonTooltips();
+            if (select.id === 'save-options' || select.id === 'load-options') select.value = '';
+            select.blur();
+        });
+    });
+
+    window.addEventListener('keydown', (event) => {
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT' || activeElement.tagName === 'TEXTAREA';
+
+        const keysToPrevent = ['r', 'k', 'l', 'i', 'o', 'a', 's', 'z', 'x', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+
+        if (isInputFocused && activeElement.tagName === 'SELECT' && ['ArrowUp', 'ArrowDown', 'Space'].includes(event.key)) {
+        } else if (isInputFocused && (event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey))) {
+        } else if (isInputFocused && (event.key.toLowerCase() === 'x' && (event.metaKey || event.ctrlKey))) {
+        } else if (isInputFocused && (event.key.toLowerCase() === 'z' && (event.metaKey || event.ctrlKey))) {
+        } else if (keysToPrevent.includes(event.key.toLowerCase())) {
+            event.preventDefault();
+        } else {
+            return;
+        }
+
+        switch (event.key.toLowerCase()) {
+            case 'r':
+                if (isGenerating) stopGeneration(); else generateRandomGame();
+                break;
+            case 'k': 
+                if (komiSelect && document.activeElement !== komiSelect) {
+                    komiSelect.selectedIndex = Math.max(0, komiSelect.selectedIndex - 1);
+                    komiSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'l': 
+                if (komiSelect && document.activeElement !== komiSelect) {
+                    komiSelect.selectedIndex = Math.min(komiSelect.options.length - 1, komiSelect.selectedIndex + 1);
+                    komiSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'i': 
+                if (boardSizeSelect && document.activeElement !== boardSizeSelect) {
+                    boardSizeSelect.selectedIndex = Math.max(0, boardSizeSelect.selectedIndex - 1);
+                    boardSizeSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'o': 
+                if (boardSizeSelect && document.activeElement !== boardSizeSelect) {
+                    boardSizeSelect.selectedIndex = Math.min(boardSizeSelect.options.length - 1, boardSizeSelect.selectedIndex + 1);
+                    boardSizeSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'a':
+                if (loadSelect) {
+                    loadSelect.value = 'file';
+                    loadSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 's':
+                if (saveSelect) {
+                    saveSelect.value = 'file';
+                    saveSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'c':
+                copyLastMove();
+                break;
+            case 'z':
+                if (loadSelect) {
+                    loadSelect.value = 'clipboard';
+                    loadSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'x':
+                if (saveSelect) {
+                    saveSelect.value = 'clipboard';
+                    saveSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+        }
+
+        if (document.activeElement.tagName !== 'SELECT' && !isInputFocused) {
+            switch (event.key) {
+                case 'ArrowUp': replayStart(); break;
+                case 'ArrowDown': replayEnd(); break;
+                case 'ArrowLeft': replayBack(); break;
+                case 'ArrowRight': replayForward(); break;
+            }
+        }
+    });
+</script>
+</body>
+</html>
