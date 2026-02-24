@@ -793,7 +793,7 @@
             backBtn.disabled = currentMoveIndex === 0;
             forwardBtn.disabled = currentMoveIndex === gameHistory.length - 1;
             endBtn.disabled = currentMoveIndex === gameHistory.length - 1;
-            randomBtn.disabled = gameOver || swapTargets !== null;
+            randomBtn.disabled = swapTargets !== null;
         }
     }
 
