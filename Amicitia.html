@@ -171,7 +171,7 @@
         /* Custom colors for square pieces only */
         .black.square {
             background: rgb(80, 96, 128);
-            border: 2px solid black;
+            border: 2px solid black; 
         }
 
         .white.square {
@@ -1125,9 +1125,92 @@
         select.value = '';
     }
 
-    function getTotalMaxWidth() {}
-    function updateButtonTooltips() {}
-    function adjustHeaderLayout() {}
+    function getTotalMaxWidth() {
+        const controls = document.querySelector('.replay-controls');
+        const elements = controls.querySelectorAll('button, select');
+        const numElements = elements.length;
+        const numGaps = numElements - 1;
+
+        const sampleElement = elements[0];
+        const styles = getComputedStyle(sampleElement);
+        const maxWidth = parseFloat(styles.maxWidth);
+        const paddingLeft = parseFloat(styles.paddingLeft);
+        const paddingRight = parseFloat(styles.paddingRight);
+        const borderLeft = parseFloat(styles.borderLeftWidth);
+        const borderRight = parseFloat(styles.borderRightWidth);
+        const gap = parseFloat(getComputedStyle(controls).gap);
+
+        const elementWidth = maxWidth + paddingLeft + paddingRight + borderLeft + borderRight;
+        const totalMaxWidth = (elementWidth * numElements) + (gap * numGaps);
+
+        return totalMaxWidth;
+    }
+
+    function updateButtonTooltips() {
+        const buttons = document.querySelectorAll('.replay-controls button');
+        const selects = document.querySelectorAll('.replay-controls select');
+        const elements = [...buttons, ...selects];
+        const totalMaxWidth = getTotalMaxWidth();
+        const windowWidth = window.innerWidth;
+
+        elements.forEach(element => {
+            let fullText = '';
+            if (element.tagName === 'BUTTON') {
+                fullText = element.textContent.trim();
+            } else if (element.tagName === 'SELECT' && element.selectedIndex >= 0) {
+                fullText = element.options[element.selectedIndex].text.trim();
+            }
+
+            if (windowWidth < totalMaxWidth) {
+                element.setAttribute('title', fullText);
+            } else {
+                element.removeAttribute('title');
+            }
+        });
+    }
+
+    function adjustHeaderLayout() {
+        const header = document.querySelector('.header');
+        const statusLeft = document.querySelector('.status-left');
+        const statusCenter = document.querySelector('.status-center');
+        const controlsRight = document.querySelector('.controls-right');
+        const board = document.querySelector('.board');
+
+        const headerWidth = header.offsetWidth;
+        const leftWidth = statusLeft.offsetWidth;
+        const centerWidth = statusCenter.offsetWidth;
+        const rightWidth = controlsRight.offsetWidth;
+
+        statusCenter.style.position = 'absolute';
+        statusCenter.style.left = '50%';
+        statusCenter.style.transform = 'translateX(-50%)';
+
+        statusLeft.style.position = 'absolute';
+        controlsRight.style.position = 'absolute';
+        statusLeft.style.left = '0';
+        controlsRight.style.right = '0';
+
+        const centerLeft = (headerWidth - centerWidth) / 2;
+        const centerRight = centerLeft + centerWidth;
+
+        const leftOverlap = leftWidth > centerLeft;
+        const rightOverlap = rightWidth > (headerWidth - centerRight);
+
+        if (leftOverlap || rightOverlap) {
+            const leftPush = leftOverlap ? leftWidth - centerLeft : 0;
+            const rightPush = rightOverlap ? rightWidth - (headerWidth - centerRight) : 0;
+
+            if (leftPush > 0) {
+                statusLeft.style.left = `-${leftPush}px`;
+            }
+            if (rightPush > 0) {
+                controlsRight.style.right = `-${rightPush}px`;
+            }
+        } else {
+            statusLeft.style.left = '0';
+            controlsRight.style.right = '0';
+        }
+    }
 
     resetGame(SIZE);
     initKomiSelect();

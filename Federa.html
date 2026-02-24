@@ -142,13 +142,13 @@
             z-index: 0;
         }
 
-        /* ── Pieces ── */
+        /* ── Stones ── */
         .point {
             position: relative;
             cursor: pointer;
         }
 
-        .piece {
+        .stone {
             position: absolute;
             top: 50%;
             left: 50%;
@@ -250,8 +250,8 @@
             opacity: 0.5;
         }
 
-        /* Inline piece icons used in status text */
-        .piece-icon {
+        /* Inline stone icons used in status text */
+        .stone-icon {
             width: 1em;
             height: 1em;
             vertical-align: middle;
@@ -362,7 +362,7 @@
     // ─────────────────────────────────────────────────────────────
 
     /**
-     * Returns true if a piece of (pieceColor, pieceShape) covets a piece of
+     * Returns true if a stone of (stoneColor, stoneShape) covets a piece of
      * (targetColor, targetShape) under Federa's three covet rules:
      *
      *   Rule 1 — Black covets white of the OPPOSITE shape.
@@ -378,19 +378,19 @@
      *   white○  →  black○, white□
      *   white□  →  black□, white○
      */
-    function doesCovet(pieceColor, pieceShape, targetColor, targetShape) {
+    function doesCovet(stoneColor, stoneShape, targetColor, targetShape) {
         // Rule 1: black covets white of opposite shape
-        if (pieceColor === 'black' && targetColor === 'white' && targetShape !== pieceShape) return true;
+        if (stoneColor === 'black' && targetColor === 'white' && targetShape !== stoneShape) return true;
         // Rule 2: white covets black of same shape
-        if (pieceColor === 'white' && targetColor === 'black' && targetShape === pieceShape) return true;
+        if (stoneColor === 'white' && targetColor === 'black' && targetShape === stoneShape) return true;
         // Rule 3: all covet same color, opposite shape
-        if (targetColor === pieceColor && targetShape !== pieceShape) return true;
+        if (targetColor === stoneColor && targetShape !== stoneShape) return true;
         return false;
     }
 
     /** Inline SVG icons rendered inside status text. */
-    const blackPieceSVG = `<svg class="piece-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
-    const whitePieceSVG = `<svg class="piece-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
+    const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
+    const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
 
     // ─────────────────────────────────────────────────────────────
     // Game state
@@ -479,9 +479,9 @@
 
                 point.addEventListener('contextmenu', (e) => e.preventDefault());
 
-                const piece = document.createElement('div');
-                piece.className = 'piece';
-                point.appendChild(piece);
+                const stone = document.createElement('div');
+                stone.className = 'stone';
+                point.appendChild(stone);
                 gridDiv.appendChild(point);
             }
         }
@@ -492,24 +492,24 @@
     }
 
     /**
-     * Re-renders every piece on the board from the current `board` state.
+     * Re-renders every stone on the board from the current `board` state.
      * Also refreshes button tooltips.
      */
     function renderBoard() {
         const points = document.getElementsByClassName('point');
         for (let i = 0; i < SIZE; i++) {
             for (let j = 0; j < SIZE; j++) {
-                const piece = points[i * SIZE + j].firstChild;
+                const stone = points[i * SIZE + j].firstChild;
                 const cell  = board[i][j];
 
                 // Build class list from scratch each render
-                let cls = 'piece';
+                let cls = 'stone';
                 if (cell) {
                     cls += ` ${cell.color}`;
                     if (cell.shape === 'square') cls += ' square';
                 }
                 if (i === lastMoveX && j === lastMoveY) cls += ' last-move';
-                piece.className = cls;
+                stone.className = cls;
             }
         }
         updateButtonTooltips();
@@ -577,7 +577,7 @@
      *
      * Claim conditions (Federa):
      *   1. The group must be fully bounded (no empty liberties).
-     *   2. The actor must own a strict majority of adjacent pieces that
+     *   2. The actor must own a strict majority of adjacent stones that
      *      covet the group's type (per doesCovet).
      *
      * Replacement type: the actor's own piece type(s) that covet the group.
@@ -599,7 +599,7 @@
             return {valid: false, reason: "Group must be bounded", group};
         }
 
-        // Gather all distinct pieces adjacent to (but outside) the group
+        // Gather all distinct stones adjacent to (but outside) the group
         const groupSet    = new Set(group.map(([gx, gy]) => `${gx},${gy}`));
         const neighborSet = new Set();
 
@@ -613,7 +613,7 @@
             }
         }
 
-        // Rule 2: count coveting pieces for each player
+        // Rule 2: count coveting stones for each player
         let actorCoveting    = 0;
         let opponentCoveting = 0;
 
@@ -627,11 +627,11 @@
         }
 
         if (actorCoveting === 0 && opponentCoveting === 0) {
-            return {valid: false, reason: "No coveting pieces adjacent to group", group};
+            return {valid: false, reason: "No coveting stones adjacent to group", group};
         }
 
         if (actorCoveting < opponentCoveting) {
-            return {valid: false, reason: `You don't have a majority of coveting pieces (yours: ${actorCoveting}, opponent's: ${opponentCoveting})`, group};
+            return {valid: false, reason: `You don't have a majority of coveting stones (yours: ${actorCoveting}, opponent's: ${opponentCoveting})`, group};
         }
 
         // On a tie, only the friendly player (same colour as the group) may claim
@@ -651,7 +651,7 @@
     // Move execution
     // ─────────────────────────────────────────────────────────────
 
-    /** Places a new piece of the current player's color at (x, y). */
+    /** Places a new stone of the current player's color at (x, y). */
     function performPlacement(x, y, shape) {
         if (board[x][y] !== null) {
             setMessage("Position occupied!");
@@ -701,10 +701,10 @@
         // Advance turn
         turn = turn === 'black' ? 'white' : 'black';
 
-        // Win condition: board full and one colour holds every piece
+        // Win condition: board full and one colour holds every stone
         const {black: bCount, white: wCount} = getCounts();
-        const totalPieces = bCount + wCount;
-        if (totalPieces === SIZE * SIZE && (bCount === totalPieces || wCount === totalPieces)) {
+        const totalStones = bCount + wCount;
+        if (totalStones === SIZE * SIZE && (bCount === totalStones || wCount === totalStones)) {
             gameOver = true;
         }
 
@@ -819,8 +819,8 @@
 
         // Re-detect terminal state (single-color full board)
         const {black: bCount, white: wCount} = getCounts();
-        const totalPieces = bCount + wCount;
-        if (totalPieces === SIZE * SIZE && (bCount === totalPieces || wCount === totalPieces)) {
+        const totalStones = bCount + wCount;
+        if (totalStones === SIZE * SIZE && (bCount === totalStones || wCount === totalStones)) {
             gameOver = true;
         }
 
@@ -861,15 +861,15 @@
 
     function clearLastMoveMarker() {
         if (lastMoveX !== null && lastMoveY !== null) {
-            const piece = document.getElementsByClassName('point')[lastMoveX * SIZE + lastMoveY].firstChild;
-            piece.classList.remove('last-move');
+            const stone = document.getElementsByClassName('point')[lastMoveX * SIZE + lastMoveY].firstChild;
+            stone.classList.remove('last-move');
         }
     }
 
     function setLastMoveMarker(x, y) {
         clearLastMoveMarker();
-        const piece = document.getElementsByClassName('point')[x * SIZE + y].firstChild;
-        piece.classList.add('last-move');
+        const stone = document.getElementsByClassName('point')[x * SIZE + y].firstChild;
+        stone.classList.add('last-move');
         lastMoveX = x;
         lastMoveY = y;
     }
@@ -952,7 +952,7 @@
     // Score & header UI
     // ─────────────────────────────────────────────────────────────
 
-    /** Returns piece counts for each colour. */
+    /** Returns stone counts for each colour. */
     function getCounts() {
         let black = 0, white = 0;
         for (const row of board) {
@@ -973,20 +973,20 @@
         const {black: bCount, white: wCount} = getCounts();
 
         scoreStatus.innerHTML =
-            `${bCount}<span class="left-spacing">${blackPieceSVG}</span> ` +
-            `${wCount}<span class="left-spacing">${whitePieceSVG}</span>`;
+            `${bCount}<span class="left-spacing">${blackStoneSVG}</span> ` +
+            `${wCount}<span class="left-spacing">${whiteStoneSVG}</span>`;
 
         const isAtEnd = currentMoveIndex === gameHistory.length - 1;
 
         if (gameOver && isAtEnd) {
-            // Determine winner by checking who holds every piece
+            // Determine winner by checking who holds every stone
             let result;
-            if (bCount === SIZE * SIZE)      result = `${blackPieceSVG} wins!`;
-            else if (wCount === SIZE * SIZE) result = `${whitePieceSVG} wins!`;
+            if (bCount === SIZE * SIZE)      result = `${blackStoneSVG} wins!`;
+            else if (wCount === SIZE * SIZE) result = `${whiteStoneSVG} wins!`;
             else                             result = 'Draw!';
             turnStatus.innerHTML = result;
         } else {
-            const turnSVG = turn === 'black' ? blackPieceSVG : whitePieceSVG;
+            const turnSVG = turn === 'black' ? blackStoneSVG : whiteStoneSVG;
             turnStatus.innerHTML = `${turnSVG} to move`;
         }
 
@@ -1034,7 +1034,7 @@
      * Move priority:
      *   Tier 1 – any placement, or a flip of an enemy group
      *   Tier 2 – flip of own group, preferring the group with the fewest
-     *            pieces adjacent to a different-shape same-colour piece
+     *            stones adjacent to a different-shape same-colour stone
      */
     function generateRandomGame() {
         if (isGenerating) {
@@ -1146,12 +1146,12 @@
     }
 
     /**
-     * Counts how many pieces in the group touch a same-colour piece
+     * Counts how many stones in the group touch a same-colour stone
      * of a different shape. Lower values are preferred by the AI.
      */
     function calculateMixedShapePerimeter(group) {
         const groupSet   = new Set(group.map(([gx, gy]) => `${gx},${gy}`));
-        const mixedPieces = new Set();
+        const mixedStones = new Set();
 
         for (const [gx, gy] of group) {
             for (const [dx, dy] of DIRS) {
@@ -1160,14 +1160,14 @@
                 if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
                     const nb = board[nx][ny];
                     if (nb && nb.color === turn && nb.shape !== board[gx][gy].shape) {
-                        mixedPieces.add(`${gx},${gy}`);
-                        break; // no need to check more neighbours for this piece
+                        mixedStones.add(`${gx},${gy}`);
+                        break; // no need to check more neighbours for this stone
                     }
                 }
             }
         }
 
-        return mixedPieces.size;
+        return mixedStones.size;
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -1322,8 +1322,8 @@
             turn = turn === 'black' ? 'white' : 'black';
 
             const {black: bCount, white: wCount} = getCounts();
-            const totalPieces = bCount + wCount;
-            if (totalPieces === SIZE * SIZE && (bCount === totalPIeces || wCount === totalPieces)) {
+            const totalStones = bCount + wCount;
+            if (totalStones === SIZE * SIZE && (bCount === totalStones || wCount === totalStones)) {
                 gameOver = true;
             }
 
@@ -1402,9 +1402,92 @@
     // Placeholder stubs (reserved for future layout features)
     // ─────────────────────────────────────────────────────────────
 
-    function getTotalMaxWidth() {}
-    function updateButtonTooltips() {}
-    function adjustHeaderLayout() {}
+    function getTotalMaxWidth() {
+        const controls = document.querySelector('.replay-controls');
+        const elements = controls.querySelectorAll('button, select');
+        const numElements = elements.length;
+        const numGaps = numElements - 1;
+
+        const sampleElement = elements[0];
+        const styles = getComputedStyle(sampleElement);
+        const maxWidth = parseFloat(styles.maxWidth);
+        const paddingLeft = parseFloat(styles.paddingLeft);
+        const paddingRight = parseFloat(styles.paddingRight);
+        const borderLeft = parseFloat(styles.borderLeftWidth);
+        const borderRight = parseFloat(styles.borderRightWidth);
+        const gap = parseFloat(getComputedStyle(controls).gap);
+
+        const elementWidth = maxWidth + paddingLeft + paddingRight + borderLeft + borderRight;
+        const totalMaxWidth = (elementWidth * numElements) + (gap * numGaps);
+
+        return totalMaxWidth;
+    }
+
+    function updateButtonTooltips() {
+        const buttons = document.querySelectorAll('.replay-controls button');
+        const selects = document.querySelectorAll('.replay-controls select');
+        const elements = [...buttons, ...selects];
+        const totalMaxWidth = getTotalMaxWidth();
+        const windowWidth = window.innerWidth;
+
+        elements.forEach(element => {
+            let fullText = '';
+            if (element.tagName === 'BUTTON') {
+                fullText = element.textContent.trim();
+            } else if (element.tagName === 'SELECT' && element.selectedIndex >= 0) {
+                fullText = element.options[element.selectedIndex].text.trim();
+            }
+
+            if (windowWidth < totalMaxWidth) {
+                element.setAttribute('title', fullText);
+            } else {
+                element.removeAttribute('title');
+            }
+        });
+    }
+
+    function adjustHeaderLayout() {
+        const header = document.querySelector('.header');
+        const statusLeft = document.querySelector('.status-left');
+        const statusCenter = document.querySelector('.status-center');
+        const controlsRight = document.querySelector('.controls-right');
+        const board = document.querySelector('.board');
+
+        const headerWidth = header.offsetWidth;
+        const leftWidth = statusLeft.offsetWidth;
+        const centerWidth = statusCenter.offsetWidth;
+        const rightWidth = controlsRight.offsetWidth;
+
+        statusCenter.style.position = 'absolute';
+        statusCenter.style.left = '50%';
+        statusCenter.style.transform = 'translateX(-50%)';
+
+        statusLeft.style.position = 'absolute';
+        controlsRight.style.position = 'absolute';
+        statusLeft.style.left = '0';
+        controlsRight.style.right = '0';
+
+        const centerLeft = (headerWidth - centerWidth) / 2;
+        const centerRight = centerLeft + centerWidth;
+
+        const leftOverlap = leftWidth > centerLeft;
+        const rightOverlap = rightWidth > (headerWidth - centerRight);
+
+        if (leftOverlap || rightOverlap) {
+            const leftPush = leftOverlap ? leftWidth - centerLeft : 0;
+            const rightPush = rightOverlap ? rightWidth - (headerWidth - centerRight) : 0;
+
+            if (leftPush > 0) {
+                statusLeft.style.left = `-${leftPush}px`;
+            }
+            if (rightPush > 0) {
+                controlsRight.style.right = `-${rightPush}px`;
+            }
+        } else {
+            statusLeft.style.left = '0';
+            controlsRight.style.right = '0';
+        }
+    }
 
     // ─────────────────────────────────────────────────────────────
     // Initialisation
