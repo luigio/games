@@ -334,6 +334,7 @@
     let lastMoveX = null;
     let lastMoveY = null;
     let lastMovePlayer = null;
+    let gameResult = null; // null, 'black', or 'white'
     let gameHistory = [];
     let currentMoveIndex = -1;
     let isGenerating = false;
@@ -403,6 +404,7 @@
             lastMoveX: lastMoveX,
             lastMoveY: lastMoveY,
             lastMovePlayer: lastMovePlayer,
+            gameResult: gameResult,
             komi: komi
         };
     }
@@ -414,6 +416,7 @@
         lastMoveX = state.lastMoveX;
         lastMoveY = state.lastMoveY;
         lastMovePlayer = state.lastMovePlayer || null;
+        gameResult = state.gameResult || null;
         komi = state.komi;
         renderBoard();
         updateStatus();
@@ -424,6 +427,7 @@
         board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
         turn = 'black';
         prison = { black: komi, white: 0 };
+        gameResult = null;
         lastMoveX = null;
         lastMoveY = null;
         gameHistory = [saveGameState()];
@@ -654,6 +658,15 @@
         }
         while (prison.black > 0 && prison.white > 0) { prison.black--; prison.white--; }
 
+        // Win/lose check: count remaining stones by color
+        const enemyGone = !board.some(row => row.some(c => c && c.color === enemy));
+        const friendlyGone = !board.some(row => row.some(c => c && c.color === player));
+        if (enemyGone) {
+            gameResult = player; // last enemy group captured → win (even if friendly also gone)
+        } else if (friendlyGone) {
+            gameResult = enemy;  // last friendly group captured without killing last enemy → lose
+        }
+
         clearMessage();
         commitMove(x, y);
         return true;
@@ -661,6 +674,7 @@
 
     function play(x, y, rightClick) {
         if (board[x][y] !== null) return;
+        if (gameResult) return;
 
         const player = turn;
 
@@ -679,6 +693,7 @@
     }
 
     function hold() {
+        if (gameResult) return;
         const enemy = turn === 'black' ? 'white' : 'black';
         if (prison[enemy] === 0) {
             setMessage("No enemy stones in prison to hold!");
@@ -806,11 +821,16 @@
     function updateStatus() {
         const turnStatus = document.getElementById('turn-status');
         const prisonStatus = document.getElementById('prison-status');
-        turnStatus.innerHTML = `${turn === 'black' ? blackStoneSVG : whiteStoneSVG} to move`;
-        const movesAvailable = hasValidMove(turn);
-        if (!movesAvailable) {
-            const winnerIcon = turn === 'black' ? whiteStoneSVG : blackStoneSVG;
+        if (gameResult) {
+            const winnerIcon = gameResult === 'black' ? blackStoneSVG : whiteStoneSVG;
             turnStatus.innerHTML = `${winnerIcon} wins!`;
+        } else {
+            turnStatus.innerHTML = `${turn === 'black' ? blackStoneSVG : whiteStoneSVG} to move`;
+            const movesAvailable = hasValidMove(turn);
+            if (!movesAvailable) {
+                const winnerIcon = turn === 'black' ? whiteStoneSVG : blackStoneSVG;
+                turnStatus.innerHTML = `${winnerIcon} wins!`;
+            }
         }
         prisonStatus.innerHTML = prison.black > 0 ? `Prison: ${prison.black}<span class="left-spacing">${blackStoneSVG}</span>` :
                                  prison.white > 0 ? `Prison: ${prison.white}<span class="left-spacing">${whiteStoneSVG}</span>` : '';
@@ -900,7 +920,7 @@
             stopGeneration();
             return;
         }
-        if (!hasValidMove(turn)) resetGame(SIZE);
+        if (gameResult || !hasValidMove(turn)) resetGame(SIZE);
 
         isGenerating = true;
         const randomBtn = document.getElementById('random-button');
@@ -911,7 +931,7 @@
         updateReplayButtons();
 
         generationInterval = setInterval(() => {
-            if (!hasValidMove(turn)) {
+            if (gameResult || !hasValidMove(turn)) {
                 stopGeneration();
                 return;
             }
