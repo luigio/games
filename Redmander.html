@@ -333,6 +333,7 @@
     let komi = 0;
     let lastMoveX = null;
     let lastMoveY = null;
+    let lastPlacer = null;
     let gameHistory = [];
     let currentMoveIndex = -1;
     let isGenerating = false;
@@ -402,7 +403,8 @@
             turn: turn,
             phase: phase,
             lastMoveX: lastMoveX,
-            lastMoveY: lastMoveY
+            lastMoveY: lastMoveY,
+            lastPlacer: lastPlacer
         };
     }
 
@@ -412,6 +414,7 @@
         phase = state.phase;
         lastMoveX = state.lastMoveX;
         lastMoveY = state.lastMoveY;
+        lastPlacer = state.lastPlacer;
         
         renderBoard();
         updateStatus();
@@ -419,7 +422,7 @@
         clearAllLastMoveMarkers();
         
         if (state.lastMoveX !== null && state.lastMoveY !== null) {
-            setLastMoveMarker(state.lastMoveX, state.lastMoveY);
+            setLastMoveMarker(state.lastMoveX, state.lastMoveY, state.lastPlacer);
         } else {
             lastMoveX = null;
             lastMoveY = null;
@@ -472,7 +475,7 @@
         });
     }
 
-    function setLastMoveMarker(x, y) {
+    function setLastMoveMarker(x, y, placer) {
         clearAllLastMoveMarkers();
         
         const points = document.getElementsByClassName('point');
@@ -481,11 +484,12 @@
         stone.classList.add('last-move');
         
         if (board[x][y] === 'red') {
-            stone.classList.add(turn === 'black' ? 'last-placer-black' : 'last-placer-white');
+            stone.classList.add(placer === 'black' ? 'last-placer-black' : 'last-placer-white');
         }
         
         lastMoveX = x;
         lastMoveY = y;
+        lastPlacer = placer;
     }
 
     function clearMessage() {
@@ -574,7 +578,7 @@
         const color = phase === 'player' ? turn : 'red';
         board[x][y] = color;
 
-        setLastMoveMarker(x, y);
+        setLastMoveMarker(x, y, turn);
         resolveClaims(turn);
 
         const {empty} = getCounts();
@@ -963,7 +967,8 @@
             }
 
             board[x][y] = color;
-            setLastMoveMarker(x, y);
+            turn = currentPlayer;
+            setLastMoveMarker(x, y, currentPlayer);
             resolveClaims(currentPlayer);
 
             const {empty: emptyAfter} = getCounts();
@@ -971,12 +976,17 @@
             if (color === 'red') {
                 currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
                 isPlayerPhase = true;
+                turn = currentPlayer;
+                phase = 'player';
             } else {
                 if (emptyAfter > 0 && hasValidRedMove()) {
                     isPlayerPhase = false;
+                    phase = 'red';
                 } else {
                     currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
                     isPlayerPhase = true;
+                    turn = currentPlayer;
+                    phase = 'player';
                 }
             }
 
