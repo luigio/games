@@ -801,21 +801,9 @@
             forwardBtn.disabled = currentMoveIndex === gameHistory.length - 1;
             endBtn.disabled = currentMoveIndex === gameHistory.length - 1;
 
-            const atEnd = currentMoveIndex === gameHistory.length - 1;
-            const gameOver = atEnd && !hasValidMove(turn);
-            if (gameOver) {
-                randomBtn.disabled = false;
-                randomBtn.setAttribute('onmousedown', 'newRandomGame()');
-            } else {
-                randomBtn.disabled = !hasValidMove(turn);
-                randomBtn.setAttribute('onmousedown', 'generateRandomGame()');
-            }
+            randomBtn.disabled = false;
+            randomBtn.setAttribute('onmousedown', 'generateRandomGame()');
         }
-    }
-
-    function newRandomGame() {
-        resetGame(SIZE);
-        generateRandomGame();
     }
 
     // === RENDERING ===
@@ -935,6 +923,7 @@
             stopGeneration();
             return;
         }
+        if (!hasValidMove(turn)) resetGame(SIZE);
 
         isGenerating = true;
         const randomBtn = document.getElementById('random-button');
@@ -1486,7 +1475,6 @@
         switch (event.key.toLowerCase()) {
             case 'r':
                 if (isGenerating) stopGeneration();
-                else if (!hasValidMove(turn) && currentMoveIndex === gameHistory.length - 1) newRandomGame();
                 else generateRandomGame();
                 break;
             case 'h': hold(); break;
