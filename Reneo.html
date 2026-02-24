@@ -12,23 +12,27 @@
             width: 100vw;
             overflow: hidden;
             background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         .game-container {
             display: flex;
             flex-direction: column;
-            height: 100vh;
             width: 100vw;
+            max-width: 100%;
         }
 
         .header {
-            width: 90vmin;
-            height: 8vh;
+            width: min(100vw, calc(100vh - 100px));
+            height: 50px;
             position: relative;
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin: 0 auto;
+            overflow: visible;
         }
 
         .status-left {
@@ -36,38 +40,75 @@
             font-size: 1.2em;
             display: flex;
             align-items: center;
-        }
-
-        .status-center {
-            font-family: Arial, sans-serif;
+            white-space: nowrap;
             position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 1.2em;
+            left: 0;
+            z-index: 1;
+            padding-right: 0.5em;
         }
 
         .controls-right {
+            font-family: Arial, sans-serif;
             display: flex;
-            gap: 0.5vw;
+            align-items: center;
+            white-space: nowrap;
+            position: absolute;
+            right: 0;
+            z-index: 1;
+            gap: 0.5em;
         }
 
         .board-container {
-            flex: 1;
             display: flex;
             justify-content: center;
             align-items: center;
-            position: relative;
+            width: 100%;
             background-color: #f0f0f0;
         }
 
+        .footer {
+            width: 100%;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
         .board {
-            width: 90vmin;
-            height: 90vmin;
+            width: min(100vw, calc(100vh - 100px));
+            height: min(100vw, calc(100vh - 100px));
             background-color: #d9a359;
             position: relative;
             display: flex;
             justify-content: center;
             align-items: center;
+        }
+
+        #last-move-text {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            white-space: nowrap;
+        }
+
+        #copy-move {
+            font-size: 1.2em;
+            padding: 0;
+            border: none;
+            background: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .copy-icon {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+        }
+
+        #copy-move:hover .copy-icon path {
+            fill: #555;
         }
 
         .grid {
@@ -117,12 +158,13 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 20%;
-            height: 20%;
+            width: 22%;
+            height: 22%;
             border-radius: 50%;
             background: red;
             z-index: 3;
         }
+
         .swap-dot {
             position: absolute;
             top: 50%;
@@ -141,26 +183,43 @@
         .swap-dot.swap-white {
             background: black;
         }
-        .footer {
-            width: 90vmin;
-            height: 8vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 0 auto;
-        }
 
         .replay-controls {
             display: flex;
-            gap: 0.5vw;
+            flex-wrap: nowrap;
+            width: 100%;
+            gap: 0.5em;
+            overflow: hidden;
+            justify-content: center;
+        }
+
+        .replay-controls button,
+        .replay-controls select {
+            flex: 0 1 auto;
+            padding: 0.3em 0.5em;
+            font-size: 1em;
+            border: 2px solid black;
+            background: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            min-width: 0;
+            text-overflow: clip;
+            overflow: hidden;
+            white-space: nowrap;
+            max-width: 100px;
         }
 
         button, select {
             font-size: 1em;
-            padding: 0.5vh 0.5vw;
+            padding: 0.3em 0.5em;
             border: 2px solid black;
             background: white;
             cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:not(:disabled):hover, select:hover {
+            background: #FFF5E9;
         }
 
         select {
@@ -183,10 +242,9 @@
         #message {
             font-family: Arial, sans-serif;
             position: absolute;
-            left: calc(50% + 45vmin);
+            left: calc(50vw + 50vh - 30px);
             top: 50%;
             transform: translateY(-50%);
-            margin-left: 1vw;
             font-size: 1.2em;
             color: #d32f2f;
             width: 20vw;
@@ -198,43 +256,10 @@
         }
 
         #random-button {
-            min-width: 8em;
+            flex: 0 1 auto;
+            min-width: 0;
             text-align: center;
-        }
-
-        .status-center {
-            font-family: Arial, sans-serif;
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 1.2em;
-            display: flex; /* Added for horizontal alignment of text and icon */
-            align-items: center; /* Vertically center text and icon */
-            gap: 0.5em; /* Space between text and copy button */
-        }
-
-        #last-move-text {
-            white-space: nowrap; /* Prevent text wrapping */
-        }
-
-        #copy-move {
-            padding: 0; /* Remove default padding for tight fit */
-            border: none; /* Remove border for a cleaner look */
-            background: none; /* Transparent background */
-            cursor: pointer;
-            display: flex; /* Ensure icon centers properly */
-            align-items: center;
-            justify-content: center;
-        }
-
-        .copy-icon {
-            width: 1em; /* Match stone-icon size */
-            height: 1em;
-            vertical-align: middle;
-        }
-
-        #copy-move:hover .copy-icon path {
-            fill: #555; /* Darken on hover for feedback */
+            max-width: 8em;
         }
     </style>
 </head>
@@ -242,34 +267,15 @@
 <div class="game-container">
     <div class="header">
         <div class="status-left" id="turn-status"></div>
-        <div class="status-center" id="last-move-display">
-            <span id="last-move-text"></span>
-            <button id="copy-move" title="Copy last move" style="display: none;">
-                <svg class="copy-icon" viewBox="0 0 24 24">
-                    <path fill="black" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
-                </svg>
-            </button>
-        </div>
         <div class="controls-right">
-            <select id="board-size" onchange="changeBoardSize()">
-                <option value="3">3×3</option>
-                <option value="4">4×4</option>
-                <option value="5">5×5</option>
-                <option value="6">6×6</option>
-                <option value="7">7×7</option>
-                <option value="8">8×8</option>
-                <option value="9">9×9</option>
-                <option value="10">10×10</option>
-                <option value="11">11×11</option>
-                <option value="12">12×12</option>
-                <option value="13" selected>13×13</option>
-                <option value="14">14×14</option>
-                <option value="15">15×15</option>
-                <option value="16">16×16</option>
-                <option value="17">17×17</option>
-                <option value="18">18×18</option>
-                <option value="19">19×19</option>
-            </select>
+            <div id="last-move-display" style="display: flex; align-items: center; gap: 0.5em;">
+                <span id="last-move-text"></span>
+                <button id="copy-move" title="Copy last move" style="display: none;">
+                    <svg class="copy-icon" viewBox="0 0 24 24">
+                        <path fill="black" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+                    </svg>
+                </button>
+            </div>
             <button id="hold-button" onmousedown="hold()" style="display: none;">Hold</button>
         </div>
     </div>
@@ -289,6 +295,25 @@
             <button id="random-button" onmousedown="generateRandomGame()">Random game</button>
             <button id="save-button" onmousedown="saveGame()">Save</button>
             <button id="load-button" onmousedown="triggerLoadGame()">Load</button>
+            <select id="board-size" onchange="changeBoardSize()">
+                <option value="3">3×3</option>
+                <option value="4">4×4</option>
+                <option value="5">5×5</option>
+                <option value="6">6×6</option>
+                <option value="7">7×7</option>
+                <option value="8">8×8</option>
+                <option value="9">9×9</option>
+                <option value="10">10×10</option>
+                <option value="11">11×11</option>
+                <option value="12">12×12</option>
+                <option value="13" selected>13×13</option>
+                <option value="14">14×14</option>
+                <option value="15">15×15</option>
+                <option value="16">16×16</option>
+                <option value="17">17×17</option>
+                <option value="18">18×18</option>
+                <option value="19">19×19</option>
+            </select>
             <input type="file" id="load-input" style="display: none;" accept=".txt" onchange="loadGame(event)">
         </div>
     </div>
@@ -385,6 +410,8 @@
         linesDiv.appendChild(canvas);
         updateStatus();
         updateLastMoveDisplay();
+        updateButtonTooltips();
+        adjustHeaderLayout();
     }
 
     function saveGameState() {
@@ -464,12 +491,12 @@
         lastMoveY = y;
     }
 
-    function clearMessage() {
-        document.getElementById('message').textContent = '';
+    function setMessage(msg) {
+        document.getElementById('message').textContent = msg;
     }
 
-    function setMessage(text) {
-        document.getElementById('message').textContent = text;
+    function clearMessage() {
+        document.getElementById('message').textContent = '';
     }
 
     function isPartOfCrosscut(x, y) {
@@ -490,7 +517,6 @@
 
     function getCrosscutEnemies(x, y, player) {
         const enemies = [];
-        const enemy = player === 0 ? 1 : 0;
         for (let i = Math.max(0, x-1); i <= x; i++) {
             for (let j = Math.max(0, y-1); j <= y; j++) {
                 if (i >= SIZE - 1 || j >= SIZE - 1) continue;
@@ -847,6 +873,78 @@
         }
 
         turnStatus.innerHTML = statusText;
+        adjustHeaderLayout();
+    }
+
+    function getTotalMaxWidth() {
+        const controls = document.querySelector('.replay-controls');
+        const elements = controls.querySelectorAll('button, select');
+        const numElements = elements.length;
+        const numGaps = numElements - 1;
+
+        const sampleElement = elements[0];
+        const styles = getComputedStyle(sampleElement);
+        const maxWidth = parseFloat(styles.maxWidth);
+        const paddingLeft = parseFloat(styles.paddingLeft);
+        const paddingRight = parseFloat(styles.paddingRight);
+        const borderLeft = parseFloat(styles.borderLeftWidth);
+        const borderRight = parseFloat(styles.borderRightWidth);
+        const gap = parseFloat(getComputedStyle(controls).gap);
+
+        const elementWidth = maxWidth + paddingLeft + paddingRight + borderLeft + borderRight;
+        const totalMaxWidth = (elementWidth * numElements) + (gap * numGaps);
+
+        return totalMaxWidth;
+    }
+
+    function updateButtonTooltips() {
+        const buttons = document.querySelectorAll('.replay-controls button');
+        const selects = document.querySelectorAll('.replay-controls select');
+        const elements = [...buttons, ...selects];
+        const totalMaxWidth = getTotalMaxWidth();
+        const windowWidth = window.innerWidth;
+
+        elements.forEach(element => {
+            let fullText = '';
+            if (element.tagName === 'BUTTON') {
+                fullText = element.textContent.trim();
+            } else if (element.tagName === 'SELECT' && element.selectedIndex >= 0) {
+                fullText = element.options[element.selectedIndex].text.trim();
+            }
+
+            if (windowWidth < totalMaxWidth) {
+                element.setAttribute('title', fullText);
+            } else {
+                element.removeAttribute('title');
+            }
+        });
+    }
+
+    function adjustHeaderLayout() {
+        const header = document.querySelector('.header');
+        const statusLeft = document.querySelector('.status-left');
+        const controlsRight = document.querySelector('.controls-right');
+        const board = document.querySelector('.board');
+
+        const headerWidth = header.offsetWidth;
+        const leftWidth = statusLeft.offsetWidth;
+        const rightWidth = controlsRight.offsetWidth;
+
+        statusLeft.style.position = 'absolute';
+        controlsRight.style.position = 'absolute';
+        statusLeft.style.left = '0';
+        controlsRight.style.right = '0';
+
+        // Check if left and right sections overlap
+        if (leftWidth + rightWidth > headerWidth) {
+            // Push left section further left if needed
+            const overflow = leftWidth + rightWidth - headerWidth;
+            statusLeft.style.left = `-${overflow / 2}px`;
+            controlsRight.style.right = `-${overflow / 2}px`;
+        } else {
+            statusLeft.style.left = '0';
+            controlsRight.style.right = '0';
+        }
     }
 
     function stopGeneration() {
@@ -855,6 +953,7 @@
             generationInterval = null;
             isGenerating = false;
             const randomBtn = document.getElementById('random-button');
+            randomBtn.style.width = '';
             randomBtn.textContent = 'Random game';
             randomBtn.setAttribute('onmousedown', 'generateRandomGame()');
             updateReplayButtons();
@@ -862,15 +961,33 @@
         }
     }
 
+    function measureRandomGameWidth() {
+        const randomBtn = document.getElementById('random-button');
+        const clone = randomBtn.cloneNode(true);
+        clone.textContent = 'Random game';
+        clone.style.width = '';
+        clone.style.visibility = 'hidden';
+        clone.style.position = 'absolute';
+        clone.removeAttribute('onmousedown');
+        document.body.appendChild(clone);
+        const width = clone.offsetWidth;
+        document.body.removeChild(clone);
+        return width;
+    }
+
     function generateRandomGame() {
         if (isGenerating) {
             stopGeneration();
             return;
         }
-        if (gameOver) return;
+        if (gameOver) {
+            resetGame(SIZE);
+        }
 
         isGenerating = true;
         const randomBtn = document.getElementById('random-button');
+        const randomGameWidth = measureRandomGameWidth();
+        randomBtn.style.width = `${randomGameWidth}px`;
         randomBtn.textContent = 'Stop';
         randomBtn.setAttribute('onmousedown', 'stopGeneration()');
         updateReplayButtons();
@@ -1030,7 +1147,7 @@
             }
 
             const moves = moveText.split(' ');
-            const sizeMatch = moves[0].match(/^(\d+)[-x×*�](\d+)$/);
+            const sizeMatch = moves[0].match(/^(\d+)[-x×*\uFFFD](\d+)$/);
             if (!sizeMatch) {
                 setMessage("Error: File must start with board size (e.g., '19x19').");
                 return;
@@ -1052,162 +1169,129 @@
 
             for (let i = 1; i < moves.length; i++) {
                 const move = moves[i];
-                const skipMatch = move.match(/^([BW])[-x×*�]$/);
-                const moveMatch = move.match(/^([BW])([a-z])(\d+)(?:[-x×*�]([a-z])(\d+))?$/);
+                if (!move) continue;
 
-                let currentPlayer;
+                const skipMatch = move.match(/^([BW])-$/);
                 if (skipMatch) {
-                    currentPlayer = skipMatch[1];
-                } else if (moveMatch) {
-                    currentPlayer = moveMatch[1];
-                } else {
+                    const player = skipMatch[1] === 'B' ? 0 : 1;
+                    if (player !== tempTurn) {
+                        setMessage(`Error: Move '${move}' is out of turn order.`);
+                        renderBoard();
+                        return;
+                    }
+                    tempTurn = tempTurn === 0 ? 1 : 0;
+                    lastMoveWasSkip = true;
+                    lastPlayer = player;
+
+                    const skipState = saveGameState();
+                    skipState.initialX = null;
+                    skipState.initialY = null;
+                    skipState.swapX = null;
+                    skipState.swapY = null;
+                    skipState.isSkip = true;
+                    if (currentMoveIndex < gameHistory.length - 1) {
+                        gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+                    }
+                    gameHistory.push(skipState);
+                    currentMoveIndex++;
+                    blackWins = skipState.blackWins;
+                    whiteWins = skipState.whiteWins;
+                    gameOver = skipState.gameOver;
+                    continue;
+                }
+
+                const moveMatch = move.match(/^([BW])([a-z])(\d+)(?:([-x])([a-z])(\d+))?$/);
+                if (!moveMatch) {
                     setMessage(`Error: Invalid move format '${move}'.`);
-                    renderBoard(); // Ensure board reflects state before exiting
+                    renderBoard();
                     return;
                 }
 
-                if (lastPlayer && lastPlayer === currentPlayer) {
-                    const opponent = lastPlayer === 'B' ? 'W' : 'B';
-                    const opponentTurn = opponent === 'B' ? 0 : 1;
-                    if (tempTurn !== opponentTurn) {
-                        setMessage(`Error: Turn mismatch before processing move '${move}'.`);
-                        renderBoard(); // Ensure board reflects state before exiting
-                        return;
-                    }
+                const [, playerChar, col, row, separator, swapCol, swapRow] = moveMatch;
+                const player = playerChar === 'B' ? 0 : 1;
 
-                    // Check if the opponent had a valid move
-                    if (hasValidMove(opponentTurn)) {
-                        setMessage(`Error: Consecutive moves for ${lastPlayer} at '${move}' but ${opponent} had a valid move available.`);
-                        renderBoard(); // Ensure board reflects state up to last valid move
-                        updateStatus(); // Update turn indicator
-                        updateReplayButtons(); // Update button states
-                        updateLastMoveDisplay();
-                        return;
-                    }
-
-                    // If no valid move, insert a skip for the opponent
-                    tempTurn = tempTurn === 0 ? 1 : 0;
-                    const skipState = saveGameState();
-                    skipState.initialX = null;
-                    skipState.initialY = null;
-                    skipState.swapX = null;
-                    skipState.swapY = null;
-                    skipState.isSkip = true;
-                    if (currentMoveIndex < gameHistory.length - 1) {
-                        gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
-                    }
-                    gameHistory.push(skipState);
-                    currentMoveIndex++;
+                if (player !== tempTurn) {
+                    setMessage(`Error: Move '${move}' is out of turn order.`);
+                    renderBoard();
+                    return;
                 }
 
-                if (skipMatch) {
-                    const [, player] = skipMatch;
-                    const expectedPlayer = tempTurn === 0 ? 'B' : 'W';
-                    if (player !== expectedPlayer) {
-                        setMessage(`Error: Wrong player turn in skip '${move}'.`);
-                        renderBoard(); // Ensure board reflects state before exiting
-                        return;
-                    }
+                const x = SIZE - parseInt(row);
+                const y = col.charCodeAt(0) - 97;
 
-                    tempTurn = tempTurn === 0 ? 1 : 0;
-                    const skipState = saveGameState();
-                    skipState.initialX = null;
-                    skipState.initialY = null;
-                    skipState.swapX = null;
-                    skipState.swapY = null;
-                    skipState.isSkip = true;
-                    if (currentMoveIndex < gameHistory.length - 1) {
-                        gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
-                    }
-                    gameHistory.push(skipState);
-                    currentMoveIndex++;
-                    lastMoveWasSkip = true;
-                    lastPlayer = player;
-                } else if (moveMatch) {
-                    const [, player, col, row, swapCol, swapRow] = moveMatch;
-                    const expectedPlayer = tempTurn === 0 ? 'B' : 'W';
-                    if (player !== expectedPlayer) {
-                        setMessage(`Error: Wrong player turn in move '${move}'.`);
-                        renderBoard(); // Ensure board reflects state before exiting
-                        return;
-                    }
-
-                    const x = SIZE - parseInt(row);
-                    const y = col.charCodeAt(0) - 97;
-                    if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) {
-                        setMessage(`Error: Move '${move}' out of bounds for ${SIZE}x${SIZE} board.`);
-                        renderBoard(); // Ensure board reflects state before exiting
-                        return;
-                    }
-
-                    if (board[x][y] !== null) {
-                        setMessage(`Error: Position already occupied in move '${move}'.`);
-                        renderBoard(); // Ensure board reflects state before exiting
-                        return;
-                    }
-
-                    board[x][y] = tempTurn;
-                    setLastMoveMarker(x, y);
-
-                    let state;
-                    if (swapCol && swapRow) {
-                        const swapX = SIZE - parseInt(swapRow);
-                        const swapY = swapCol.charCodeAt(0) - 97;
-                        if (swapX < 0 || swapX >= SIZE || swapY < 0 || swapY >= SIZE) {
-                            setMessage(`Error: Swap position '${swapCol}${swapRow}' out of bounds in move '${move}'.`);
-                            renderBoard(); // Ensure board reflects state before exiting
-                            return;
-                        }
-
-                        const enemy = tempTurn === 0 ? 1 : 0;
-                        if (board[swapX][swapY] !== enemy) {
-                            setMessage(`Error: Invalid swap target in move '${move}'.`);
-                            renderBoard(); // Ensure board reflects state before exiting
-                            return;
-                        }
-
-                        const enemies = getCrosscutEnemies(x, y, tempTurn);
-                        if (!enemies.some(([ex, ey]) => ex === swapX && ey === swapY)) {
-                            setMessage(`Error: Swap in '${move}' not part of a crosscut.`);
-                            renderBoard(); // Ensure board reflects state before exiting
-                            return;
-                        }
-
-                        board[swapX][swapY] = tempTurn;
-                        board[x][y] = enemy;
-                        if (isPartOfCrosscut(x, y)) {
-                            board[x][y] = null;
-                        }
-                        setLastMoveMarker(swapX, swapY);
-
-                        state = saveGameState();
-                        state.initialX = x;
-                        state.initialY = y;
-                        state.swapX = swapX;
-                        state.swapY = swapY;
-                        state.isSkip = false;
-                    } else {
-                        state = saveGameState();
-                        state.initialX = x;
-                        state.initialY = y;
-                        state.swapX = null;
-                        state.swapY = null;
-                        state.isSkip = false;
-                    }
-
-                    if (currentMoveIndex < gameHistory.length - 1) {
-                        gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
-                    }
-                    gameHistory.push(state);
-                    currentMoveIndex++;
-                    blackWins = state.blackWins;
-                    whiteWins = state.whiteWins;
-                    gameOver = state.gameOver;
-
-                    tempTurn = tempTurn === 0 ? 1 : 0;
-                    lastMoveWasSkip = false;
-                    lastPlayer = player;
+                if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) {
+                    setMessage(`Error: Move '${move}' out of bounds for ${SIZE}x${SIZE} board.`);
+                    renderBoard();
+                    return;
                 }
+
+                if (board[x][y] !== null) {
+                    setMessage(`Error: Position already occupied in move '${move}'.`);
+                    renderBoard();
+                    return;
+                }
+
+                board[x][y] = tempTurn;
+                setLastMoveMarker(x, y);
+
+                let state;
+                if (swapCol && swapRow) {
+                    const swapX = SIZE - parseInt(swapRow);
+                    const swapY = swapCol.charCodeAt(0) - 97;
+                    if (swapX < 0 || swapX >= SIZE || swapY < 0 || swapY >= SIZE) {
+                        setMessage(`Error: Swap position '${swapCol}${swapRow}' out of bounds in move '${move}'.`);
+                        renderBoard();
+                        return;
+                    }
+
+                    const enemy = tempTurn === 0 ? 1 : 0;
+                    if (board[swapX][swapY] !== enemy) {
+                        setMessage(`Error: Invalid swap target in move '${move}'.`);
+                        renderBoard();
+                        return;
+                    }
+
+                    const enemies = getCrosscutEnemies(x, y, tempTurn);
+                    if (!enemies.some(([ex, ey]) => ex === swapX && ey === swapY)) {
+                        setMessage(`Error: Swap in '${move}' not part of a crosscut.`);
+                        renderBoard();
+                        return;
+                    }
+
+                    board[swapX][swapY] = tempTurn;
+                    board[x][y] = enemy;
+                    if (isPartOfCrosscut(x, y)) {
+                        board[x][y] = null;
+                    }
+                    setLastMoveMarker(swapX, swapY);
+
+                    state = saveGameState();
+                    state.initialX = x;
+                    state.initialY = y;
+                    state.swapX = swapX;
+                    state.swapY = swapY;
+                    state.isSkip = false;
+                } else {
+                    state = saveGameState();
+                    state.initialX = x;
+                    state.initialY = y;
+                    state.swapX = null;
+                    state.swapY = null;
+                    state.isSkip = false;
+                }
+
+                if (currentMoveIndex < gameHistory.length - 1) {
+                    gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+                }
+                gameHistory.push(state);
+                currentMoveIndex++;
+                blackWins = state.blackWins;
+                whiteWins = state.whiteWins;
+                gameOver = state.gameOver;
+
+                tempTurn = tempTurn === 0 ? 1 : 0;
+                lastMoveWasSkip = false;
+                lastPlayer = player;
             }
 
             if (!gameOver && !lastMoveWasSkip && !hasValidMove(tempTurn)) {
@@ -1249,11 +1333,9 @@
         }
         
         const state = gameHistory[lastRealMoveIndex];
-        const prevState = gameHistory[lastRealMoveIndex - 1];
         const player = (lastRealMoveIndex - 1) % 2 === 0 ? 'B' : 'W';
 
         if (state.isSkip || state.initialX === null || state.initialY === null) {
-            // If even the last move is a skip or invalid, show nothing
             lastMoveText.textContent = '';
             copyButton.style.display = 'none';
         } else {
@@ -1267,7 +1349,7 @@
                 moveStr += `${isCapture ? 'x' : '-'}${swapCol}${swapRow}`;
             }
             lastMoveText.textContent = moveStr;
-            copyButton.style.display = 'inline-flex'; // Show copy button for real moves
+            copyButton.style.display = 'inline-flex';
         }
     }
 
@@ -1295,11 +1377,16 @@
         }
     }
 
-    resetGame(SIZE);
+    // === INIT ===
 
-    document.getElementById('copy-move').addEventListener('click', copyLastMove);
+    resetGame(SIZE);
+    updateButtonTooltips();
+    adjustHeaderLayout();
+
+    document.getElementById('copy-move').addEventListener('mousedown', copyLastMove);
 
     const boardSizeSelect = document.getElementById('board-size');
+
     boardSizeSelect.addEventListener('keydown', (event) => {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
             event.preventDefault();
@@ -1309,6 +1396,13 @@
     window.addEventListener('resize', () => {
         initBoard();
         renderBoard();
+        updateButtonTooltips();
+        if (isGenerating) {
+            const randomBtn = document.getElementById('random-button');
+            const randomGameWidth = measureRandomGameWidth();
+            randomBtn.style.width = `${randomGameWidth}px`;
+        }
+        adjustHeaderLayout();
     });
 
     window.addEventListener('wheel', (event) => {
@@ -1317,63 +1411,65 @@
         else if (event.deltaY < 0) replayBack();
     }, { passive: false });
 
+    document.addEventListener('DOMContentLoaded', updateButtonTooltips);
+    document.querySelectorAll('.replay-controls select').forEach(select => {
+        select.addEventListener('change', () => {
+            updateButtonTooltips();
+            select.blur();
+        });
+    });
+
     window.addEventListener('keydown', (event) => {
-        if (['s', 'e', 'b', 'f', 'r', 'i', 'o', 'c', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key.toLowerCase())) {
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT' || activeElement.tagName === 'TEXTAREA';
+
+        const keysToPrevent = ['r', 'i', 'o', 'a', 's', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+
+        if (isInputFocused && activeElement.tagName === 'SELECT' && ['ArrowUp', 'ArrowDown', 'Space'].includes(event.key)) {
+        } else if (isInputFocused && (event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey))) {
+        } else if (keysToPrevent.includes(event.key.toLowerCase())) {
             event.preventDefault();
+        } else {
+            return;
         }
 
-        const boardSizeSelect = document.getElementById('board-size');
+        const boardSizeSelectEl = document.getElementById('board-size');
+
         switch (event.key.toLowerCase()) {
-            case 's':
-                replayStart();
-                break;
-            case 'e':
-                replayEnd();
-                break;
-            case 'b':
-                replayBack();
-                break;
-            case 'f':
-                replayForward();
-                break;
             case 'r':
-                if (isGenerating) {
-                    stopGeneration();
-                } else {
-                    generateRandomGame();
-                }
+                if (isGenerating) stopGeneration();
+                else generateRandomGame();
                 break;
             case 'i':
-                boardSizeSelect.selectedIndex = (boardSizeSelect.options.length + boardSizeSelect.selectedIndex - 1) % boardSizeSelect.options.length;
-                boardSizeSelect.dispatchEvent(new Event('change'));
+                if (boardSizeSelectEl && document.activeElement !== boardSizeSelectEl) {
+                    boardSizeSelectEl.selectedIndex = Math.max(0, boardSizeSelectEl.selectedIndex - 1);
+                    boardSizeSelectEl.dispatchEvent(new Event('change'));
+                }
                 break;
             case 'o':
-                boardSizeSelect.selectedIndex = (boardSizeSelect.selectedIndex + 1) % boardSizeSelect.options.length;
-                boardSizeSelect.dispatchEvent(new Event('change'));
+                if (boardSizeSelectEl && document.activeElement !== boardSizeSelectEl) {
+                    boardSizeSelectEl.selectedIndex = Math.min(boardSizeSelectEl.options.length - 1, boardSizeSelectEl.selectedIndex + 1);
+                    boardSizeSelectEl.dispatchEvent(new Event('change'));
+                }
                 break;
-            case 'k':
-                saveGame();
-                break;
-            case 'l':
+            case 'a':
                 triggerLoadGame();
+                break;
+            case 's':
+                saveGame();
                 break;
             case 'c':
                 copyLastMove();
                 break;
         }
-        switch (event.key) {
-            case 'ArrowUp':
-                replayStart();
-                break;
-            case 'ArrowDown':
-                replayEnd();
-                break;
-            case 'ArrowLeft':
-                replayBack();
-                break;
-            case 'ArrowRight':
-                replayForward();
-                break;
+
+        if (document.activeElement.tagName !== 'SELECT' && !isInputFocused) {
+            switch (event.key) {
+                case 'ArrowUp': replayStart(); break;
+                case 'ArrowDown': replayEnd(); break;
+                case 'ArrowLeft': replayBack(); break;
+                case 'ArrowRight': replayForward(); break;
+            }
         }
     });
 </script>
