@@ -316,10 +316,10 @@
         <div class="footer">
             <div class="replay-controls">
                 <button id="toggle-icons-button" onmousedown="toggleAnimalIcons()" title="Toggle animal icons"></button>
-                <button onmousedown="replayStart()">Start</button>
-                <button onmousedown="replayBack()">Back</button>
-                <button onmousedown="replayForward()">Forward</button>
-                <button onmousedown="replayEnd()">End</button>
+                <button onmousedown="replayStart()"><<</button>
+                <button onmousedown="replayBack()"><</button>
+                <button onmousedown="replayForward()">></button>
+                <button onmousedown="replayEnd()">>></button>
                 <button id="random-button" onmousedown="generateRandomGame()">Random game</button>
 
                 <select id="save-options" onchange="handleSave()">
@@ -406,8 +406,8 @@
 
     // Elephant  (top-left quadrant — three combined paths)
     const ELEPHANT_PATHS = [
-        "M 77,129 L 50,155 L 34,178 L 23,199 L 14,229 L 10,254 L 10,480 L 129,480 L 130,384 L 251,385 L 251,480 L 370,480 L 370,334 L 342,329 L 314,319 L 273,297 L 225,260 L 200,233 L 190,218 L 184,203 L 178,163 L 178,145 L 182,120 L 187,105 L 196,91 L 164,92 L 139,97 L 101,113 Z",
-        "M 233,83 L 222,100 L 214,116 L 208,141 L 208,168 L 211,188 L 219,209 L 230,225 L 250,245 L 274,264 L 326,293 L 350,301 L 370,303 L 371,256 L 401,290 L 442,328 L 473,349 L 494,359 L 512,365 L 537,370 L 563,371 L 590,367 L 618,358 L 587,356 L 551,346 L 527,333 L 514,323 L 501,309 L 492,290 L 487,194 L 484,172 L 476,142 L 469,124 L 455,99 L 449,91 L 422,66 L 391,49 L 374,44 L 342,39 L 317,40 L 292,45 L 272,53 L 249,67 Z",
+        "M 174,91 L 146,95 L 121,103 L 81,126 L 50,155 L 34,178 L 23,199 L 14,229 L 10,254 L 10,480 L 129,480 L 130,384 L 250,384 L 251,480 L 370,480 L 370,333 L 330,330 L 291,318 L 255,298 L 233,280 L 218,264 L 203,243 L 192,222 L 180,182 L 178,145 L 181,125 L 187,105 L 196,91 L 175,91 Z",
+        "M 336,39 L 304,42 L 272,53 L 244,71 L 222,100 L 209,134 L 208,171 L 216,203 L 229,229 L 251,256 L 278,277 L 306,291 L 338,300 L 370,303 L 371,256 L 415,304 L 464,344 L 505,363 L 551,371 L 581,369 L 610,361 L 610,358 L 576,354 L 551,346 L 514,323 L 496,301 L 491,282 L 489,213 L 484,172 L 473,134 L 457,102 L 432,74 L 416,62 L 385,47 L 337,39 Z",
         "M 440,351 L 440,404 L 438,416 L 436,422 L 433,427 L 424,436 L 423,438 L 420,448 L 419,455 L 419,466 L 417,475 L 417,478 L 422,478 L 440,474 L 444,472 L 455,465 L 463,457 L 474,444 L 482,432 L 484,428 L 487,417 L 487,411 L 489,405 L 490,394 L 489,377 L 487,377 L 482,374 L 474,371 L 464,366 L 450,358 L 445,354 Z"
     ];
     // transform: places the elephant at its true rendered position in a 100×100 stone coordinate space.
