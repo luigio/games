@@ -416,13 +416,13 @@
         let paths, iconColor, viewBox;
         let offsetX = '0%';
         if (color === 'black' && shape === 'circle') {
-            paths = ELEPHANT_PATHS; iconColor = 'rgb(208,224,255)'; viewBox = ELEPHANT_VIEWBOX; offsetX = '7%';
+            paths = ELEPHANT_PATHS; iconColor = 'rgb(135,152,197)'; viewBox = ELEPHANT_VIEWBOX; offsetX = '7%';
         } else if (color === 'black' && shape === 'square') {
-            paths = CAT_PATHS;      iconColor = 'rgb(208,224,255)'; viewBox = CAT_VIEWBOX;
+            paths = CAT_PATHS;      iconColor = 'rgb(225,234,255)'; viewBox = CAT_VIEWBOX; // rgb(195,213,255)
         } else if (color === 'white' && shape === 'circle') {
-            paths = HORSE_PATHS;    iconColor = 'rgb(80,96,128)';   viewBox = HORSE_VIEWBOX;
+            paths = HORSE_PATHS;    iconColor = 'rgb(75,91,138)';   viewBox = HORSE_VIEWBOX;
         } else {
-            paths = MOUSE_PATHS;    iconColor = 'rgb(80,96,128)';   viewBox = MOUSE_VIEWBOX;
+            paths = MOUSE_PATHS;    iconColor = 'rgb(75,91,138)';   viewBox = MOUSE_VIEWBOX;
         }
         const size = (color === 'black' && shape === 'square') ? '64%'
                    : (color === 'white') ? '88%'   // 78% ÷ 0.8862 to match full-cell visual size
@@ -434,9 +434,9 @@
     /** Returns disk background, border, borderRadius and size for a given color+shape. */
     function getDiskStyle(color, shape) {
         if (color === 'black' && shape === 'circle') return { background: 'black',            border: 'none',              borderRadius: '50%', size: '100%', overflow: 'hidden' };
-        if (color === 'black' && shape === 'square') return { background: 'rgb(80,96,128)',   border: '2px solid black',   borderRadius: '50%', size: '100%', overflow: 'hidden' };
+        if (color === 'black' && shape === 'square') return { background: 'rgb(75,91,138)',   border: '2px solid black',   borderRadius: '50%', size: '100%', overflow: 'hidden' };
         if (color === 'white' && shape === 'circle') return { background: 'white',            border: '2px solid black',   borderRadius: '0',  size: '88.62%', overflow: 'visible' };
-        /* white + square → mouse */                return { background: 'rgb(208,224,255)', border: '2px solid black',   borderRadius: '0',  size: '88.62%', overflow: 'visible' };
+        /* white + square → mouse */                return { background: 'rgb(195,213,255)', border: '2px solid black',   borderRadius: '0',  size: '88.62%', overflow: 'visible' };
     }
 
     // ─────────────────────────────────────────────────────────────
