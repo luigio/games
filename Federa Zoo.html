@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Federa</title>
+    <style>
+        /* ── Page layout ── */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            width: 100vw;
+            max-width: 100%;
+        }
+
+        /* ── Header ── */
+        .header {
+            width: min(100vw, calc(100vh - 100px));
+            height: 50px;
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0 auto;
+            overflow: visible;
+        }
+
+        .status-left {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            position: absolute;
+            left: 0;
+            z-index: 1;
+            padding-right: 0.5em;
+        }
+
+        .status-center {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            white-space: nowrap;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1;
+        }
+
+        .controls-right {
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            position: absolute;
+            right: 0;
+            z-index: 1;
+            gap: 0.5em;
+        }
+
+        /* ── Board area ── */
+        .board-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            background-color: #f0f0f0;
+        }
+
+        .board {
+            width: min(100vw, calc(100vh - 100px));
+            height: min(100vw, calc(100vh - 100px));
+            background-color: #d9a359;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* ── Footer ── */
+        .footer {
+            width: 100%;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* ── Last-move display ── */
+        #last-move-text {
+            font-family: Arial, sans-serif;
+            font-size: 1.2em;
+            white-space: nowrap;
+        }
+
+        #copy-move {
+            font-size: 1.2em;
+            padding: 0;
+            border: none;
+            background: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .copy-icon {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+        }
+
+        #copy-move:hover .copy-icon path {
+            fill: #555;
+        }
+
+        /* ── Grid & lines ── */
+        .grid {
+            display: grid;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        .lines {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        /* ── Stones ── */
+        .point {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .stone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-sizing: border-box;
+            z-index: 2;
+            overflow: hidden;
+        }
+
+        /* All pieces are disks — .square is no longer used for visual shape */
+
+        /* Red dot marking the last move */
+        .last-move::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 22%;
+            height: 22%;
+            border-radius: 50%;
+            background: red;
+            z-index: 3;
+        }
+
+        /* ── Replay / footer controls ── */
+        .replay-controls {
+            display: flex;
+            flex-wrap: nowrap;
+            width: 100%;
+            gap: 0.5em;
+            overflow: hidden;
+            justify-content: center;
+        }
+
+        .replay-controls button,
+        .replay-controls select {
+            flex: 0 1 auto;
+            padding: 0.3em 0.5em;
+            font-size: 1em;
+            border: 2px solid black;
+            background: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            min-width: 0;
+            text-overflow: clip;
+            overflow: hidden;
+            white-space: nowrap;
+            max-width: 100px;
+        }
+
+        /* Default button / select styling */
+        button, select {
+            font-size: 1em;
+            padding: 0.3em 0.5em;
+            border: 2px solid black;
+            background: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:not(:disabled):hover, select:hover {
+            background: #FFF5E9;
+        }
+
+        select {
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .replay-controls button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        /* Inline stone icons used in status text */
+        .stone-icon {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+            margin-right: 0.5em;
+        }
+
+        /* Floating status message (appears beside the board) */
+        #message {
+            font-family: Arial, sans-serif;
+            position: absolute;
+            left: calc(50vw + 50vh - 30px);
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2em;
+            color: #d32f2f;
+            width: 20vw;
+            text-align: left;
+        }
+
+        .left-spacing {
+            margin-left: 0.5em;
+        }
+
+        #random-button {
+            flex: 0 1 auto;
+            min-width: 0;
+            text-align: center;
+            max-width: 8em;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+
+        <!-- Header: turn indicator, score, and last-move display -->
+        <div class="header">
+            <div class="status-left" id="turn-status"></div>
+            <div class="status-center" id="score-status"></div>
+            <div class="controls-right">
+                <div id="last-move-display" style="display: flex; align-items: center; gap: 0.5em;">
+                    <span id="last-move-text"></span>
+                    <button id="copy-move" title="Copy last move" style="display: none;">
+                        <svg class="copy-icon" viewBox="0 0 23 24">
+                            <path fill="black" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Board -->
+        <div class="board-container">
+            <div class="board" id="board">
+                <div class="lines" id="lines"></div>
+                <div class="grid" id="grid"></div>
+            </div>
+            <div id="message"></div>
+        </div>
+
+        <!-- Footer: replay navigation and game management controls -->
+        <div class="footer">
+            <div class="replay-controls">
+                <button onmousedown="replayStart()">Start</button>
+                <button onmousedown="replayBack()">Back</button>
+                <button onmousedown="replayForward()">Forward</button>
+                <button onmousedown="replayEnd()">End</button>
+                <button id="random-button" onmousedown="generateRandomGame()">Random game</button>
+
+                <select id="save-options" onchange="handleSave()">
+                    <option value="" disabled selected hidden>Save</option>
+                    <option value="file">To file</option>
+                    <option value="clipboard">To clipboard</option>
+                </select>
+
+                <select id="load-options" onchange="handleLoad()">
+                    <option value="" disabled selected hidden>Load</option>
+                    <option value="file">From file</option>
+                    <option value="clipboard">From clipboard</option>
+                </select>
+
+                <select id="board-size" onchange="changeBoardSize()">
+                    <option value="7">7×7</option>
+                    <option value="9">9×9</option>
+                    <option value="11">11×11</option>
+                    <option value="13" selected>13×13</option>
+                    <option value="15">15×15</option>
+                    <option value="17">17×17</option>
+                    <option value="19">19×19</option>
+                    <option value="21">21×21</option>
+                </select>
+
+                <input type="file" id="load-input" style="display: none;" accept=".txt" onchange="loadGame(event)">
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+    // ─────────────────────────────────────────────────────────────
+    // Constants
+    // ─────────────────────────────────────────────────────────────
+
+    /** Four orthogonal directions used for adjacency checks throughout. */
+    const DIRS = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+
+    // ─────────────────────────────────────────────────────────────
+    // Covet rules  (Federa-specific)
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Returns true if a stone of (stoneColor, stoneShape) covets a piece of
+     * (targetColor, targetShape) under Federa's three covet rules:
+     *
+     *   Rule 1 — Black covets white of the OPPOSITE shape.
+     *              (black○ → white□, black□ → white○)
+     *   Rule 2 — White covets black of the SAME shape.
+     *              (white○ → black○, white□ → black□)
+     *   Rule 3 — ALL pieces covet same-color, OPPOSITE shape.
+     *              (any○ → same-color□, any□ → same-color○)
+     *
+     * Full covet table (animal names → color/shape mapping):
+     *   elephant (black○) covets  horse (white○),  cat (black□)
+     *   horse    (white○) covets  cat   (black□),  mouse (white□)
+     *   cat      (black□) covets  mouse (white□),  elephant (black○)
+     *   mouse    (white□) covets  elephant (black○), horse (white○)
+     *
+     * In words: there is a cross-player cycle  elephant→horse→cat→mouse→elephant,
+     * plus each same-player pair covets each other (elephant↔cat, horse↔mouse).
+     */
+    function doesCovet(stoneColor, stoneShape, targetColor, targetShape) {
+        const key = `${stoneColor},${stoneShape}`;
+        const tgt = `${targetColor},${targetShape}`;
+        const covetMap = {
+            'black,circle':  ['white,circle',  'black,square'],   // elephant → horse, cat
+            'white,circle':  ['black,square',  'white,square'],   // horse    → cat,   mouse
+            'black,square':  ['white,square',  'black,circle'],   // cat      → mouse, elephant
+            'white,square':  ['black,circle',  'white,circle'],   // mouse    → elephant, horse
+        };
+        return covetMap[key]?.includes(tgt) ?? false;
+    }
+
+    /** Inline SVG icons rendered inside status text. */
+    const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
+    const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
+
+    // ─────────────────────────────────────────────────────────────
+    // Animal SVG icon definitions  (extracted from animales_iconos_3.svg)
+    // ─────────────────────────────────────────────────────────────
+
+    // Elephant  (top-left quadrant — three combined paths)
+    const ELEPHANT_VIEWBOX = "8 35 615 455";
+    const ELEPHANT_PATHS = [
+        "M 77,129 L 50,155 L 34,178 L 23,199 L 14,229 L 10,254 L 10,480 L 129,480 L 130,384 L 251,385 L 251,480 L 370,480 L 370,334 L 342,329 L 314,319 L 273,297 L 225,260 L 200,233 L 190,218 L 184,203 L 178,163 L 178,145 L 182,120 L 187,105 L 196,91 L 164,92 L 139,97 L 101,113 Z",
+        "M 233,83 L 222,100 L 214,116 L 208,141 L 208,168 L 211,188 L 219,209 L 230,225 L 250,245 L 274,264 L 326,293 L 350,301 L 370,303 L 371,256 L 401,290 L 442,328 L 473,349 L 494,359 L 512,365 L 537,370 L 563,371 L 590,367 L 618,358 L 587,356 L 551,346 L 527,333 L 514,323 L 501,309 L 492,290 L 487,194 L 484,172 L 476,142 L 469,124 L 455,99 L 449,91 L 422,66 L 391,49 L 374,44 L 342,39 L 317,40 L 292,45 L 272,53 L 249,67 Z",
+        "M 440,351 L 440,404 L 438,416 L 436,422 L 433,427 L 424,436 L 423,438 L 420,448 L 419,455 L 419,466 L 417,475 L 417,478 L 422,478 L 440,474 L 444,472 L 455,465 L 463,457 L 474,444 L 482,432 L 484,428 L 487,417 L 487,411 L 489,405 L 490,394 L 489,377 L 487,377 L 482,374 L 474,371 L 464,366 L 450,358 L 445,354 Z"
+    ];
+
+    // Cat  (bottom-left quadrant)
+    const CAT_VIEWBOX = "15 535 460 480";
+    const CAT_PATHS = [
+        "M 382,541 L 337,586 L 317,610 L 260,689 L 244,705 L 194,743 L 164,773 L 139,805 L 125,832 L 116,865 L 112,897 L 111,968 L 78,966 L 66,959 L 59,951 L 53,932 L 53,877 L 39,881 L 25,894 L 17,920 L 18,947 L 27,971 L 45,991 L 61,1001 L 98,1009 L 379,1009 L 380,747 L 400,746 L 420,739 L 431,733 L 467,704 L 467,671 L 382,599 Z"
+    ];
+
+    // Horse  (top-right quadrant — two combined paths)
+    const HORSE_VIEWBOX = "658 8 558 478";
+    const HORSE_PATHS = [
+        "M 1157,10 L 1121,46 L 1059,63 L 1022,81 L 982,118 L 941,172 L 835,173 L 802,184 L 789,192 L 775,206 L 760,232 L 752,267 L 752,481 L 840,481 L 841,349 L 983,350 L 983,481 L 1071,481 L 1071,333 L 1074,278 L 1086,225 L 1103,182 L 1107,180 L 1182,229 L 1206,213 L 1211,206 L 1210,181 L 1157,63 Z",
+        "M 767,194 L 759,195 L 748,198 L 722,211 L 710,221 L 698,233 L 697,236 L 694,239 L 685,254 L 677,276 L 675,288 L 675,315 L 676,324 L 678,330 L 679,346 L 679,368 L 676,384 L 672,396 L 668,404 L 662,411 L 673,410 L 683,407 L 697,399 L 700,396 L 703,395 L 716,382 L 723,369 L 727,356 L 729,339 L 729,318 L 728,317 L 727,282 L 731,255 L 738,235 L 744,223 L 756,205 Z"
+    ];
+
+    // Mouse  (bottom-right quadrant)
+    const MOUSE_VIEWBOX = "670 550 545 465";
+    const MOUSE_PATHS = [
+        "M 726,560 C 731.3,562.0 749.5,566.7 758,572 C 766.5,577.3 771.8,584.8 777,592 C 782.2,599.2 786.3,605.0 789,615 C 791.7,625.0 793.8,640.0 793,652 C 792.2,664.0 787.8,677.0 784,687 C 780.2,697.0 783.5,694.7 770,712 C 756.5,729.3 717.7,771.0 703,791 C 688.3,811.0 686.7,819.3 682,832 C 677.3,844.7 675.8,856.2 675,867 C 674.2,877.8 676.7,892.0 677,897 L 686,928 L 700,951 L 726,979 L 768,1000 L 792,1005 L 839,1009 L 1068,1009 L 1058,981 L 1048,972 L 1027,964 L 1066,850 L 1076,844 L 1126,838 L 1175,820 L 1200,797 L 1207,784 L 1206,778 L 1088,682 L 1085,662 L 1075,638 L 1054,617 L 1041,609 L 1018,604 L 997,605 L 965,618 L 946,639 L 934,670 L 935,693 L 942,713 L 976,749 L 931,752 L 895,762 L 858,782 L 833,805 L 811,841 L 797,885 L 794,933 L 802,965 L 793,967 L 767,960 L 741,943 L 721,919 L 709,886 L 709,858 L 716,831 L 727,809 L 783,735 L 803,700 L 811,670 L 812,638 L 800,601 L 778,574 L 753,560 Z"
+    ];
+
+    /**
+     * Returns an inline SVG string for the given piece type.
+     *   black + circle  → elephant  (white icon on black disk)
+     *   black + square  → cat       (white icon on dark-blue disk)
+     *   white + circle  → horse     (black icon on white disk)
+     *   white + square  → mouse     (black icon on light-blue disk)
+     */
+    function getAnimalSVG(color, shape) {
+        let paths, iconColor, viewBox;
+        let offsetX = '0%';
+        if (color === 'black' && shape === 'circle') {
+            paths = ELEPHANT_PATHS; iconColor = 'rgb(208,224,255)'; viewBox = ELEPHANT_VIEWBOX; offsetX = '7%';
+        } else if (color === 'black' && shape === 'square') {
+            paths = CAT_PATHS;      iconColor = 'rgb(208,224,255)'; viewBox = CAT_VIEWBOX;
+        } else if (color === 'white' && shape === 'circle') {
+            paths = HORSE_PATHS;    iconColor = 'rgb(80,96,128)';   viewBox = HORSE_VIEWBOX;
+        } else {
+            paths = MOUSE_PATHS;    iconColor = 'rgb(80,96,128)';   viewBox = MOUSE_VIEWBOX;
+        }
+        const size = (color === 'black' && shape === 'square') ? '64%'
+                   : (color === 'white') ? '88%'   // 78% ÷ 0.8862 to match full-cell visual size
+                   : '78%';
+        const pathsHTML = paths.map(d => `<path fill="${iconColor}" d="${d}"/>`).join('');
+        return `<svg viewBox="${viewBox}" style="width:${size};height:${size};position:absolute;top:50%;left:calc(50% + ${offsetX});transform:translate(-50%,-50%);pointer-events:none;">${pathsHTML}</svg>`;
+    }
+
+    /** Returns disk background, border, borderRadius and size for a given color+shape. */
+    function getDiskStyle(color, shape) {
+        if (color === 'black' && shape === 'circle') return { background: 'black',            border: 'none',              borderRadius: '50%', size: '100%', overflow: 'hidden' };
+        if (color === 'black' && shape === 'square') return { background: 'rgb(80,96,128)',   border: '2px solid black',   borderRadius: '50%', size: '100%', overflow: 'hidden' };
+        if (color === 'white' && shape === 'circle') return { background: 'white',            border: '2px solid black',   borderRadius: '0',  size: '88.62%', overflow: 'visible' };
+        /* white + square → mouse */                return { background: 'rgb(208,224,255)', border: '2px solid black',   borderRadius: '0',  size: '88.62%', overflow: 'visible' };
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Game state
+    // ─────────────────────────────────────────────────────────────
+
+    let SIZE = 13;
+    let board = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
+    let turn = 'black';
+    let lastMoveX = null;
+    let lastMoveY = null;
+    let lastShape = null;
+    let lastWasFlip = false;
+    let gameHistory = [];
+    let currentMoveIndex = -1;
+    let isGenerating = false;
+    let generationInterval = null;
+    let gameOver = false;
+    let passesInRow = 0; // tracks consecutive passes (used in resetGame)
+
+    // ─────────────────────────────────────────────────────────────
+    // Board initialisation & rendering
+    // ─────────────────────────────────────────────────────────────
+
+    /** Builds the DOM grid and canvas grid-lines for the current SIZE. */
+    function initBoard() {
+        const gridDiv = document.getElementById('grid');
+        gridDiv.innerHTML = '';
+        const linesDiv = document.getElementById('lines');
+        linesDiv.innerHTML = '';
+
+        // Draw grid lines onto a canvas element
+        const boardSize = document.getElementById('board').offsetWidth;
+        const canvas = document.createElement('canvas');
+        canvas.width = boardSize;
+        canvas.height = boardSize;
+        const ctx = canvas.getContext('2d');
+        ctx.strokeStyle = 'black';
+        const cellSize = boardSize / SIZE;
+
+        // Draw all horizontal and vertical lines in a single pass
+        for (let i = 0; i < SIZE; i++) {
+            const pos = cellSize / 2 + i * cellSize;
+            const isBorder = (i === 0 || i === SIZE - 1);
+            ctx.lineWidth = isBorder ? 2 : 1;
+
+            // Vertical line
+            ctx.beginPath();
+            ctx.moveTo(pos, cellSize / 2);
+            ctx.lineTo(pos, boardSize - cellSize / 2);
+            ctx.stroke();
+
+            // Horizontal line
+            ctx.beginPath();
+            ctx.moveTo(cellSize / 2, pos);
+            ctx.lineTo(boardSize - cellSize / 2, pos);
+            ctx.stroke();
+        }
+        linesDiv.appendChild(canvas);
+
+        // Configure CSS grid dimensions
+        gridDiv.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+        gridDiv.style.gridTemplateRows    = `repeat(${SIZE}, 1fr)`;
+
+        // Create one clickable .point div per intersection
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const point = document.createElement('div');
+                point.className = 'point';
+                point.dataset.x = i;
+                point.dataset.y = j;
+
+                point.addEventListener('mousedown', (e) => {
+                    if (gameOver) return;
+
+                    // Left-click = circle, right-click = square
+                    const shape = e.button === 0 ? 'circle' : (e.button === 2 ? 'square' : null);
+                    if (!shape) return;
+
+                    if (board[i][j] === null) {
+                        performPlacement(i, j, shape);
+                    } else {
+                        // Validation happens inside performFlip
+                        performFlip(i, j, shape);
+                    }
+                });
+
+                point.addEventListener('contextmenu', (e) => e.preventDefault());
+
+                const stone = document.createElement('div');
+                stone.className = 'stone';
+                point.appendChild(stone);
+                gridDiv.appendChild(point);
+            }
+        }
+
+        updateStatus();
+        updateLastMoveDisplay();
+        updateButtonTooltips();
+    }
+
+    /**
+     * Re-renders every stone on the board from the current `board` state.
+     * Also refreshes button tooltips.
+     */
+    function renderBoard() {
+        const points = document.getElementsByClassName('point');
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const stone = points[i * SIZE + j].firstChild;
+                const cell  = board[i][j];
+
+                // Base class — all pieces are disks, no .square
+                let cls = 'stone';
+                if (i === lastMoveX && j === lastMoveY) cls += ' last-move';
+                stone.className = cls;
+
+                if (cell) {
+                    const ds = getDiskStyle(cell.color, cell.shape);
+                    stone.style.background   = ds.background;
+                    stone.style.border       = ds.border;
+                    stone.style.borderRadius = ds.borderRadius;
+                    stone.style.width        = ds.size;
+                    stone.style.height       = ds.size;
+                    stone.style.overflow     = ds.overflow;
+                    stone.innerHTML = getAnimalSVG(cell.color, cell.shape);
+                } else {
+                    stone.style.background   = '';
+                    stone.style.border       = '';
+                    stone.style.borderRadius = '';
+                    stone.style.width        = '';
+                    stone.style.height       = '';
+                    stone.style.overflow     = '';
+                    stone.innerHTML = '';
+                }
+            }
+        }
+        updateButtonTooltips();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Group logic
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Returns all cells in the connected group containing (x, y),
+     * where connectivity requires matching color AND shape.
+     */
+    function getGroup(x, y) {
+        if (!board[x][y]) return [];
+        const {color, shape} = board[x][y];
+        const visited = Array.from({length: SIZE}, () => Array(SIZE).fill(false));
+        const group = [[x, y]];
+        const queue = [[x, y]];
+        visited[x][y] = true;
+
+        while (queue.length > 0) {
+            const [cx, cy] = queue.shift();
+            for (const [dx, dy] of DIRS) {
+                const nx = cx + dx;
+                const ny = cy + dy;
+                if (
+                    nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE &&
+                    !visited[nx][ny] &&
+                    board[nx][ny]?.color === color &&
+                    board[nx][ny]?.shape === shape
+                ) {
+                    visited[nx][ny] = true;
+                    queue.push([nx, ny]);
+                    group.push([nx, ny]);
+                }
+            }
+        }
+        return group;
+    }
+
+    /**
+     * Returns true if every orthogonal neighbour of every cell in
+     * the group is occupied (i.e. no liberty touches an empty cell).
+     */
+    function isGroupBounded(group) {
+        for (const [gx, gy] of group) {
+            for (const [dx, dy] of DIRS) {
+                const nx = gx + dx;
+                const ny = gy + dy;
+                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && board[nx][ny] === null) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Flip validation  (Federa rules)
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Validates whether `actorColor` may legally claim the group at (x, y).
+     *
+     * Claim conditions (Federa):
+     *   1. The group must be fully bounded (no empty liberties).
+     *   2. The actor must own a strict majority of adjacent stones that
+     *      covet the group's type (per doesCovet).
+     *
+     * Replacement type: the actor's own piece type(s) that covet the group.
+     * In Federa this is always exactly one shape (deterministic, never a tie).
+     *
+     * @param {number} x
+     * @param {number} y
+     * @param {string} actorColor  - 'black' | 'white'
+     * @returns {{ valid: boolean, reason?: string, group: number[][], validTargetShapes: string[] }}
+     */
+    function getFlipValidation(x, y, actorColor) {
+        if (!board[x][y]) return {valid: false, reason: "Empty cell", group: []};
+
+        const group = getGroup(x, y);
+        const {color: groupColor, shape: groupShape} = board[x][y];
+
+        // Rule 1: group must have no empty liberties
+        if (!isGroupBounded(group)) {
+            return {valid: false, reason: "Group must be bounded", group};
+        }
+
+        // Gather all distinct stones adjacent to (but outside) the group
+        const groupSet    = new Set(group.map(([gx, gy]) => `${gx},${gy}`));
+        const neighborSet = new Set();
+
+        for (const [gx, gy] of group) {
+            for (const [dx, dy] of DIRS) {
+                const nx = gx + dx, ny = gy + dy;
+                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
+                    const key = `${nx},${ny}`;
+                    if (board[nx][ny] && !groupSet.has(key)) neighborSet.add(key);
+                }
+            }
+        }
+
+        // Rule 2: count coveting stones for each player
+        let actorCoveting    = 0;
+        let opponentCoveting = 0;
+
+        for (const key of neighborSet) {
+            const [nx, ny] = key.split(',').map(Number);
+            const {color: nc, shape: ns} = board[nx][ny];
+            if (doesCovet(nc, ns, groupColor, groupShape)) {
+                if (nc === actorColor) actorCoveting++;
+                else opponentCoveting++;
+            }
+        }
+
+        if (actorCoveting === 0 && opponentCoveting === 0) {
+            return {valid: false, reason: "No coveting stones adjacent to group", group};
+        }
+
+        if (actorCoveting < opponentCoveting) {
+            return {valid: false, reason: `You don't have a majority of coveting stones (yours: ${actorCoveting}, opponent's: ${opponentCoveting})`, group};
+        }
+
+        // On a tie, only the friendly player (same colour as the group) may claim
+        if (actorCoveting === opponentCoveting && actorColor !== groupColor) {
+            return {valid: false, reason: `Tied coveting — only the friendly player may claim on a tie (yours: ${actorCoveting}, opponent's: ${opponentCoveting})`, group};
+        }
+
+        // Replacement: actor's piece types that covet this group (always one in Federa)
+        const validTargetShapes = ['circle', 'square'].filter(s =>
+            doesCovet(actorColor, s, groupColor, groupShape)
+        );
+
+        return {valid: true, group, validTargetShapes};
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Move execution
+    // ─────────────────────────────────────────────────────────────
+
+    /** Places a new stone of the current player's color at (x, y). */
+    function performPlacement(x, y, shape) {
+        if (board[x][y] !== null) {
+            setMessage("Position occupied!");
+            return;
+        }
+        board[x][y] = {color: turn, shape};
+        successfulMove(x, y, shape, false);
+    }
+
+    /**
+     * Attempts to claim the group at (x, y) for the current player.
+     * `preferredShape` is accepted for API compatibility but Federa's
+     * replacement type is always deterministic (validTargetShapes has one entry),
+     * so it only acts as a tie-breaker in the degenerate case.
+     */
+    function performFlip(x, y, preferredShape = 'circle') {
+        const result = getFlipValidation(x, y, turn);
+        if (!result.valid) {
+            setMessage(result.reason);
+            return;
+        }
+
+        // Honour the player's preferred shape when there is a tie
+        let targetShape = result.validTargetShapes[0];
+        if (result.validTargetShapes.includes(preferredShape)) {
+            targetShape = preferredShape;
+        }
+
+        // Convert the entire group to the actor's color and the coveting shape
+        for (const [gx, gy] of result.group) {
+            board[gx][gy].color = turn;
+            board[gx][gy].shape = targetShape;
+        }
+
+        successfulMove(x, y, targetShape, true);
+    }
+
+    /**
+     * Shared post-move logic: switches turn, checks for win/skip,
+     * saves state, and refreshes the UI.
+     */
+    function successfulMove(x, y, shape, isFlip) {
+        lastWasFlip = isFlip;
+        setLastMoveMarker(x, y);
+        lastShape = shape;
+
+        // Advance turn
+        turn = turn === 'black' ? 'white' : 'black';
+
+        // Win condition: board full and one colour holds every stone
+        const {black: bCount, white: wCount} = getCounts();
+        const totalStones = bCount + wCount;
+        if (totalStones === SIZE * SIZE && (bCount === totalStones || wCount === totalStones)) {
+            gameOver = true;
+        }
+
+        // If the new move matches the next entry in history, step into it rather
+        // than appending a duplicate. Otherwise truncate forward history and push.
+        if (currentMoveIndex < gameHistory.length - 1) {
+            const next = gameHistory[currentMoveIndex + 1];
+            const sameMove = next.lastMoveX === x &&
+                             next.lastMoveY === y &&
+                             next.lastShape === shape &&
+                             next.lastWasFlip === isFlip;
+            if (sameMove) {
+                currentMoveIndex++;
+                // Load from the saved state so that turn (and any skip-logic
+                // that ran when this move was first made) is correctly restored
+                loadGameState(gameHistory[currentMoveIndex]);
+                updateReplayButtons();
+                return;
+            } else {
+                gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+            }
+        }
+
+        // Auto-skip any player with no legal moves; draw if both are skipped in succession
+        let consecutiveSkips = 0;
+        while (!hasLegalMove() && !gameOver) {
+            consecutiveSkips++;
+            if (consecutiveSkips >= 2) {
+                gameOver = true;
+                setMessage("Neither player has a legal move — draw!");
+                break;
+            }
+            const skippedPlayer = turn === 'black' ? 'Black' : 'White';
+            turn = turn === 'black' ? 'white' : 'black';
+            //setMessage(`${skippedPlayer} has no moves — turn skipped.`);
+        }
+
+        gameHistory.push(saveGameState());
+        currentMoveIndex++;
+
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+        updateReplayButtons();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Legal-move checks
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Returns true if the current player (`turn`) has at least one legal move.
+     * Empty cell → always legal to place. Full board → check for valid flips.
+     */
+    function hasLegalMove() {
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                if (board[i][j] === null) return true; // placement always legal
+            }
+        }
+
+        // Board is full — check for any flippable group
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                if (board[i][j] && getFlipValidation(i, j, turn).valid) return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Returns true if `playerColor` has at least one legal move,
+     * temporarily swapping `turn` to perform the check without side effects.
+     */
+    function hasLegalMoveForPlayer(playerColor) {
+        const originalTurn = turn;
+        turn = playerColor;
+        const hasMove = hasLegalMove();
+        turn = originalTurn;
+        return hasMove;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Game state persistence
+    // ─────────────────────────────────────────────────────────────
+
+    /** Returns a deep snapshot of the current game state for history storage. */
+    function saveGameState() {
+        return {
+            board:       board.map(row => row.map(cell => cell ? {...cell} : null)),
+            turn,
+            lastMoveX,
+            lastMoveY,
+            lastShape,
+            lastWasFlip,
+            message:     document.getElementById('message').textContent
+        };
+    }
+
+    /** Restores game state from a saved snapshot and refreshes the UI. */
+    function loadGameState(state) {
+        board      = state.board.map(row => row.map(cell => cell ? {...cell} : null));
+        turn       = state.turn;
+        lastMoveX  = state.lastMoveX;
+        lastMoveY  = state.lastMoveY;
+        lastShape  = state.lastShape;
+        lastWasFlip = state.lastWasFlip || false;
+        gameOver   = false;
+        // Restore any skip/draw message that was active when this state was saved
+        if (state.message) setMessage(state.message); else clearMessage();
+
+        // Re-detect terminal state (single-color full board)
+        const {black: bCount, white: wCount} = getCounts();
+        const totalStones = bCount + wCount;
+        if (totalStones === SIZE * SIZE && (bCount === totalStones || wCount === totalStones)) {
+            gameOver = true;
+        }
+
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+    }
+
+    /** Resets game to a blank board of the given size. */
+    function resetGame(newSize) {
+        SIZE          = newSize;
+        board         = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
+        turn          = 'black';
+        lastMoveX     = lastMoveY = lastShape = null;
+        lastWasFlip   = false;
+        passesInRow   = 0;
+        gameOver      = false;
+        gameHistory   = [saveGameState()];
+        currentMoveIndex = 0;
+
+        clearMessage();
+        initBoard();
+        updateReplayButtons();
+        renderBoard();
+        updateLastMoveDisplay();
+    }
+
+    /** Called when the board-size <select> changes. */
+    function changeBoardSize() {
+        const select = document.getElementById('board-size');
+        resetGame(parseInt(select.value));
+        select.blur();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Last-move marker
+    // ─────────────────────────────────────────────────────────────
+
+    function clearLastMoveMarker() {
+        if (lastMoveX !== null && lastMoveY !== null) {
+            const stone = document.getElementsByClassName('point')[lastMoveX * SIZE + lastMoveY].firstChild;
+            stone.classList.remove('last-move');
+        }
+    }
+
+    function setLastMoveMarker(x, y) {
+        clearLastMoveMarker();
+        const stone = document.getElementsByClassName('point')[x * SIZE + y].firstChild;
+        stone.classList.add('last-move');
+        lastMoveX = x;
+        lastMoveY = y;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Status messages
+    // ─────────────────────────────────────────────────────────────
+
+    function clearMessage() {
+        document.getElementById('message').textContent = '';
+    }
+
+    /** Displays a temporary message that auto-clears after 3 seconds. */
+    function setMessage(text) {
+        document.getElementById('message').textContent = text;
+        setTimeout(clearMessage, 3000);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Replay controls
+    // ─────────────────────────────────────────────────────────────
+
+    function replayStart() {
+        currentMoveIndex = 0;
+        loadGameState(gameHistory[0]);
+        // Skip forward past any auto-skip states at the start
+        while (currentMoveIndex < gameHistory.length - 1 && !gameOver && !hasLegalMove()) {
+            loadGameState(gameHistory[++currentMoveIndex]);
+        }
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function replayBack() {
+        if (currentMoveIndex <= 0) return;
+        loadGameState(gameHistory[--currentMoveIndex]);
+        while (currentMoveIndex > 0 && !gameOver && !hasLegalMove()) {
+            loadGameState(gameHistory[--currentMoveIndex]);
+        }
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function replayForward() {
+        if (currentMoveIndex >= gameHistory.length - 1) return;
+        loadGameState(gameHistory[++currentMoveIndex]);
+        while (currentMoveIndex < gameHistory.length - 1 && !gameOver && !hasLegalMove()) {
+            loadGameState(gameHistory[++currentMoveIndex]);
+        }
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    function replayEnd() {
+        currentMoveIndex = gameHistory.length - 1;
+        loadGameState(gameHistory[currentMoveIndex]);
+        while (currentMoveIndex > 0 && !gameOver && !hasLegalMove()) {
+            loadGameState(gameHistory[--currentMoveIndex]);
+        }
+        updateReplayButtons();
+        updateLastMoveDisplay();
+    }
+
+    /** Enables / disables replay buttons based on current position in history. */
+    function updateReplayButtons() {
+        const buttons    = document.querySelectorAll('.replay-controls button');
+        const [startBtn, backBtn, forwardBtn, endBtn] = buttons;
+        const randomBtn  = document.getElementById('random-button');
+        const isAtStart  = currentMoveIndex === 0;
+        const isAtEnd    = currentMoveIndex === gameHistory.length - 1;
+
+        randomBtn.disabled  = isGenerating ? false : (!gameOver && !hasLegalMove());
+        startBtn.disabled   = isAtStart   || isGenerating;
+        backBtn.disabled    = isAtStart   || isGenerating;
+        forwardBtn.disabled = isAtEnd     || isGenerating;
+        endBtn.disabled     = isAtEnd     || isGenerating;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Score & header UI
+    // ─────────────────────────────────────────────────────────────
+
+    /** Returns stone counts for each colour. */
+    function getCounts() {
+        let black = 0, white = 0;
+        for (const row of board) {
+            for (const cell of row) {
+                if (cell) {
+                    if (cell.color === 'black') black++;
+                    else white++;
+                }
+            }
+        }
+        return {black, white};
+    }
+
+    /** Updates the turn indicator and score display in the header. */
+    function updateStatus() {
+        const turnStatus  = document.getElementById('turn-status');
+        const scoreStatus = document.getElementById('score-status');
+        const {black: bCount, white: wCount} = getCounts();
+
+        scoreStatus.innerHTML =
+            `${bCount}<span class="left-spacing">${blackStoneSVG}</span> ` +
+            `${wCount}<span class="left-spacing">${whiteStoneSVG}</span>`;
+
+        const isAtEnd = currentMoveIndex === gameHistory.length - 1;
+
+        if (gameOver && isAtEnd) {
+            // Determine winner by checking who holds every stone
+            let result;
+            if (bCount === SIZE * SIZE)      result = `${blackStoneSVG} wins!`;
+            else if (wCount === SIZE * SIZE) result = `${whiteStoneSVG} wins!`;
+            else                             result = 'Draw!';
+            turnStatus.innerHTML = result;
+        } else {
+            const turnSVG = turn === 'black' ? blackStoneSVG : whiteStoneSVG;
+            turnStatus.innerHTML = `${turnSVG} to move`;
+        }
+
+        adjustHeaderLayout();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Random game generation
+    // ─────────────────────────────────────────────────────────────
+
+    /** Stops the random-game generator interval and restores the button label. */
+    function stopGeneration() {
+        if (!generationInterval) return;
+        clearInterval(generationInterval);
+        generationInterval = null;
+        isGenerating = false;
+        const randomBtn = document.getElementById('random-button');
+        randomBtn.textContent = 'Random game';
+        randomBtn.setAttribute('onmousedown', 'generateRandomGame()');
+        updateReplayButtons();
+        updateStatus();
+        renderBoard();
+    }
+
+    /**
+     * Measures the natural width of the "Random game" button label
+     * using a hidden clone, so the button width can be locked before
+     * the label changes to "Stop".
+     */
+    function measureRandomGameWidth() {
+        const randomBtn = document.getElementById('random-button');
+        const clone = randomBtn.cloneNode(true);
+        clone.textContent = 'Random game';
+        clone.style.visibility = 'hidden';
+        clone.style.position   = 'absolute';
+        document.body.appendChild(clone);
+        const width = clone.offsetWidth;
+        document.body.removeChild(clone);
+        return width;
+    }
+
+    /**
+     * Starts (or stops) an interval that plays random legal moves.
+     *
+     * Move priority:
+     *   Tier 1 – any placement, or a flip of an enemy group
+     *   Tier 2 – flip of own group, preferring the group with the fewest
+     *            stones adjacent to a different-shape same-colour stone
+     */
+    function generateRandomGame() {
+        if (isGenerating) {
+            stopGeneration();
+            return;
+        }
+        if (gameOver) {
+            resetGame(SIZE);
+        }
+        isGenerating = true;
+        const randomBtn = document.getElementById('random-button');
+        randomBtn.style.width = `${measureRandomGameWidth()}px`;
+        randomBtn.textContent = 'Stop';
+        randomBtn.setAttribute('onmousedown', 'stopGeneration()');
+        updateReplayButtons();
+
+        generationInterval = setInterval(() => {
+            // ── Tier 1: placements + enemy flips ──
+            const goodMoves = [];
+
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (board[i][j] === null) {
+                        goodMoves.push({type: 'place', x: i, y: j, shape: 'circle'});
+                        goodMoves.push({type: 'place', x: i, y: j, shape: 'square'});
+                    }
+                }
+            }
+
+            const seenEnemyGroups = new Set();
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (board[i][j] && board[i][j].color !== turn) {
+                        const result = getFlipValidation(i, j, turn);
+                        if (result.valid) {
+                            const groupKey = result.group.map(([gx, gy]) => `${gx},${gy}`).sort().join(';');
+                            if (!seenEnemyGroups.has(groupKey)) {
+                                seenEnemyGroups.add(groupKey);
+                                const [rx, ry] = result.group[0];
+                                for (const shape of result.validTargetShapes) {
+                                    goodMoves.push({type: 'flip', x: rx, y: ry, shape});
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let selectedMoves = goodMoves;
+
+            if (goodMoves.length === 0) {
+                // ── Tier 2: flip own group, preferring the least "mixed" one ──
+                const candidates = [];
+                let minMixedPerimeter = Infinity;
+                const seenOwnGroups = new Set();
+
+                for (let i = 0; i < SIZE; i++) {
+                    for (let j = 0; j < SIZE; j++) {
+                        if (board[i][j] && board[i][j].color === turn) {
+                            const result = getFlipValidation(i, j, turn);
+                            if (result.valid) {
+                                const groupKey = result.group.map(([gx, gy]) => `${gx},${gy}`).sort().join(';');
+                                if (!seenOwnGroups.has(groupKey)) {
+                                    seenOwnGroups.add(groupKey);
+                                    const mixed = calculateMixedShapePerimeter(result.group);
+                                    const candidate = {
+                                        moves: result.validTargetShapes.map(shape => ({
+                                            type: 'flip',
+                                            x: result.group[0][0],
+                                            y: result.group[0][1],
+                                            shape
+                                        })),
+                                        mixed
+                                    };
+
+                                    if (mixed < minMixedPerimeter) {
+                                        minMixedPerimeter = mixed;
+                                        candidates.length = 0;
+                                        candidates.push(candidate);
+                                    } else if (mixed === minMixedPerimeter) {
+                                        candidates.push(candidate);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (candidates.length > 0) {
+                    selectedMoves = candidates[Math.floor(Math.random() * candidates.length)].moves;
+                } else {
+                    selectedMoves = [];
+                }
+            }
+
+            // ── Execute or halt ──
+            if (selectedMoves.length === 0) {
+                stopGeneration();
+                return;
+            }
+
+            const move = selectedMoves[Math.floor(Math.random() * selectedMoves.length)];
+            if (move.type === 'place') {
+                performPlacement(move.x, move.y, move.shape);
+            } else {
+                performFlip(move.x, move.y, move.shape);
+            }
+        }, 1);
+    }
+
+    /**
+     * Counts how many stones in the group touch a same-colour stone
+     * of a different shape. Lower values are preferred by the AI.
+     */
+    function calculateMixedShapePerimeter(group) {
+        const groupSet   = new Set(group.map(([gx, gy]) => `${gx},${gy}`));
+        const mixedStones = new Set();
+
+        for (const [gx, gy] of group) {
+            for (const [dx, dy] of DIRS) {
+                const nx = gx + dx;
+                const ny = gy + dy;
+                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
+                    const nb = board[nx][ny];
+                    if (nb && nb.color === turn && nb.shape !== board[gx][gy].shape) {
+                        mixedStones.add(`${gx},${gy}`);
+                        break; // no need to check more neighbours for this stone
+                    }
+                }
+            }
+        }
+
+        return mixedStones.size;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Last-move display & copy
+    // ─────────────────────────────────────────────────────────────
+
+    /** Refreshes the last-move notation shown in the header. */
+    function updateLastMoveDisplay() {
+        const lastMoveText = document.getElementById('last-move-text');
+        const copyButton   = document.getElementById('copy-move');
+
+        if (currentMoveIndex < 1 || !gameHistory[currentMoveIndex]) {
+            lastMoveText.textContent = '';
+            copyButton.style.display = 'none';
+            return;
+        }
+
+        const state = gameHistory[currentMoveIndex];
+        if (state.lastMoveX === null || state.lastShape === null) {
+            lastMoveText.textContent = '';
+            copyButton.style.display = 'none';
+            return;
+        }
+
+        // The player who just moved is the opposite of the current turn
+        const playerSymbol = state.turn === 'black' ? 'W' : 'B';
+        const flipChar  = state.lastWasFlip ? 'F' : '';
+        const shapeChar = state.lastShape === 'circle' ? 'C' : 'S';
+        const col = String.fromCharCode(97 + state.lastMoveY);
+        const row = SIZE - state.lastMoveX;
+
+        lastMoveText.textContent = `${playerSymbol}${flipChar}${shapeChar}${col}${row}`;
+        copyButton.style.display = 'inline-flex';
+    }
+
+    /** Copies the last-move notation to the clipboard. */
+    function copyLastMove() {
+        const text = document.getElementById('last-move-text').textContent;
+        if (text) navigator.clipboard.writeText(text).then(() => setMessage('Copied!'));
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Game record serialisation / deserialisation
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Serialises the full game history to a space-delimited notation string.
+     * Format: "<N>x<N> [B|W][F?][C|S]<col><row> ..."
+     */
+    function generateGameRecordText(history, currentBoardSize) {
+        const moves = [`${currentBoardSize}x${currentBoardSize}`];
+        for (let i = 1; i < history.length; i++) {
+            const state      = history[i];
+            const prevTurn   = history[i - 1].turn;
+            const playerSymbol = prevTurn === 'black' ? 'B' : 'W';
+            if (state.lastMoveX !== null && state.lastShape !== null) {
+                const flipChar  = state.lastWasFlip ? 'F' : '';
+                const shapeChar = state.lastShape === 'circle' ? 'C' : 'S';
+                const col = String.fromCharCode(97 + state.lastMoveY);
+                const row = currentBoardSize - state.lastMoveX;
+                moves.push(`${playerSymbol}${flipChar}${shapeChar}${col}${row}`);
+            }
+        }
+        return moves.join(' ');
+    }
+
+    /**
+     * Parses and replays a game-record string, rebuilding the full history.
+     * Returns true on success, false if validation fails.
+     */
+    function processGameRecordText(text) {
+        text = text.trim();
+        if (!text) return false;
+
+        const parts = text.split(/\s+/);
+        const sizeMatch = parts[0].match(/^(\d+)x(\d+)$/i);
+        if (!sizeMatch || sizeMatch[1] !== sizeMatch[2]) {
+            setMessage("Invalid board size.");
+            return false;
+        }
+
+        const newSize = parseInt(sizeMatch[1]);
+        resetGame(newSize);
+
+        for (let i = 1; i < parts.length; i++) {
+            const m = parts[i].match(/^([BW])(F)?([CS])?([a-z])(\d+)$/i);
+            if (!m) {
+                setMessage(`Invalid move: ${parts[i]}`);
+                return false;
+            }
+
+            const [, pSym, fStr, sChar, colChar, rowStr] = m;
+            const isFlip         = !!fStr;
+            const recordedPlayer = pSym.toUpperCase() === 'B' ? 'black' : 'white';
+            const y = colChar.toLowerCase().charCodeAt(0) - 97;
+            const x = newSize - parseInt(rowStr);
+
+            // Strict turn validation
+            if (recordedPlayer !== turn) {
+                const expected = turn === 'black' ? 'Black (B)' : 'White (W)';
+                const got      = recordedPlayer === 'black' ? 'Black (B)' : 'White (W)';
+                setMessage(`Turn mismatch at ${parts[i]}: expected ${expected}, got ${got}`);
+                return false;
+            }
+
+            if (x < 0 || x >= newSize || y < 0 || y >= newSize) {
+                setMessage("Move out of bounds.");
+                return false;
+            }
+
+            // Determine piece shape (explicit shape required for placements)
+            let parsedShape = 'circle';
+            if (sChar) {
+                parsedShape = sChar.toUpperCase() === 'C' ? 'circle' : 'square';
+            } else if (!isFlip) {
+                setMessage("Shape missing for placement.");
+                return false;
+            }
+
+            // Apply the move
+            if (isFlip) {
+                const result = getFlipValidation(x, y, turn);
+                if (!result.valid) {
+                    setMessage(`Invalid Flip: ${result.reason} at ${parts[i]}`);
+                    return false;
+                }
+                if (!result.validTargetShapes.includes(parsedShape)) {
+                    setMessage(`Illegal Flip Target: Cannot flip to ${parsedShape} at ${parts[i]}`);
+                    return false;
+                }
+                for (const [gx, gy] of result.group) {
+                    board[gx][gy].color = turn;
+                    board[gx][gy].shape = parsedShape;
+                }
+                lastMoveX    = x;
+                lastMoveY    = y;
+                lastShape    = parsedShape;
+                lastWasFlip  = true;
+            } else {
+                if (board[x][y] !== null) {
+                    setMessage("Position occupied.");
+                    return false;
+                }
+                board[x][y] = {color: turn, shape: parsedShape};
+                lastMoveX    = x;
+                lastMoveY    = y;
+                lastShape    = parsedShape;
+                lastWasFlip  = false;
+            }
+
+            // Mirrors successfulMove turn-switching logic (no UI update during load)
+            turn = turn === 'black' ? 'white' : 'black';
+
+            const {black: bCount, white: wCount} = getCounts();
+            const totalStones = bCount + wCount;
+            if (totalStones === SIZE * SIZE && (bCount === totalStones || wCount === totalStones)) {
+                gameOver = true;
+            }
+
+            // Auto-skip with no message (avoids spam during bulk loading); draw if both skipped
+            let consecutiveSkips = 0;
+            while (!hasLegalMove() && !gameOver) {
+                consecutiveSkips++;
+                if (consecutiveSkips >= 2) {
+                    gameOver = true;
+                    break;
+                }
+                turn = turn === 'black' ? 'white' : 'black';
+            }
+
+            gameHistory.push(saveGameState());
+            currentMoveIndex++;
+        }
+
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+        updateReplayButtons();
+        clearMessage();
+        return true;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Save / Load
+    // ─────────────────────────────────────────────────────────────
+
+    /** Handles the Save <select>: writes game record to file or clipboard. */
+    function handleSave() {
+        const select = document.getElementById('save-options');
+        const option = select.value;
+        if (!option) return;
+
+        const text = generateGameRecordText(gameHistory, SIZE);
+
+        if (option === 'file') {
+            const blob = new Blob([text], {type: 'text/plain'});
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = 'federa_game.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        } else if (option === 'clipboard') {
+            navigator.clipboard.writeText(text).then(() => setMessage('Copied to clipboard!'));
+        }
+        select.value = '';
+    }
+
+    /** FileReader callback — reads a .txt file and passes its text to the parser. */
+    function loadGame(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => processGameRecordText(e.target.result);
+        reader.readAsText(file);
+        event.target.value = '';
+    }
+
+    /** Handles the Load <select>: triggers file picker or reads from clipboard. */
+    function handleLoad() {
+        const select = document.getElementById('load-options');
+        const option = select.value;
+        if (option === 'file') {
+            document.getElementById('load-input').click();
+        } else if (option === 'clipboard') {
+            navigator.clipboard.readText().then(text => processGameRecordText(text));
+        }
+        select.value = '';
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Placeholder stubs (reserved for future layout features)
+    // ─────────────────────────────────────────────────────────────
+
+    function getTotalMaxWidth() {
+        const controls = document.querySelector('.replay-controls');
+        const elements = controls.querySelectorAll('button, select');
+        const numElements = elements.length;
+        const numGaps = numElements - 1;
+
+        const sampleElement = elements[0];
+        const styles = getComputedStyle(sampleElement);
+        const maxWidth = parseFloat(styles.maxWidth);
+        const paddingLeft = parseFloat(styles.paddingLeft);
+        const paddingRight = parseFloat(styles.paddingRight);
+        const borderLeft = parseFloat(styles.borderLeftWidth);
+        const borderRight = parseFloat(styles.borderRightWidth);
+        const gap = parseFloat(getComputedStyle(controls).gap);
+
+        const elementWidth = maxWidth + paddingLeft + paddingRight + borderLeft + borderRight;
+        const totalMaxWidth = (elementWidth * numElements) + (gap * numGaps);
+
+        return totalMaxWidth;
+    }
+
+    function updateButtonTooltips() {
+        const buttons = document.querySelectorAll('.replay-controls button');
+        const selects = document.querySelectorAll('.replay-controls select');
+        const elements = [...buttons, ...selects];
+        const totalMaxWidth = getTotalMaxWidth();
+        const windowWidth = window.innerWidth;
+
+        elements.forEach(element => {
+            let fullText = '';
+            if (element.tagName === 'BUTTON') {
+                fullText = element.textContent.trim();
+            } else if (element.tagName === 'SELECT' && element.selectedIndex >= 0) {
+                fullText = element.options[element.selectedIndex].text.trim();
+            }
+
+            if (windowWidth < totalMaxWidth) {
+                element.setAttribute('title', fullText);
+            } else {
+                element.removeAttribute('title');
+            }
+        });
+    }
+
+    function adjustHeaderLayout() {
+        const header = document.querySelector('.header');
+        const statusLeft = document.querySelector('.status-left');
+        const statusCenter = document.querySelector('.status-center');
+        const controlsRight = document.querySelector('.controls-right');
+        const board = document.querySelector('.board');
+
+        const headerWidth = header.offsetWidth;
+        const leftWidth = statusLeft.offsetWidth;
+        const centerWidth = statusCenter.offsetWidth;
+        const rightWidth = controlsRight.offsetWidth;
+
+        statusCenter.style.position = 'absolute';
+        statusCenter.style.left = '50%';
+        statusCenter.style.transform = 'translateX(-50%)';
+
+        statusLeft.style.position = 'absolute';
+        controlsRight.style.position = 'absolute';
+        statusLeft.style.left = '0';
+        controlsRight.style.right = '0';
+
+        const centerLeft = (headerWidth - centerWidth) / 2;
+        const centerRight = centerLeft + centerWidth;
+
+        const leftOverlap = leftWidth > centerLeft;
+        const rightOverlap = rightWidth > (headerWidth - centerRight);
+
+        if (leftOverlap || rightOverlap) {
+            const leftPush = leftOverlap ? leftWidth - centerLeft : 0;
+            const rightPush = rightOverlap ? rightWidth - (headerWidth - centerRight) : 0;
+
+            if (leftPush > 0) {
+                statusLeft.style.left = `-${leftPush}px`;
+            }
+            if (rightPush > 0) {
+                controlsRight.style.right = `-${rightPush}px`;
+            }
+        } else {
+            statusLeft.style.left = '0';
+            controlsRight.style.right = '0';
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Initialisation
+    // ─────────────────────────────────────────────────────────────
+
+    resetGame(SIZE);
+    updateButtonTooltips();
+    adjustHeaderLayout();
+
+    // ── Event listeners ──
+
+    document.getElementById('copy-move').addEventListener('mousedown', copyLastMove);
+
+    const boardSizeSelect = document.getElementById('board-size');
+    const saveSelect      = document.getElementById('save-options');
+    const loadSelect      = document.getElementById('load-options');
+
+    // Prevent arrow keys from scrolling <select> dropdowns unintentionally
+    const arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+    [boardSizeSelect, saveSelect, loadSelect].forEach(sel => {
+        sel.addEventListener('keydown', (e) => {
+            if (arrowKeys.includes(e.key)) e.preventDefault();
+        });
+    });
+
+    // Re-draw board on window resize
+    window.addEventListener('resize', () => {
+        initBoard();
+        renderBoard();
+        updateButtonTooltips();
+        if (isGenerating) {
+            const randomBtn = document.getElementById('random-button');
+            randomBtn.style.width = `${measureRandomGameWidth()}px`;
+        }
+        adjustHeaderLayout();
+    });
+
+    // Scroll wheel navigates replay history
+    window.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (e.deltaY > 0) replayForward();
+        else if (e.deltaY < 0) replayBack();
+    }, {passive: false});
+
+    document.addEventListener('DOMContentLoaded', updateButtonTooltips);
+
+    // Reset save/load selects after a change and blur to avoid accidental key navigation
+    document.querySelectorAll('.replay-controls select').forEach(sel => {
+        sel.addEventListener('change', () => {
+            updateButtonTooltips();
+            if (sel.id === 'save-options' || sel.id === 'load-options') sel.value = '';
+            sel.blur();
+        });
+    });
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (event) => {
+        const active         = document.activeElement;
+        const isInputFocused = active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA';
+        const key            = event.key.toLowerCase();
+        const gameKeys       = ['r', 'i', 'o', 'a', 's', 'z', 'x', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+
+        // Allow native copy/cut/undo shortcuts inside inputs; block game keys elsewhere
+        const isNativeShortcut = (event.metaKey || event.ctrlKey) && ['c', 'x', 'z'].includes(key);
+        const isSelectNav      = isInputFocused && active.tagName === 'SELECT' && ['ArrowUp', 'ArrowDown', 'Space'].includes(event.key);
+
+        if (!isSelectNav && !isNativeShortcut && gameKeys.includes(key)) {
+            event.preventDefault();
+        } else if (isSelectNav || isNativeShortcut) {
+            return; // let the browser handle it
+        } else {
+            return;
+        }
+
+        // Game-key actions
+        switch (key) {
+            case 'r': isGenerating ? stopGeneration() : generateRandomGame(); break;
+            case 'i':
+                if (boardSizeSelect && active !== boardSizeSelect) {
+                    boardSizeSelect.selectedIndex = Math.max(0, boardSizeSelect.selectedIndex - 1);
+                    boardSizeSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'o':
+                if (boardSizeSelect && active !== boardSizeSelect) {
+                    boardSizeSelect.selectedIndex = Math.min(boardSizeSelect.options.length - 1, boardSizeSelect.selectedIndex + 1);
+                    boardSizeSelect.dispatchEvent(new Event('change'));
+                }
+                break;
+            case 'a':
+                if (loadSelect) { loadSelect.value = 'file'; loadSelect.dispatchEvent(new Event('change')); }
+                break;
+            case 's':
+                if (saveSelect) { saveSelect.value = 'file'; saveSelect.dispatchEvent(new Event('change')); }
+                break;
+            case 'c': copyLastMove(); break;
+            case 'z':
+                if (loadSelect) { loadSelect.value = 'clipboard'; loadSelect.dispatchEvent(new Event('change')); }
+                break;
+            case 'x':
+                if (saveSelect) { saveSelect.value = 'clipboard'; saveSelect.dispatchEvent(new Event('change')); }
+                break;
+        }
+
+        // Arrow key replay navigation (only when no input/select is focused)
+        if (active.tagName !== 'SELECT' && !isInputFocused) {
+            switch (event.key) {
+                case 'ArrowUp':    replayStart();   break;
+                case 'ArrowDown':  replayEnd();     break;
+                case 'ArrowLeft':  replayBack();    break;
+                case 'ArrowRight': replayForward(); break;
+            }
+        }
+    });
+    </script>
+</body>
+</html>
