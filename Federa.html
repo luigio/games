@@ -1226,26 +1226,27 @@
                                 if (!seenOwnGroups.has(groupKey)) {
                                     seenOwnGroups.add(groupKey);
 
-                                    // Only include this friendly group if it is adjacent to at least
-                                    // one enemy group that it does NOT covet.
+                                    // Only include this friendly group if it borders at least one
+                                    // enemy stone and does not covet any enemy stone it borders.
                                     const {color: friendlyColor, shape: friendlyShape} = board[result.group[0][0]][result.group[0][1]];
                                     const groupSet = new Set(result.group.map(([gx, gy]) => `${gx},${gy}`));
-                                    let hasUncoveted = false;
-                                    outer: for (const [gx, gy] of result.group) {
+                                    let hasEnemyNeighbor = false;
+                                    let covetsAnyEnemy = false;
+                                    for (const [gx, gy] of result.group) {
                                         for (const [dx, dy] of DIRS) {
                                             const nx = gx + dx, ny = gy + dy;
                                             if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
                                                 const nb = board[nx][ny];
                                                 if (nb && nb.color !== turn && !groupSet.has(`${nx},${ny}`)) {
-                                                    if (!doesCovet(friendlyColor, friendlyShape, nb.color, nb.shape)) {
-                                                        hasUncoveted = true;
-                                                        break outer;
+                                                    hasEnemyNeighbor = true;
+                                                    if (doesCovet(friendlyColor, friendlyShape, nb.color, nb.shape)) {
+                                                        covetsAnyEnemy = true;
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                    if (!hasUncoveted) continue;
+                                    if (!hasEnemyNeighbor || covetsAnyEnemy) continue;
 
                                     const mixed = calculateMixedShapePerimeter(result.group);
                                     const candidate = {
