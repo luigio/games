@@ -1674,7 +1674,7 @@
         const active         = document.activeElement;
         const isInputFocused = active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA';
         const key            = event.key.toLowerCase();
-        const gameKeys       = ['r', 'i', 'o', 'a', 's', 'z', 'x', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+        const gameKeys       = ['e', 'r', 'i', 'o', 'a', 's', 'z', 'x', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
 
         // Allow native copy/cut/undo shortcuts inside inputs; block game keys elsewhere
         const isNativeShortcut = (event.metaKey || event.ctrlKey) && ['c', 'x', 'z'].includes(key);
@@ -1690,6 +1690,7 @@
 
         // Game-key actions
         switch (key) {
+            case 'e': toggleAnimalIcons(); break;
             case 'r': isGenerating ? stopGeneration() : generateRandomGame(); break;
             case 'i':
                 if (boardSizeSelect && active !== boardSizeSelect) {
