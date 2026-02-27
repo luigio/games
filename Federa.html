@@ -1225,6 +1225,28 @@
                                 const groupKey = result.group.map(([gx, gy]) => `${gx},${gy}`).sort().join(';');
                                 if (!seenOwnGroups.has(groupKey)) {
                                     seenOwnGroups.add(groupKey);
+
+                                    // Only include this friendly group if it is adjacent to at least
+                                    // one enemy group that it does NOT covet.
+                                    const {color: friendlyColor, shape: friendlyShape} = board[result.group[0][0]][result.group[0][1]];
+                                    const groupSet = new Set(result.group.map(([gx, gy]) => `${gx},${gy}`));
+                                    let hasUncoveted = false;
+                                    outer: for (const [gx, gy] of result.group) {
+                                        for (const [dx, dy] of DIRS) {
+                                            const nx = gx + dx, ny = gy + dy;
+                                            if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
+                                                const nb = board[nx][ny];
+                                                if (nb && nb.color !== turn && !groupSet.has(`${nx},${ny}`)) {
+                                                    if (!doesCovet(friendlyColor, friendlyShape, nb.color, nb.shape)) {
+                                                        hasUncoveted = true;
+                                                        break outer;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (!hasUncoveted) continue;
+
                                     const mixed = calculateMixedShapePerimeter(result.group);
                                     const candidate = {
                                         moves: result.validTargetShapes.map(shape => ({
@@ -1252,7 +1274,46 @@
                 if (candidates.length > 0) {
                     selectedMoves = candidates[Math.floor(Math.random() * candidates.length)].moves;
                 } else {
-                    selectedMoves = [];
+                    // Fallback: no filtered candidate passed the adjacency test, so
+                    // use any valid friendly flip to ensure the game can always complete.
+                    const fallbackCandidates = [];
+                    let minMixedFallback = Infinity;
+                    const seenFallback = new Set();
+
+                    for (let i = 0; i < SIZE; i++) {
+                        for (let j = 0; j < SIZE; j++) {
+                            if (board[i][j] && board[i][j].color === turn) {
+                                const result = getFlipValidation(i, j, turn);
+                                if (result.valid) {
+                                    const groupKey = result.group.map(([gx, gy]) => `${gx},${gy}`).sort().join(';');
+                                    if (!seenFallback.has(groupKey)) {
+                                        seenFallback.add(groupKey);
+                                        const mixed = calculateMixedShapePerimeter(result.group);
+                                        const candidate = {
+                                            moves: result.validTargetShapes.map(shape => ({
+                                                type: 'flip',
+                                                x: result.group[0][0],
+                                                y: result.group[0][1],
+                                                shape
+                                            })),
+                                            mixed
+                                        };
+                                        if (mixed < minMixedFallback) {
+                                            minMixedFallback = mixed;
+                                            fallbackCandidates.length = 0;
+                                            fallbackCandidates.push(candidate);
+                                        } else if (mixed === minMixedFallback) {
+                                            fallbackCandidates.push(candidate);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    selectedMoves = fallbackCandidates.length > 0
+                        ? fallbackCandidates[Math.floor(Math.random() * fallbackCandidates.length)].moves
+                        : [];
                 }
             }
 
