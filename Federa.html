@@ -435,7 +435,7 @@
      * transform is needed.
      */
     function getAnimalSVG(color, shape) {
-        if (iconMode === 0) return '';
+        if (!showAnimalIcons) return '';
         let paths, iconColor;
         if (color === 'black' && shape === 'circle') {
             paths = ELEPHANT_PATHS; iconColor = 'rgb(135,152,197)';
@@ -491,13 +491,14 @@
     let lastMoveY = null;
     let lastShape = null;
     let lastWasFlip = false;
+    let lastWasSwap = false;
     let gameHistory = [];
     let currentMoveIndex = -1;
     let isGenerating = false;
     let generationInterval = null;
     let gameOver = false;
     let passesInRow = 0; // tracks consecutive passes (used in resetGame)
-    let iconMode = 0; // 0 = none, 1 = animals
+    let showAnimalIcons = true;
 
     // ─────────────────────────────────────────────────────────────
     // Board initialisation & rendering
@@ -560,6 +561,9 @@
 
                     if (board[i][j] === null) {
                         performPlacement(i, j, shape);
+                    } else if (canSwap()) {
+                        // Pie rule: clicking the only stone on the board swaps sides
+                        performSwap();
                     } else {
                         // Validation happens inside performFlip
                         performFlip(i, j, shape);
@@ -799,6 +803,7 @@
      */
     function successfulMove(x, y, shape, isFlip) {
         lastWasFlip = isFlip;
+        lastWasSwap = false;
         setLastMoveMarker(x, y);
         lastShape = shape;
 
@@ -905,6 +910,7 @@
             lastMoveY,
             lastShape,
             lastWasFlip,
+            lastWasSwap,
             message:     document.getElementById('message').textContent
         };
     }
@@ -917,6 +923,7 @@
         lastMoveY  = state.lastMoveY;
         lastShape  = state.lastShape;
         lastWasFlip = state.lastWasFlip || false;
+        lastWasSwap = state.lastWasSwap || false;
         gameOver   = false;
         // Restore any skip/draw message that was active when this state was saved
         if (state.message) setMessage(state.message); else clearMessage();
@@ -935,7 +942,7 @@
 
     /** Toggles animal icons on/off and re-renders the board. */
     function toggleAnimalIcons() {
-        iconMode = (iconMode + 1) % 2; // none → animals → none
+        showAnimalIcons = !showAnimalIcons;
         renderBoard();
     }
 
@@ -946,6 +953,7 @@
         turn          = 'black';
         lastMoveX     = lastMoveY = lastShape = null;
         lastWasFlip   = false;
+        lastWasSwap   = false;
         passesInRow   = 0;
         gameOver      = false;
         gameHistory   = [saveGameState()];
@@ -1104,6 +1112,53 @@
     }
 
     // ─────────────────────────────────────────────────────────────
+    // Pie rule (swap)
+    // ─────────────────────────────────────────────────────────────
+
+    /** Returns true when White may invoke the pie rule. */
+    function canSwap() {
+        return turn === 'white' && currentMoveIndex === 1 && !gameOver && !isGenerating;
+    }
+
+    /**
+     * Executes the pie rule swap for White:
+     * the board is left untouched — the pieces keep their colors — and it
+     * simply becomes Black's turn.  The second player now plays as Black
+     * (controlling the already-placed black piece) and the first player
+     * continues as White.
+     */
+    function performSwap() {
+        if (!canSwap()) { setMessage("Swap is only available as White's first move."); return; }
+
+        // The board is unchanged. Turn stays 'white' — the next piece placed
+        // must be a white piece. The swap only determines which human controls
+        // which color from here on.
+        lastWasSwap = true;
+        lastWasFlip = false;
+
+        // If replaying and the next state is already a swap, step into it
+        if (currentMoveIndex < gameHistory.length - 1) {
+            const next = gameHistory[currentMoveIndex + 1];
+            if (next.lastWasSwap) {
+                currentMoveIndex++;
+                loadGameState(gameHistory[currentMoveIndex]);
+                updateReplayButtons();
+                return;
+            } else {
+                gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+            }
+        }
+
+        gameHistory.push(saveGameState());
+        currentMoveIndex++;
+
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+        updateReplayButtons();
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // Random game generation
     // ─────────────────────────────────────────────────────────────
 
@@ -1162,6 +1217,12 @@
         updateReplayButtons();
 
         generationInterval = setInterval(() => {
+            // ── Pie rule: randomly decide to swap on White's first move ──
+            if (canSwap() && Math.random() < 0.5) {
+                performSwap();
+                return;
+            }
+
             // ── Tier 1: placements + enemy flips ──
             const goodMoves = [];
 
@@ -1210,27 +1271,26 @@
                                 if (!seenOwnGroups.has(groupKey)) {
                                     seenOwnGroups.add(groupKey);
 
-                                    // Only include this friendly group if it borders at least one
-                                    // enemy stone and does not covet any enemy stone it borders.
+                                    // Only include this friendly group if it is adjacent to at least
+                                    // one enemy group that it does NOT covet.
                                     const {color: friendlyColor, shape: friendlyShape} = board[result.group[0][0]][result.group[0][1]];
                                     const groupSet = new Set(result.group.map(([gx, gy]) => `${gx},${gy}`));
-                                    let hasEnemyNeighbor = false;
-                                    let covetsAnyEnemy = false;
-                                    for (const [gx, gy] of result.group) {
+                                    let hasUncoveted = false;
+                                    outer: for (const [gx, gy] of result.group) {
                                         for (const [dx, dy] of DIRS) {
                                             const nx = gx + dx, ny = gy + dy;
                                             if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
                                                 const nb = board[nx][ny];
                                                 if (nb && nb.color !== turn && !groupSet.has(`${nx},${ny}`)) {
-                                                    hasEnemyNeighbor = true;
-                                                    if (doesCovet(friendlyColor, friendlyShape, nb.color, nb.shape)) {
-                                                        covetsAnyEnemy = true;
+                                                    if (!doesCovet(friendlyColor, friendlyShape, nb.color, nb.shape)) {
+                                                        hasUncoveted = true;
+                                                        break outer;
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                    if (!hasEnemyNeighbor || covetsAnyEnemy) continue;
+                                    if (!hasUncoveted) continue;
 
                                     const mixed = calculateMixedShapePerimeter(result.group);
                                     const candidate = {
@@ -1358,6 +1418,14 @@
         }
 
         const state = gameHistory[currentMoveIndex];
+
+        // Swap move has no position — display it directly
+        if (state.lastWasSwap) {
+            lastMoveText.textContent = 'WSwap';
+            copyButton.style.display = 'inline-flex';
+            return;
+        }
+
         if (state.lastMoveX === null || state.lastShape === null) {
             lastMoveText.textContent = '';
             copyButton.style.display = 'none';
@@ -1387,7 +1455,7 @@
 
     /**
      * Serialises the full game history to a space-delimited notation string.
-     * Format: "<N>x<N> [B|W][F?][C|S]<col><row> ..."
+     * Format: "<N>x<N> [B|W][F?][C|S]<col><row> ... WSwap ..."
      */
     function generateGameRecordText(history, currentBoardSize) {
         const moves = [`${currentBoardSize}x${currentBoardSize}`];
@@ -1395,7 +1463,9 @@
             const state      = history[i];
             const prevTurn   = history[i - 1].turn;
             const playerSymbol = prevTurn === 'black' ? 'B' : 'W';
-            if (state.lastMoveX !== null && state.lastShape !== null) {
+            if (state.lastWasSwap) {
+                moves.push('WSwap');
+            } else if (state.lastMoveX !== null && state.lastShape !== null) {
                 const flipChar  = state.lastWasFlip ? 'F' : '';
                 const shapeChar = state.lastShape === 'circle' ? 'C' : 'S';
                 const col = String.fromCharCode(97 + state.lastMoveY);
@@ -1425,6 +1495,23 @@
         resetGame(newSize);
 
         for (let i = 1; i < parts.length; i++) {
+
+            // ── Swap token ──────────────────────────────────────────
+            if (parts[i].toLowerCase() === 'wswap') {
+                if (turn !== 'white' || gameHistory.length !== 2) {
+                    setMessage(`Swap is only legal as White's first move (at ${parts[i]}).`);
+                    return false;
+                }
+                lastWasSwap = true;
+                lastWasFlip = false;
+                // turn stays 'white' — next move must be a white piece
+                gameHistory.push(saveGameState());
+                currentMoveIndex++;
+                continue;
+            }
+            lastWasSwap = false;
+
+            // ── Normal move token ───────────────────────────────────
             const m = parts[i].match(/^([BW])(F)?([CS])?([a-z])(\d+)$/i);
             if (!m) {
                 setMessage(`Invalid move: ${parts[i]}`);
