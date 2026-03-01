@@ -401,40 +401,27 @@
     const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
 
     // ─────────────────────────────────────────────────────────────
-    // Animal SVG icon definitions  (extracted from animales_iconos_3.svg)
+    // Animal SVG icon definitions
     // ─────────────────────────────────────────────────────────────
 
-    // Elephant  (top-left quadrant — three combined paths)
     const ELEPHANT_PATHS = [
-        "M 174,91 L 146,95 L 121,103 L 81,126 L 50,155 L 34,178 L 23,199 L 14,229 L 10,254 L 10,480 L 129,480 L 130,384 L 250,384 L 251,480 L 370,480 L 370,333 L 330,330 L 291,318 L 255,298 L 233,280 L 218,264 L 203,243 L 192,222 L 180,182 L 178,145 L 181,125 L 187,105 L 196,91 L 175,91 Z",
-        "M 336,39 L 304,42 L 272,53 L 244,71 L 222,100 L 209,134 L 208,171 L 216,203 L 229,229 L 251,256 L 278,277 L 306,291 L 338,300 L 370,303 L 371,256 L 415,304 L 464,344 L 505,363 L 551,371 L 581,369 L 610,361 L 610,358 L 576,354 L 551,346 L 514,323 L 496,301 L 491,282 L 489,213 L 484,172 L 473,134 L 457,102 L 432,74 L 416,62 L 385,47 L 337,39 Z",
-        "M 440,351 L 440,404 L 438,416 L 436,422 L 433,427 L 424,436 L 423,438 L 420,448 L 419,455 L 419,466 L 417,475 L 417,478 L 422,478 L 440,474 L 444,472 L 455,465 L 463,457 L 474,444 L 482,432 L 484,428 L 487,417 L 487,411 L 489,405 L 490,394 L 489,377 L 487,377 L 482,374 L 474,371 L 464,366 L 450,358 L 445,354 Z"
+        "M 39.0536 28.2488 L 35.5024 28.7561 L 32.3317 29.7707 L 27.2585 32.6878 L 23.3268 36.3658 L 21.2976 39.2829 L 19.9024 41.9463 L 18.761 45.7512 L 18.2537 48.9219 L 18.2537 77.5852 L 33.3463 77.5852 L 33.4731 65.4097 L 48.6926 65.4097 L 48.8194 77.5852 L 63.9121 77.5852 L 63.9121 58.9414 L 58.8389 58.5609 L 53.8926 57.0389 L 49.3268 54.5024 L 46.5365 52.2194 L 44.6341 50.1902 L 42.7317 47.5268 L 41.3365 44.8634 L 39.8146 39.7902 L 39.5609 35.0975 L 39.9414 32.5609 L 40.7024 30.0244 L 41.8439 28.2488 L 39.1804 28.2488 Z",
+        "M 59.5999 21.6536 L 55.5414 22.0341 L 51.4829 23.4293 L 47.9316 25.7122 L 45.1414 29.3902 L 43.4926 33.7024 L 43.3658 38.3951 L 44.3804 42.4536 L 46.0292 45.7512 L 48.8194 49.1755 L 52.2438 51.8389 L 55.795 53.6146 L 59.8536 54.756 L 63.9121 55.1365 L 64.0389 49.1755 L 69.6194 55.2633 L 75.834 60.3365 L 81.034 62.7462 L 86.8681 63.7609 L 90.673 63.5072 L 94.3511 62.4926 L 94.3511 62.1121 L 90.0389 61.6048 L 86.8681 60.5902 L 82.1755 57.6731 L 79.8925 54.8828 L 79.2584 52.4731 L 79.0047 43.7219 L 78.3706 38.5219 L 76.9755 33.7024 L 74.9462 29.6439 L 71.7755 26.0927 L 69.7462 24.5707 L 65.8145 22.6683 L 59.7267 21.6536 Z",
+        "M 72.7901 61.2243 L 72.7901 67.9462 L 72.5365 69.4682 L 72.2828 70.2292 L 71.9023 70.8633 L 70.7609 72.0048 L 70.634 72.2584 L 70.2535 73.5267 L 70.1267 74.4145 L 70.1267 75.8096 L 69.8731 76.9511 L 69.8731 77.3316 L 70.5072 77.3316 L 72.7901 76.8243 L 73.2974 76.5706 L 74.6926 75.6828 L 75.7072 74.6682 L 77.1023 73.0194 L 78.1169 71.4974 L 78.3706 70.9901 L 78.7511 69.595 L 78.7511 68.834 L 79.0047 68.0731 L 79.1316 66.6779 L 79.0047 64.5219 L 78.7511 64.5219 L 78.1169 64.1414 L 77.1023 63.7609 L 75.834 63.1267 L 74.0584 62.1121 L 73.4243 61.6048 Z"
     ];
-    // transform: places the elephant at its true rendered position in a 100×100 stone coordinate space.
-    // Derived from: S=78%, viewBox=615×455, offsetX=+7%, preserveAspectRatio xMidYMid meet.
-    const ELEPHANT_TRANSFORM = "translate(16.985366,16.707317) scale(0.126829)";
 
-    // Cat  (bottom-left quadrant)
     const CAT_PATHS = [
-        "M 382,541 L 337,586 L 317,610 L 260,689 L 244,705 L 194,743 L 164,773 L 139,805 L 125,832 L 116,865 L 112,897 L 111,968 L 78,966 L 66,959 L 59,951 L 53,932 L 53,877 L 39,881 L 25,894 L 17,920 L 18,947 L 27,971 L 45,991 L 61,1001 L 98,1009 L 379,1009 L 380,747 L 400,746 L 420,739 L 431,733 L 467,704 L 467,671 L 382,599 Z"
+        "M 70.6127 14.7926 L 63.8421 21.5632 L 60.8329 25.1742 L 52.2568 37.0604 L 49.8495 39.4677 L 42.3266 45.1851 L 37.8128 49.6988 L 34.0514 54.5135 L 31.945 58.5758 L 30.5908 63.541 L 29.989 68.3556 L 29.8385 79.0381 L 24.8734 78.7372 L 23.0679 77.684 L 22.0147 76.4804 L 21.112 73.6216 L 21.112 65.3465 L 19.0056 65.9483 L 16.8992 67.9042 L 15.6955 71.8162 L 15.846 75.8785 L 17.2001 79.4895 L 19.9083 82.4987 L 22.3156 84.0033 L 27.8826 85.2069 L 70.1613 85.2069 L 70.3117 45.7869 L 73.3209 45.6365 L 76.3301 44.5833 L 77.9851 43.6805 L 83.4016 39.3172 L 83.4016 34.3521 L 70.6127 23.5191 Z"
     ];
-    // S=72.22%, viewBox=460×480, centered.
-    const CAT_TRANSFORM = "translate(13.137708,-66.605208) scale(0.150458)";
 
-    // Horse  (top-right quadrant — two combined paths)
     const HORSE_PATHS = [
-        "M 1157,10 L 1121,46 L 1059,63 L 1022,81 L 982,118 L 941,172 L 835,173 L 802,184 L 789,192 L 775,206 L 760,232 L 752,267 L 752,481 L 840,481 L 841,349 L 983,350 L 983,481 L 1071,481 L 1071,333 L 1074,278 L 1086,225 L 1103,182 L 1107,180 L 1182,229 L 1206,213 L 1211,206 L 1210,181 L 1157,63 Z",
-        "M 767,194 L 759,195 L 748,198 L 722,211 L 710,221 L 698,233 L 697,236 L 694,239 L 685,254 L 677,276 L 675,288 L 675,315 L 676,324 L 678,330 L 679,346 L 679,368 L 676,384 L 672,396 L 668,404 L 662,411 L 673,410 L 683,407 L 697,399 L 700,396 L 703,395 L 716,382 L 723,369 L 727,356 L 729,339 L 729,318 L 728,317 L 727,282 L 731,255 L 738,235 L 744,223 L 756,205 Z"
+        "M 84.7033 12.6152 L 79.0246 18.2939 L 69.2446 20.9755 L 63.4081 23.8148 L 57.0984 29.6513 L 50.631 38.1694 L 33.9104 38.3271 L 28.7049 40.0623 L 26.6542 41.3242 L 24.4459 43.5326 L 22.0797 47.6339 L 20.8178 53.1549 L 20.8178 86.9116 L 34.6991 86.9116 L 34.8568 66.0897 L 57.2562 66.2474 L 57.2562 86.9116 L 71.1375 86.9116 L 71.1375 63.5658 L 71.6107 54.89 L 73.5036 46.5297 L 76.1852 39.7468 L 76.8162 39.4313 L 88.6469 47.1607 L 92.4327 44.6368 L 93.2214 43.5326 L 93.0636 39.589 L 84.7033 20.9755 Z",
+        "M 23.1839 41.6397 L 21.922 41.7974 L 20.1868 42.2707 L 16.0855 44.3213 L 14.1926 45.8987 L 12.2997 47.7916 L 12.142 48.2649 L 11.6688 48.7381 L 10.2491 51.1042 L 8.9871 54.5745 L 8.6717 56.4674 L 8.6717 60.7265 L 8.8294 62.1461 L 9.1449 63.0926 L 9.3026 65.6165 L 9.3026 69.0868 L 8.8294 71.6107 L 8.1984 73.5036 L 7.5675 74.7655 L 6.621 75.8697 L 8.3562 75.712 L 9.9336 75.2387 L 12.142 73.9768 L 12.6152 73.5036 L 13.0884 73.3458 L 15.1391 71.2952 L 16.2433 69.2445 L 16.8742 67.1939 L 17.1897 64.5123 L 17.1897 61.1997 L 17.032 61.042 L 16.8742 55.521 L 17.5052 51.262 L 18.6094 48.1071 L 19.5559 46.2142 L 21.4488 43.3749 Z"
     ];
-    // S=88.02%, viewBox=558×478, centered.
-    const HORSE_TRANSFORM = "translate(-97.804194,11.037742) scale(0.157742)";
 
-    // Mouse  (bottom-right quadrant)
     const MOUSE_PATHS = [
-        "M 726,560 C 731.3,562.0 749.5,566.7 758,572 C 766.5,577.3 771.8,584.8 777,592 C 782.2,599.2 786.3,605.0 789,615 C 791.7,625.0 793.8,640.0 793,652 C 792.2,664.0 787.8,677.0 784,687 C 780.2,697.0 783.5,694.7 770,712 C 756.5,729.3 717.7,771.0 703,791 C 688.3,811.0 686.7,819.3 682,832 C 677.3,844.7 675.8,856.2 675,867 C 674.2,877.8 676.7,892.0 677,897 L 686,928 L 700,951 L 726,979 L 768,1000 L 792,1005 L 839,1009 L 1068,1009 L 1058,981 L 1048,972 L 1027,964 L 1066,850 L 1076,844 L 1126,838 L 1175,820 L 1200,797 L 1207,784 L 1206,778 L 1088,682 L 1085,662 L 1075,638 L 1054,617 L 1041,609 L 1018,604 L 997,605 L 965,618 L 946,639 L 934,670 L 935,693 L 942,713 L 976,749 L 931,752 L 895,762 L 858,782 L 833,805 L 811,841 L 797,885 L 794,933 L 802,965 L 793,967 L 767,960 L 741,943 L 721,919 L 709,886 L 709,858 L 716,831 L 727,809 L 783,735 L 803,700 L 811,670 L 812,638 L 800,601 L 778,574 L 753,560 Z"
+        "M 19.0145 18.1558 C 19.773 18.4421 22.3778 19.1147 23.5943 19.8732 C 24.8108 20.6318 25.5693 21.7052 26.3136 22.7356 C 27.0578 23.7661 27.6446 24.5962 28.031 26.0274 C 28.4174 27.4585 28.718 29.6053 28.6035 31.3228 C 28.489 33.0402 27.8592 34.9007 27.3154 36.3319 C 26.7715 37.7631 27.2438 37.4339 25.3117 39.9099 C 23.3796 42.3859 17.8266 48.3539 15.7227 51.2163 C 13.6189 54.0787 13.3899 55.2666 12.7172 57.0842 C 12.0446 58.9018 11.8299 60.5477 11.7154 62.0933 C 11.6009 63.639 11.9587 65.6713 12.0017 66.3869 L 13.2897 70.8236 L 15.2934 74.1153 L 19.0145 78.1227 L 25.0255 81.1282 L 28.4603 81.8438 L 35.1869 82.4162 L 67.9612 82.4162 L 66.53 78.4089 L 65.0988 77.1208 L 62.0933 75.9759 L 67.6749 59.6603 L 69.1061 58.8016 L 76.2621 57.9429 L 83.2749 55.3668 L 86.8529 52.075 L 87.8547 50.2145 L 87.7116 49.3558 L 70.8236 35.6163 L 70.3942 32.754 L 68.963 29.3191 L 65.9575 26.3136 L 64.097 25.1686 L 60.8052 24.4531 L 57.7997 24.5962 L 53.2199 26.4567 L 50.5007 29.4622 L 48.7832 33.8989 L 48.9264 37.1906 L 49.9282 40.053 L 54.7942 45.2053 L 48.3539 45.6347 L 43.2016 47.0659 L 37.9062 49.9282 L 34.3282 53.22 L 31.1796 58.3723 L 29.1759 64.6695 L 28.7466 71.5392 L 29.8915 76.119 L 28.6035 76.4052 L 24.8824 75.4034 L 21.1613 72.9704 L 18.2989 69.5355 L 16.5815 64.8126 L 16.5815 60.8053 L 17.5833 56.9411 L 19.1576 53.7924 L 27.1723 43.2016 L 30.0346 38.1925 L 31.1796 33.8989 L 31.3227 29.3191 L 29.6053 24.0237 L 26.4567 20.1595 L 22.8787 18.1558 Z"
     ];
-    // S=78%, viewBox=545×465, centered.
-    const MOUSE_TRANSFORM = "translate(-84.889908,-61.990826) scale(0.143119)";
 
     /**
      * Returns an inline SVG string for the given piece type.
@@ -444,24 +431,23 @@
      *   mouse    (white ○) — dark-blue icon on light-blue circle
      *
      * All SVGs use viewBox="0 0 100 100" (stone = 100×100 units).
-     * Each *_TRANSFORM constant encodes the exact scale and position that
-     * reproduces the original rendered appearance: correct size, aspect-ratio
-     * letterboxing, and the elephant's lateral offset — all pre-computed.
+     * Path coordinates are pre-baked into the 100×100 space; no runtime
+     * transform is needed.
      */
     function getAnimalSVG(color, shape) {
-        if (!showAnimalIcons) return '';
-        let paths, iconColor, transform;
+        if (iconMode === 0) return '';
+        let paths, iconColor;
         if (color === 'black' && shape === 'circle') {
-            paths = ELEPHANT_PATHS; iconColor = 'rgb(135,152,197)'; transform = ELEPHANT_TRANSFORM;
+            paths = ELEPHANT_PATHS; iconColor = 'rgb(135,152,197)';
         } else if (color === 'black' && shape === 'square') {
-            paths = CAT_PATHS;      iconColor = 'rgb(225,234,255)'; transform = CAT_TRANSFORM;
+            paths = CAT_PATHS;      iconColor = 'rgb(225,234,255)';
         } else if (color === 'white' && shape === 'square') {
-            paths = HORSE_PATHS;    iconColor = 'rgb(75,91,138)';   transform = HORSE_TRANSFORM;
+            paths = HORSE_PATHS;    iconColor = 'rgb(75,91,138)';
         } else {
-            paths = MOUSE_PATHS;    iconColor = 'rgb(75,91,138)';   transform = MOUSE_TRANSFORM;
+            paths = MOUSE_PATHS;    iconColor = 'rgb(75,91,138)';
         }
         const pathsHTML = paths.map(d => `<path fill="${iconColor}" d="${d}"/>`).join('');
-        return `<svg viewBox="0 0 100 100" style="width:100%;height:100%;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);overflow:visible;pointer-events:none;"><g transform="${transform}">${pathsHTML}</g></svg>`;
+        return `<svg viewBox="0 0 100 100" style="width:100%;height:100%;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);overflow:visible;pointer-events:none;"><g>${pathsHTML}</g></svg>`;
     }
 
     /** Returns background, border, borderRadius and size for a given color+shape.
@@ -483,17 +469,15 @@
 
     /**
      * Populates the elephant toggle button with an SVG built from the same
-     * ELEPHANT_PATHS and ELEPHANT_TRANSFORM used for pieces.
+     * ELEPHANT_PATHS used for pieces.
      *
      * Sizing: on pieces the elephant fills 78% of its stone width.
      * The button SVG must be W = 1.584 / 0.78 ≈ 2.031em so that the elephant
      * renders at exactly 1.584em wide — identical to the previous hardcoded button.
-     * No lateral translateX is needed; the 7% rightward offset is already baked
-     * into ELEPHANT_TRANSFORM.
      */
     (function buildToggleButton() {
         const pathsHTML = ELEPHANT_PATHS.map(d => `<path fill="black" d="${d}"/>`).join('');
-        const svg = `<svg viewBox="0 0 100 100" width="2.031em" height="2.031em" style="display:block;" overflow="visible"><g transform="${ELEPHANT_TRANSFORM}">${pathsHTML}</g></svg>`;
+        const svg = `<svg viewBox="0 0 100 100" width="2.031em" height="2.031em" style="display:block;" overflow="visible"><g>${pathsHTML}</g></svg>`;
         document.getElementById('toggle-icons-button').innerHTML = svg;
     })();
 
@@ -513,7 +497,7 @@
     let generationInterval = null;
     let gameOver = false;
     let passesInRow = 0; // tracks consecutive passes (used in resetGame)
-    let showAnimalIcons = true;
+    let iconMode = 0; // 0 = none, 1 = animals
 
     // ─────────────────────────────────────────────────────────────
     // Board initialisation & rendering
@@ -951,7 +935,7 @@
 
     /** Toggles animal icons on/off and re-renders the board. */
     function toggleAnimalIcons() {
-        showAnimalIcons = !showAnimalIcons;
+        iconMode = (iconMode + 1) % 2; // none → animals → none
         renderBoard();
     }
 
