@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inklink</title>
+    <title>Akimbo</title>
     <style>
         html, body { margin:0;padding:0;height:100vh;width:100vw;overflow:hidden;background-color:#f0f0f0;display:flex;justify-content:center;align-items:center; }
         .game-container { display:flex;flex-direction:column;width:100vw;max-width:100%; }
@@ -99,7 +99,7 @@
     const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
     const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
 
-    // ── Inklink core logic ──
+    // ── Akimbo core logic ──
 
     // The two common orthogonal neighbors of diagonal pair (r1,c1)–(r2,c2).
     function getCommonNeighbors(r1, c1, r2, c2) {
@@ -157,8 +157,8 @@
         return removed;
     }
 
-    // True iff placing `player` at (x,y) is a legal Inklink move given current board.
-    function isValidInklinkMove(x, y, player) {
+    // True iff placing `player` at (x,y) is a legal Akimbo move given current board.
+    function isValidAkimboMove(x, y, player) {
         if (board[x][y] !== null) return false;
 
         // Movement restriction: if exactly one naked diagonal of each color exists,
@@ -304,7 +304,7 @@
 
     function hasValidMove(player) {
         for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++)
-            if (isValidInklinkMove(x,y,player)) return true;
+            if (isValidAkimboMove(x,y,player)) return true;
         return false;
     }
 
@@ -318,7 +318,7 @@
             return;
         }
 
-        if (!isValidInklinkMove(x, y, turn)) {
+        if (!isValidAkimboMove(x, y, turn)) {
             const myNaked  = getNakedDiagonals(turn);
             const oppNaked = getNakedDiagonals(1-turn);
             if (myNaked.length===1 && oppNaked.length===1)
@@ -454,7 +454,7 @@
 
             const valid=[];
             for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++)
-                if (isValidInklinkMove(x,y,turn)) valid.push([x,y]);
+                if (isValidAkimboMove(x,y,turn)) valid.push([x,y]);
 
             if (valid.length===0) {
                 turn=turn===0?1:0;
@@ -522,7 +522,7 @@
         if (opt==='file') {
             const a=document.createElement('a');
             a.href=URL.createObjectURL(new Blob([text],{type:'text/plain'}));
-            a.download='inklink_game.txt'; a.click();
+            a.download='akimbo_game.txt'; a.click();
         } else if (opt==='clipboard') {
             navigator.clipboard.writeText(text).then(()=>setMessage('Copied to clipboard!'));
         }
@@ -576,7 +576,7 @@
             if (board[x][y]!==null) { setMessage("Error: Position occupied: "+mv); renderBoard(); return false; }
 
             turn=tempTurn;
-            if (!isValidInklinkMove(x,y,tempTurn)) { setMessage("Error: Illegal move: "+mv); renderBoard(); return false; }
+            if (!isValidAkimboMove(x,y,tempTurn)) { setMessage("Error: Illegal move: "+mv); renderBoard(); return false; }
             board[x][y]=tempTurn; resolveCrosscutsOnBoard(x,y,tempTurn,board); setLastMoveMarker(x,y);
             tempTurn=tempTurn===0?1:0;
             const st=saveGameState(); st.turn=tempTurn; st.initialX=x; st.initialY=y; st.isSkip=false; st.lastWasPieSwap=false;
