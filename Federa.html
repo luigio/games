@@ -175,6 +175,13 @@
             z-index: 3;
         }
 
+        /* Square stones are 88.62% the size of round stones, so scale the dot up
+           proportionally so it always appears the same absolute size: 22/0.8862 ≈ 24.83% */
+        .square.last-move::after {
+            width: 24.83%;
+            height: 24.83%;
+        }
+
         /* ── Replay / footer controls ── */
         .replay-controls {
             display: flex;
@@ -597,7 +604,10 @@
 
                 // Base class — all pieces are disks, no .square
                 let cls = 'stone';
-                if (i === lastMoveX && j === lastMoveY) cls += ' last-move';
+                if (i === lastMoveX && j === lastMoveY) {
+                    cls += ' last-move';
+                    if (lastShape === 'square') cls += ' square';
+                }
                 stone.className = cls;
 
                 if (cell) {
@@ -804,7 +814,7 @@
     function successfulMove(x, y, shape, isFlip) {
         lastWasFlip = isFlip;
         lastWasSwap = false;
-        setLastMoveMarker(x, y);
+        setLastMoveMarker(x, y, shape);
         lastShape = shape;
 
         // Advance turn
@@ -980,14 +990,15 @@
     function clearLastMoveMarker() {
         if (lastMoveX !== null && lastMoveY !== null) {
             const stone = document.getElementsByClassName('point')[lastMoveX * SIZE + lastMoveY].firstChild;
-            stone.classList.remove('last-move');
+            stone.classList.remove('last-move', 'square');
         }
     }
 
-    function setLastMoveMarker(x, y) {
+    function setLastMoveMarker(x, y, shape) {
         clearLastMoveMarker();
         const stone = document.getElementsByClassName('point')[x * SIZE + y].firstChild;
         stone.classList.add('last-move');
+        if (shape === 'square') stone.classList.add('square');
         lastMoveX = x;
         lastMoveY = y;
     }

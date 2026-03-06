@@ -170,12 +170,12 @@
 
         /* Custom colors for square pieces only */
         .black.square {
-            background: rgb(80, 96, 128);
+            background: rgb(75, 91, 138);
             border: 2px solid black; 
         }
 
         .white.square {
-            background: rgb(208, 224, 255);
+            background: rgb(195, 213, 255);
             border: 2px solid black;
         }
 
@@ -190,6 +190,13 @@
             border-radius: 50%;
             background: red;
             z-index: 3;
+        }
+
+        /* Square stones are 88.62% the size of round stones, so scale the dot up
+           proportionally so it always appears the same absolute size: 22/0.8862 ≈ 24.83% */
+        .square.last-move::after {
+            width: 24.83%;
+            height: 24.83%;
         }
 
         .replay-controls {
