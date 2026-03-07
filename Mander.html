@@ -296,10 +296,10 @@
     </div>
     <div class="footer">
         <div class="replay-controls">
-            <button onmousedown="replayStart()">Start</button>
-            <button onmousedown="replayBack()">Back</button>
-            <button onmousedown="replayForward()">Forward</button>
-            <button onmousedown="replayEnd()">End</button>
+            <button onmousedown="replayStart()"><<</button>
+            <button onmousedown="replayBack()"><</button>
+            <button onmousedown="replayForward()">></button>
+            <button onmousedown="replayEnd()">>></button>
             <button id="random-button" onmousedown="generateRandomGame()">Random game</button>
             <select id="save-options" onchange="handleSave()">
                 <option value="" disabled selected hidden>Save</option>
@@ -646,7 +646,7 @@
             backBtn.disabled = currentMoveIndex === 0;
             forwardBtn.disabled = currentMoveIndex === gameHistory.length - 1;
             endBtn.disabled = currentMoveIndex === gameHistory.length - 1;
-            randomBtn.disabled = !hasValidMove();
+            randomBtn.disabled = false;
         }
     }
 
@@ -767,6 +767,9 @@
         if (isGenerating) {
             stopGeneration();
             return;
+        }
+        if (!hasValidMove()) {
+            resetGame(SIZE);
         }
         isGenerating = true;
         const randomBtn = document.getElementById('random-button');
