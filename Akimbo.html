@@ -542,6 +542,7 @@
         const btn = document.getElementById('bot-reply-button');
         btn.innerHTML = botReply ? BOT_ON_SVG : BOT_OFF_SVG;
         btn.title = btn.dataset.tooltip = botReply ? 'Bot reply is ON' : 'Bot reply is OFF';
+        if (botReply) setTimeout(makeBotReply, 0);
     }
 
     function makeBotReply() {
@@ -853,7 +854,7 @@
 
     window.addEventListener('keydown',e=>{
         const ae=document.activeElement, inp=ae.tagName==='INPUT'||ae.tagName==='SELECT'||ae.tagName==='TEXTAREA';
-        const keys=['r','i','o','a','s','x','z','c','arrowup','arrowdown','arrowleft','arrowright'];
+        const keys=['r','b','i','o','a','s','x','z','c','arrowup','arrowdown','arrowleft','arrowright'];
         if (inp&&ae.tagName==='SELECT'&&['ArrowUp','ArrowDown','Space'].includes(e.key)) {}
         else if (inp&&e.key.toLowerCase()==='c'&&(e.metaKey||e.ctrlKey)) {}
         else if (keys.includes(e.key.toLowerCase())) e.preventDefault();
@@ -861,6 +862,7 @@
         const bss=document.getElementById('board-size');
         switch(e.key.toLowerCase()) {
             case 'r': isGenerating?stopGeneration():generateRandomGame(); break;
+            case 'b': toggleBotReply(); break;
             case 'i': if(bss&&document.activeElement!==bss){bss.selectedIndex=Math.max(0,bss.selectedIndex-1);bss.dispatchEvent(new Event('change'));} break;
             case 'o': if(bss&&document.activeElement!==bss){bss.selectedIndex=Math.min(bss.options.length-1,bss.selectedIndex+1);bss.dispatchEvent(new Event('change'));} break;
             case 'a': {const l=document.getElementById('load-options');if(l){l.value='file';l.dispatchEvent(new Event('change'));}} break;
