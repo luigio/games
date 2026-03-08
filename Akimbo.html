@@ -17,13 +17,13 @@
         #copy-move { font-size:1.2em;padding:0;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center; }
         .copy-icon { width:1em;height:1em;vertical-align:middle; }
         #copy-move:hover .copy-icon path { fill:#555; }
-        .grid { display:grid;width:100%;height:100%;position:relative;z-index:1; }
+        .grid { display:grid;width:100%;height:100%;position:relative; }
         .lines { position:absolute;width:100%;height:100%;z-index:0; }
         .point { position:relative;cursor:pointer; }
-        .stone { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;border-radius:50%;box-sizing:border-box;z-index:2; }
+        .stone { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;border-radius:50%;box-sizing:border-box; }
         .black { background:black; }
         .white { background:white;border:2px solid black; }
-        .last-move::after { content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:22%;height:22%;border-radius:50%;background:red;z-index:3; }
+        .point.last-move::after { content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:22%;height:22%;border-radius:50%;background:red;z-index:3; }
         .replay-controls { display:flex;flex-wrap:nowrap;width:100%;gap:0.5em;overflow:hidden;justify-content:center; }
         .replay-controls button,.replay-controls select { flex:0 1 auto;padding:0.3em 0.5em;font-size:1em;border:2px solid black;background:white;cursor:pointer;transition:background 0.3s ease;min-width:0;text-overflow:clip;overflow:hidden;white-space:nowrap;max-width:100px; }
         button,select { font-size:1em;padding:0.3em 0.5em;border:2px solid black;background:white;cursor:pointer;transition:background 0.3s ease; }
@@ -32,7 +32,10 @@
         .replay-controls button:disabled { cursor:not-allowed;opacity:0.5; }
         .stone-icon { width:1em;height:1em;vertical-align:middle;margin-right:0.5em; }
         #message { font-family:Arial,sans-serif;position:absolute;left:calc(50vw + 50vh - 30px);top:50%;transform:translateY(-50%);font-size:1.2em;color:#d32f2f;width:20vw;text-align:left; }
-        #random-button { flex:0 1 auto;min-width:0;text-align:center;max-width:8em; }
+        #random-button { flex:0 1 auto;min-width:0; }
+        #bot-reply-button { flex:0 1 auto;min-width:0;max-width:8em; }
+        .sq { padding:0 !important; display:flex !important; align-items:center; justify-content:center; flex-shrink:0; }
+        #save-options, #load-options { flex:0 1 auto;min-width:0;text-align:center; }
     </style>
 </head>
 <body>
@@ -59,17 +62,18 @@
     </div>
     <div class="footer">
         <div class="replay-controls">
-            <button onmousedown="replayStart()"><<</button>
-            <button onmousedown="replayBack()"><</button>
-            <button onmousedown="replayForward()">></button>
-            <button onmousedown="replayEnd()">>></button>
-            <button id="random-button" onmousedown="generateRandomGame()">Random game</button>
-            <select id="save-options" onchange="handleSave()">
+            <button class="sq" onmousedown="replayStart()" title="Go to start" data-tooltip="Go to start"><<</button>
+            <button class="sq" onmousedown="replayBack()" title="Previous move" data-tooltip="Previous move"><</button>
+            <button class="sq" onmousedown="replayForward()" title="Next move" data-tooltip="Next move">></button>
+            <button class="sq" onmousedown="replayEnd()" title="Go to end" data-tooltip="Go to end">>></button>
+            <button class="sq" id="random-button" onmousedown="generateRandomGame()" title="Play a random game" data-tooltip="Play a random game" data-tooltip-alt="Stop generation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="7" cy="17" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="17" r="1.5" fill="currentColor" stroke="none"/></svg></button>
+            <button class="sq" id="bot-reply-button" onmousedown="toggleBotReply()" title="Bot reply OFF" data-tooltip="Bot reply OFF" data-tooltip-alt="Bot reply ON"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="4" y="2" width="16" height="20" rx="2"/><rect x="1" y="8" width="3" height="5" rx="1"/><rect x="20" y="8" width="3" height="5" rx="1"/><line x1="7" y1="8.75" x2="10.5" y2="8.75"/><line x1="13.5" y1="8.75" x2="17" y2="8.75"/><line x1="8" y1="17" x2="16" y2="17"/></svg></button>
+            <select id="save-options" onchange="handleSave()" data-tooltip="Save game">
                 <option value="" disabled selected hidden>Save</option>
                 <option value="file">To file</option>
                 <option value="clipboard">To clipboard</option>
             </select>
-            <select id="load-options" onchange="handleLoad()">
+            <select id="load-options" onchange="handleLoad()" data-tooltip="Load game">
                 <option value="" disabled selected hidden>Load</option>
                 <option value="file">From file</option>
                 <option value="clipboard">From clipboard</option>
@@ -95,6 +99,7 @@
     let gameHistory = [];
     let currentMoveIndex = -1;
     let isGenerating = false, generationInterval = null;
+    let botReply = false;
     let gameOver = false, blackWins = false, whiteWins = false;
 
     const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
@@ -267,13 +272,13 @@
 
     function clearLastMoveMarker() {
         if (lastMoveX!==null && lastMoveY!==null)
-            document.getElementsByClassName('point')[lastMoveX*SIZE+lastMoveY].firstChild.classList.remove('last-move');
+            document.getElementsByClassName('point')[lastMoveX*SIZE+lastMoveY].classList.remove('last-move');
         lastMoveX = null; lastMoveY = null;
     }
 
     function setLastMoveMarker(x, y) {
         clearLastMoveMarker();
-        document.getElementsByClassName('point')[x*SIZE+y].firstChild.classList.add('last-move');
+        document.getElementsByClassName('point')[x*SIZE+y].classList.add('last-move');
         lastMoveX = x; lastMoveY = y;
     }
 
@@ -305,11 +310,92 @@
     function renderBoard() {
         const points = document.getElementsByClassName('point');
         for (let i=0;i<SIZE;i++) for (let j=0;j<SIZE;j++) {
-            const stone = points[i*SIZE+j].firstChild;
+            const point = points[i*SIZE+j];
+            const stone = point.firstChild;
             stone.className = 'stone';
             if (board[i][j]===0) stone.classList.add('black');
             else if (board[i][j]===1) stone.classList.add('white');
-            if (i===lastMoveX&&j===lastMoveY) stone.classList.add('last-move');
+            if (i===lastMoveX&&j===lastMoveY) point.classList.add('last-move');
+            else point.classList.remove('last-move');
+        }
+        renderNakedDiagLines();
+    }
+
+    function areOrthogonallyConnected(x1, y1, x2, y2, color) {
+        if (x1===x2 && y1===y2) return true;
+        const visited = new Set();
+        const queue = [[x1, y1]];
+        visited.add(`${x1},${y1}`);
+        while (queue.length) {
+            const [x, y] = queue.shift();
+            for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
+                const nx = x+dx, ny = y+dy;
+                if (nx<0||nx>=SIZE||ny<0||ny>=SIZE) continue;
+                const key = `${nx},${ny}`;
+                if (visited.has(key)) continue;
+                if (board[nx][ny] !== color) continue;
+                if (nx===x2 && ny===y2) return true;
+                visited.add(key);
+                queue.push([nx, ny]);
+            }
+        }
+        return false;
+    }
+
+    function renderNakedDiagLines() {
+        const boardEl = document.getElementById('board');
+        const boardSize = boardEl.offsetWidth;
+        const cellSize = boardSize / SIZE;
+        let svg = document.getElementById('naked-diag-svg');
+        if (!svg) {
+            svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.id = 'naked-diag-svg';
+            svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:none;';
+            boardEl.appendChild(svg);
+        }
+        svg.setAttribute('width', boardSize);
+        svg.setAttribute('height', boardSize);
+        svg.innerHTML = '';
+
+        const sq = SIZE - 1;
+        for (let col = 0; col <= 1; col++) {
+            // Black stones (col=0) get white lines/dots; white stones (col=1) get black lines/dots
+            const strokeColor = col === 0 ? 'white' : 'black';
+            for (const key of nakedDiags[col]) {
+                let x1, y1, x2, y2;
+                if (key < sq * sq) {
+                    // Type A: TL=(r,c) to BR=(r+1,c+1)
+                    const r = Math.floor(key / sq), c = key % sq;
+                    x1=r; y1=c; x2=r+1; y2=c+1;
+                } else {
+                    // Type B: TR=(r,c+1) to BL=(r+1,c)
+                    const k = key - sq*sq;
+                    const r = Math.floor(k / sq), c = k % sq;
+                    x1=r; y1=c+1; x2=r+1; y2=c;
+                }
+                // Skip if the two stones are already orthogonally connected
+                if (areOrthogonallyConnected(x1, y1, x2, y2, col)) continue;
+
+                const px1 = (y1 + 0.5) * cellSize;
+                const py1 = (x1 + 0.5) * cellSize;
+                const px2 = (y2 + 0.5) * cellSize;
+                const py2 = (x2 + 0.5) * cellSize;
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', px1); line.setAttribute('y1', py1);
+                line.setAttribute('x2', px2); line.setAttribute('y2', py2);
+                line.setAttribute('stroke', strokeColor);
+                line.setAttribute('stroke-width', '2');
+                svg.appendChild(line);
+
+                for (const [px, py] of [[px1, py1], [px2, py2]]) {
+                    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    dot.setAttribute('cx', px); dot.setAttribute('cy', py);
+                    dot.setAttribute('r', '2');
+                    dot.setAttribute('fill', strokeColor);
+                    svg.appendChild(dot);
+                }
+            }
         }
     }
 
@@ -360,6 +446,7 @@
         }
 
         updateReplayButtons(); updateLastMoveDisplay();
+        if (!gameOver) setTimeout(makeBotReply, 0);
     }
 
     // ── Replay ──
@@ -447,20 +534,79 @@
 
     // ── Random game ──
 
+    const BOT_ON_SVG  = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="4" y="2" width="16" height="20" rx="2"/><rect x="1" y="8" width="3" height="5" rx="1"/><rect x="20" y="8" width="3" height="5" rx="1"/><rect x="7" y="7" width="3.5" height="3.5" rx="0.5"/><rect x="13.5" y="7" width="3.5" height="3.5" rx="0.5"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`;
+    const BOT_OFF_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="4" y="2" width="16" height="20" rx="2"/><rect x="1" y="8" width="3" height="5" rx="1"/><rect x="20" y="8" width="3" height="5" rx="1"/><line x1="7" y1="8.75" x2="10.5" y2="8.75"/><line x1="13.5" y1="8.75" x2="17" y2="8.75"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`;
+
+    function toggleBotReply() {
+        botReply = !botReply;
+        const btn = document.getElementById('bot-reply-button');
+        btn.innerHTML = botReply ? BOT_ON_SVG : BOT_OFF_SVG;
+        btn.title = btn.dataset.tooltip = botReply ? 'Bot reply ON' : 'Bot reply OFF';
+    }
+
+    function makeBotReply() {
+        if (!botReply || gameOver || isGenerating) return;
+        const valid = [];
+        for (let x = 0; x < SIZE; x++) for (let y = 0; y < SIZE; y++)
+            if (isValidAkimboMove(x, y, turn)) valid.push([x, y]);
+        if (valid.length === 0) return;
+        const [x, y] = valid[Math.floor(Math.random() * valid.length)];
+        board[x][y] = turn;
+        const removed = resolveCrosscutsOnBoard(x, y, turn, board);
+        updateNakedDiagsAround(x, y);
+        for (const [pr, pc] of removed) updateNakedDiagsAround(pr, pc);
+        setLastMoveMarker(x, y);
+        turn = turn === 0 ? 1 : 0;
+        const state = saveGameState();
+        state.initialX = x; state.initialY = y; state.isSkip = false; state.lastWasPieSwap = false;
+        if (currentMoveIndex < gameHistory.length - 1)
+            gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+        gameHistory.push(state); currentMoveIndex++;
+        blackWins = state.blackWins; whiteWins = state.whiteWins; gameOver = state.gameOver;
+        renderBoard(); updateStatus();
+        if (!gameOver && !hasValidMove(turn)) {
+            turn = turn === 0 ? 1 : 0;
+            const skip = saveGameState();
+            skip.initialX = null; skip.initialY = null; skip.isSkip = true; skip.lastWasPieSwap = false;
+            gameHistory.push(skip); currentMoveIndex++;
+            renderBoard(); updateStatus();
+        }
+        updateReplayButtons(); updateLastMoveDisplay();
+    }
+
+    const DICE_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="7" cy="17" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="17" r="1.5" fill="currentColor" stroke="none"/></svg>`;
+    const STOP_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:block;"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
+
+    function fixSquareButtons() {
+        document.querySelectorAll('.sq').forEach(btn => {
+            btn.style.width = '';
+            btn.style.width = btn.offsetHeight + 'px';
+        });
+    }
+
+    function fixSaveLoadWidths() {
+        for (const [id, label] of [['save-options', 'Save'], ['load-options', 'Load']]) {
+            const sel = document.getElementById(id);
+            const clone = sel.cloneNode(false); // no children
+            const opt = document.createElement('option');
+            opt.textContent = label;
+            clone.appendChild(opt);
+            clone.style.cssText = 'position:absolute;visibility:hidden;width:auto;';
+            document.body.appendChild(clone);
+            const w = clone.offsetWidth;
+            document.body.removeChild(clone);
+            sel.style.width = w + 'px';
+        }
+    }
+
     function stopGeneration() {
         if (generationInterval) {
             clearInterval(generationInterval); generationInterval=null; isGenerating=false;
             const r=document.getElementById('random-button');
-            r.style.width=''; r.textContent='Random game'; r.setAttribute('onmousedown','generateRandomGame()');
+            r.innerHTML=DICE_SVG; r.setAttribute('onmousedown','generateRandomGame()');
+            r.title=r.dataset.tooltip='Play a random game';
             updateReplayButtons(); renderBoard();
         }
-    }
-
-    function measureRandomGameWidth() {
-        const r=document.getElementById('random-button'), c=r.cloneNode(true);
-        c.textContent='Random game'; c.style.width=''; c.style.visibility='hidden';
-        c.style.position='absolute'; c.removeAttribute('onmousedown');
-        document.body.appendChild(c); const w=c.offsetWidth; document.body.removeChild(c); return w;
     }
 
     function generateRandomGame() {
@@ -468,7 +614,8 @@
         if (gameOver) resetGame(SIZE);
         isGenerating=true;
         const r=document.getElementById('random-button');
-        r.style.width=`${measureRandomGameWidth()}px`; r.textContent='Stop';
+        r.innerHTML=STOP_SVG;
+        r.title=r.dataset.tooltip='Stop generation';
         r.setAttribute('onmousedown','stopGeneration()'); updateReplayButtons();
 
         generationInterval=setInterval(()=>{
@@ -523,6 +670,7 @@
         st.turn=1; st.initialX=null; st.initialY=null; st.isSkip=false; st.lastWasPieSwap=true;
         gameHistory.push(st); currentMoveIndex++;
         renderBoard(); updateStatus(); updateLastMoveDisplay(); updateReplayButtons();
+        if (!gameOver) setTimeout(makeBotReply, 0);
     }
 
     // ── Save / Load ──
@@ -668,8 +816,11 @@
         const els=[...document.querySelectorAll('.replay-controls button'),...document.querySelectorAll('.replay-controls select')];
         const wide=window.innerWidth>=getTotalMaxWidth();
         els.forEach(el=>{
-            const t=el.tagName==='BUTTON'?el.textContent.trim():(el.selectedIndex>=0?el.options[el.selectedIndex].text.trim():'');
-            if (!wide) el.setAttribute('title',t); else el.removeAttribute('title');
+            const tooltip=el.dataset.tooltip;
+            if (!tooltip) return;
+            const iconOnly=el.tagName==='BUTTON'&&el.textContent.trim()==='';
+            if (iconOnly||!wide) el.setAttribute('title',tooltip);
+            else el.removeAttribute('title');
         });
     }
 
@@ -681,7 +832,7 @@
     }
 
     // ── Init ──
-    resetGame(SIZE); updateButtonTooltips(); adjustHeaderLayout();
+    resetGame(SIZE); updateButtonTooltips(); adjustHeaderLayout(); fixSquareButtons(); fixSaveLoadWidths();
     document.getElementById('copy-move').addEventListener('mousedown', copyLastMove);
 
     [document.getElementById('board-size'),document.getElementById('save-options'),document.getElementById('load-options')].forEach(sel=>{
@@ -689,8 +840,7 @@
     });
 
     window.addEventListener('resize',()=>{
-        initBoard(); renderBoard(); updateButtonTooltips();
-        if (isGenerating) document.getElementById('random-button').style.width=`${measureRandomGameWidth()}px`;
+        initBoard(); renderBoard(); updateButtonTooltips(); fixSquareButtons(); fixSaveLoadWidths();
         adjustHeaderLayout();
     });
 
