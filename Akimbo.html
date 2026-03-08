@@ -321,27 +321,6 @@
         renderNakedDiagLines();
     }
 
-    function areOrthogonallyConnected(x1, y1, x2, y2, color) {
-        if (x1===x2 && y1===y2) return true;
-        const visited = new Set();
-        const queue = [[x1, y1]];
-        visited.add(`${x1},${y1}`);
-        while (queue.length) {
-            const [x, y] = queue.shift();
-            for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
-                const nx = x+dx, ny = y+dy;
-                if (nx<0||nx>=SIZE||ny<0||ny>=SIZE) continue;
-                const key = `${nx},${ny}`;
-                if (visited.has(key)) continue;
-                if (board[nx][ny] !== color) continue;
-                if (nx===x2 && ny===y2) return true;
-                visited.add(key);
-                queue.push([nx, ny]);
-            }
-        }
-        return false;
-    }
-
     function renderNakedDiagLines() {
         const boardEl = document.getElementById('board');
         const boardSize = boardEl.offsetWidth;
@@ -373,9 +352,6 @@
                     const r = Math.floor(k / sq), c = k % sq;
                     x1=r; y1=c+1; x2=r+1; y2=c;
                 }
-                // Skip if the two stones are already orthogonally connected
-                if (areOrthogonallyConnected(x1, y1, x2, y2, col)) continue;
-
                 const px1 = (y1 + 0.5) * cellSize;
                 const py1 = (x1 + 0.5) * cellSize;
                 const px2 = (y2 + 0.5) * cellSize;
