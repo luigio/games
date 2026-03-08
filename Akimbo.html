@@ -78,7 +78,7 @@
                 <option value="file">From file</option>
                 <option value="clipboard">From clipboard</option>
             </select>
-            <select id="board-size" onchange="changeBoardSize()">
+            <select id="board-size" onchange="changeBoardSize()" data-tooltip="Board size">
                 <option value="3">3×3</option><option value="4">4×4</option><option value="5">5×5</option>
                 <option value="6">6×6</option><option value="7">7×7</option><option value="8">8×8</option>
                 <option value="9">9×9</option><option value="10">10×10</option><option value="11">11×11</option>
@@ -819,8 +819,8 @@
         els.forEach(el=>{
             const tooltip=el.dataset.tooltip;
             if (!tooltip) return;
-            const iconOnly=el.tagName==='BUTTON'&&el.textContent.trim()==='';
-            if (iconOnly||!wide) el.setAttribute('title',tooltip);
+            const squareButton = el.classList.contains('sq');
+            if (squareButton||!wide) el.setAttribute('title',tooltip);
             else el.removeAttribute('title');
         });
     }
