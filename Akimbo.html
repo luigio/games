@@ -67,7 +67,7 @@
             <button class="sq" onmousedown="replayForward()" title="Next move" data-tooltip="Next move">></button>
             <button class="sq" onmousedown="replayEnd()" title="Go to end" data-tooltip="Go to end">>></button>
             <button class="sq" id="random-button" onmousedown="generateRandomGame()" title="Play a random game" data-tooltip="Play a random game" data-tooltip-alt="Stop generation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="7" cy="17" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="17" r="1.5" fill="currentColor" stroke="none"/></svg></button>
-            <button class="sq" id="bot-reply-button" onmousedown="toggleBotReply()" title="Bot reply OFF" data-tooltip="Bot reply OFF" data-tooltip-alt="Bot reply ON"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="4" y="2" width="16" height="20" rx="2"/><rect x="1" y="8" width="3" height="5" rx="1"/><rect x="20" y="8" width="3" height="5" rx="1"/><line x1="7" y1="8.75" x2="10.5" y2="8.75"/><line x1="13.5" y1="8.75" x2="17" y2="8.75"/><line x1="8" y1="17" x2="16" y2="17"/></svg></button>
+            <button class="sq" id="bot-reply-button" onmousedown="toggleBotReply()" title="Bot reply" data-tooltip="Bot reply is OFF" data-tooltip-alt="Bot reply is ON"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="4" y="2" width="16" height="20" rx="2"/><rect x="1" y="8" width="3" height="5" rx="1"/><rect x="20" y="8" width="3" height="5" rx="1"/><line x1="7" y1="8.75" x2="10.5" y2="8.75"/><line x1="13.5" y1="8.75" x2="17" y2="8.75"/><line x1="8" y1="17" x2="16" y2="17"/></svg></button>
             <select id="save-options" onchange="handleSave()" data-tooltip="Save game">
                 <option value="" disabled selected hidden>Save</option>
                 <option value="file">To file</option>
@@ -541,7 +541,7 @@
         botReply = !botReply;
         const btn = document.getElementById('bot-reply-button');
         btn.innerHTML = botReply ? BOT_ON_SVG : BOT_OFF_SVG;
-        btn.title = btn.dataset.tooltip = botReply ? 'Bot reply ON' : 'Bot reply OFF';
+        btn.title = btn.dataset.tooltip = botReply ? 'Bot reply is ON' : 'Bot reply is OFF';
     }
 
     function makeBotReply() {
