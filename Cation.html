@@ -102,6 +102,7 @@
 
     let turnPhase = 0; // 0 for placement, 1 for removal
     let validRemovalSets = [];
+    let ineligibleRemovals = new Set(); // stones made ineligible after first removal
     let currentRemovals = [];
     let isBotPlaying = false;
 
@@ -187,7 +188,7 @@
         board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
         turn = 0; lastMoveX = null; lastMoveY = null;
         gameOver = false; blackWins = false; whiteWins = false; isDraw = false;
-        turnPhase = 0; validRemovalSets = []; currentRemovals = [];
+        turnPhase = 0; validRemovalSets = []; ineligibleRemovals = new Set(); currentRemovals = [];
         
         const init = saveGameState();
         init.turn = 0; init.initialX = null; init.initialY = null; init.isSkip = false;
@@ -293,13 +294,18 @@
     }
 
     function getValidRemovals() {
-        const validRemovals = [];
+        const seen = new Set();
+        const result = [];
         for (const set of validRemovalSets) {
-            for (const s of set) {
-                validRemovals.push([s[0], s[1]]);
+            for (const [sx, sy] of set) {
+                const key = `${sx},${sy}`;
+                if (!ineligibleRemovals.has(key) && !seen.has(key)) {
+                    seen.add(key);
+                    result.push([sx, sy]);
+                }
             }
         }
-        return validRemovals;
+        return result;
     }
 
     function hasValidMove() {
@@ -323,31 +329,77 @@
         if (turnPhase === 1) {
             const enemyColor = turn === 0 ? 1 : 0;
             if (board[x][y] !== enemyColor) {
-                setMessage("Must remove an enemy stone from the completed crosscuts.");
+                setMessage("Must remove an enemy stone from a completed crosscut.");
                 return;
             }
-            
-            let matchedSet = null;
-            for (const set of validRemovalSets) {
-                if (set.some(s => s[0] === x && s[1] === y)) {
-                    matchedSet = set;
-                    break;
+            if (ineligibleRemovals.has(`${x},${y}`)) {
+                setMessage("That stone is ineligible for removal this turn.");
+                return;
+            }
+
+            // Find every unsatisfied crosscut that contains this stone
+            const satisfiedIndices = [];
+            for (let i = 0; i < validRemovalSets.length; i++) {
+                if (validRemovalSets[i].some(s => s[0] === x && s[1] === y)) {
+                    satisfiedIndices.push(i);
                 }
             }
 
-            if (!matchedSet) {
-                setMessage("Invalid removal. You must remove a valid stone from the completed crosscuts.");
+            if (satisfiedIndices.length === 0) {
+                setMessage("Invalid removal. Stone is not part of any unsatisfied crosscut.");
                 return;
             }
 
-            // Apply all removals for the matched set automatically
-            for (const [rx, ry] of matchedSet) {
-                board[rx][ry] = null;
-            }
-            
-            currentRemovals = [...matchedSet];
+            // Remove the stone from the board
+            board[x][y] = null;
+            currentRemovals.push([x, y]);
             clearMessage();
-            finishTurn();
+
+            // All satisfied crosscuts: mark their other enemy stones as ineligible
+            for (const idx of satisfiedIndices) {
+                for (const [sx, sy] of validRemovalSets[idx]) {
+                    if (sx !== x || sy !== y) ineligibleRemovals.add(`${sx},${sy}`);
+                }
+            }
+
+            // Drop all crosscuts just satisfied (this stone was in all of them)
+            validRemovalSets = validRemovalSets.filter((_, i) => !satisfiedIndices.includes(i));
+
+            if (validRemovalSets.length === 0) {
+                finishTurn();
+                return;
+            }
+
+            // Auto-remove any remaining crosscut whose only eligible stone is now forced
+            let changed = true;
+            while (changed) {
+                changed = false;
+                for (let i = 0; i < validRemovalSets.length; i++) {
+                    const eligible = validRemovalSets[i].filter(s => !ineligibleRemovals.has(`${s[0]},${s[1]}`));
+                    if (eligible.length === 1) {
+                        const [ax, ay] = eligible[0];
+                        board[ax][ay] = null;
+                        currentRemovals.push([ax, ay]);
+                        // Mark this stone's crosscut-mates ineligible too
+                        for (const [sx, sy] of validRemovalSets[i]) {
+                            if (sx !== ax || sy !== ay) ineligibleRemovals.add(`${sx},${sy}`);
+                        }
+                        validRemovalSets.splice(i, 1);
+                        // Drop any other crosscuts that also contained this auto-removed stone
+                        validRemovalSets = validRemovalSets.filter(set => !set.some(s => s[0] === ax && s[1] === ay));
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+
+            if (validRemovalSets.length === 0) {
+                finishTurn();
+                return;
+            }
+
+            // Still crosscuts left — wait for player's next click
+            renderBoard();
             return;
         }
 
@@ -389,28 +441,27 @@
         clearMessage();
         setLastMoveMarker(x, y);
         currentRemovals = [];
+        ineligibleRemovals = new Set();
         
         if (completed.length > 0) {
             const enemyColor = turn === 0 ? 1 : 0;
-            const vSetMap = new Map();
-            const hSetMap = new Map();
-            
-            for (const pc of completed) {
+
+            // Build one candidate set per completed crosscut
+            validRemovalSets = completed.map(pc => {
+                const seen = new Set();
+                const enemies = [];
                 for (const [cx, cy] of [[pc.cx, pc.cy], [pc.cx+1, pc.cy], [pc.cx, pc.cy+1], [pc.cx+1, pc.cy+1]]) {
-                    if (board[cx][cy] === enemyColor) {
-                        if (cy === y) vSetMap.set(`${cx},${cy}`, [cx, cy]);
-                        if (cx === x) hSetMap.set(`${cx},${cy}`, [cx, cy]);
+                    const key = `${cx},${cy}`;
+                    if (board[cx][cy] === enemyColor && !seen.has(key)) {
+                        seen.add(key);
+                        enemies.push([cx, cy]);
                     }
                 }
-            }
-
-            validRemovalSets = [];
-            if (vSetMap.size > 0) validRemovalSets.push(Array.from(vSetMap.values()));
-            if (hSetMap.size > 0) validRemovalSets.push(Array.from(hSetMap.values()));
+                return enemies;
+            });
 
             turnPhase = 1;
             renderBoard();
-            //setMessage("Crosscut completed! Click an enemy stone to automatically remove the corresponding set.");
         } else {
             finishTurn();
         }
@@ -527,8 +578,9 @@
         }
         
         if (turnPhase === 1) {
-            const validRemovals = getValidRemovals();
-            if (validRemovals.length > 0) {
+            while (turnPhase === 1) {
+                const validRemovals = getValidRemovals();
+                if (validRemovals.length === 0) break;
                 const [rx, ry] = validRemovals[Math.floor(Math.random() * validRemovals.length)];
                 play(rx, ry);
             }
@@ -609,9 +661,16 @@
                 const col=String.fromCharCode(97+st.initialY), row=SIZE-st.initialX;
                 let moveStr = p+col+row;
                 if (st.removals && st.removals.length > 0) {
-                    const [rx, ry] = st.removals[0];
-                    if (ry === st.initialY) moveStr += 'v';
-                    else moveStr += 'h';
+                    const px = st.initialX, py = st.initialY;
+                    const ORDER = {n:0, s:1, e:2, w:3};
+                    const dirs = st.removals.map(([rx, ry]) => {
+                        if (rx < px) return 'n';
+                        if (rx > px) return 's';
+                        if (ry > py) return 'e';
+                        return 'w';
+                    });
+                    dirs.sort((a, b) => ORDER[a] - ORDER[b]);
+                    moveStr += dirs.join('');
                 }
                 moves.push(moveStr);
             }
@@ -655,9 +714,9 @@
 
             if (/^[BW]-$/.test(mv)) continue;
 
-            const mm=mv.match(/^([BW])([a-z])(\d+)([vh]?)$/);
+            const mm=mv.match(/^([BW])([a-z])(\d+)([nsew]{1,2})?$/);
             if (!mm) { setMessage("Error: Invalid move: "+mv); renderBoard(); return false; }
-            const [,pc,col,row,remDir]=mm, pl=pc==='B'?0:1;
+            const [,pc,col,row,remSuffix]=mm, pl=pc==='B'?0:1;
             if (pl!==tempTurn) { setMessage("Error: Move out of turn: "+mv); renderBoard(); return false; }
             const x=ns-parseInt(row), y=col.charCodeAt(0)-97;
             if (x<0||x>=ns||y<0||y>=ns) { setMessage("Error: Move out of bounds: "+mv); renderBoard(); return false; }
@@ -700,25 +759,31 @@
 
             const parsedRemovals = [];
             if (completed.length > 0) {
-                if (!remDir) {
-                    setMessage("Error: Missing removal direction (v/h) for completed crosscut: "+mv);
+                if (!remSuffix) {
+                    setMessage("Error: Missing removal for completed crosscut: "+mv);
                     board[x][y] = null;
                     renderBoard();
                     return false;
                 }
                 const enemyColor = tempTurn === 0 ? 1 : 0;
-                const removalsMap = new Map();
-                for (const pc of completed) {
-                    for (const [cx, cy] of [[pc.cx, pc.cy], [pc.cx+1, pc.cy], [pc.cx, pc.cy+1], [pc.cx+1, pc.cy+1]]) {
-                        if (board[cx][cy] === enemyColor) {
-                            if (remDir === 'v' && cy === y) removalsMap.set(`${cx},${cy}`, [cx, cy]);
-                            if (remDir === 'h' && cx === x) removalsMap.set(`${cx},${cy}`, [cx, cy]);
-                        }
+                for (const dir of remSuffix) {
+                    let rx, ry;
+                    if (dir === 'n') { rx = x - 1; ry = y; }
+                    else if (dir === 's') { rx = x + 1; ry = y; }
+                    else if (dir === 'e') { rx = x; ry = y + 1; }
+                    else { rx = x; ry = y - 1; } // 'w'
+                    if (rx < 0 || rx >= ns || ry < 0 || ry >= ns) {
+                        setMessage("Error: Removal out of bounds: "+mv);
+                        board[x][y] = null; renderBoard(); return false;
                     }
+                    if (board[rx][ry] !== enemyColor) {
+                        setMessage("Error: Invalid removal (not an enemy stone): "+mv);
+                        board[x][y] = null; renderBoard(); return false;
+                    }
+                    parsedRemovals.push([rx, ry]);
                 }
-                parsedRemovals.push(...removalsMap.values());
-            } else if (remDir) {
-                setMessage("Error: Removal direction specified but no crosscut completed: "+mv);
+            } else if (remSuffix) {
+                setMessage("Error: Removal specified but no crosscut completed: "+mv);
                 board[x][y] = null;
                 renderBoard();
                 return false;
@@ -768,9 +833,16 @@
         else {
             let moveStr = p+String.fromCharCode(97+rs.initialY)+(SIZE-rs.initialX);
             if (rs.removals && rs.removals.length > 0) {
-                const [rx, ry] = rs.removals[0];
-                if (ry === rs.initialY) moveStr += 'v';
-                else moveStr += 'h';
+                const px = rs.initialX, py = rs.initialY;
+                const ORDER = {n:0, s:1, e:2, w:3};
+                const dirs = rs.removals.map(([rx, ry]) => {
+                    if (rx < px) return 'n';
+                    if (rx > px) return 's';
+                    if (ry > py) return 'e';
+                    return 'w';
+                });
+                dirs.sort((a, b) => ORDER[a] - ORDER[b]);
+                moveStr += dirs.join('');
             }
             txt.textContent=moveStr;
             btn.style.display='inline-flex';
