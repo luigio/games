@@ -93,7 +93,7 @@
     let SIZE = 13;
     let board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
     let turn = 0; // 0=Black, 1=White
-    let lastMoveX = null, lastMoveY = null;
+    let lastMoveX = null, lastMoveY = null, lastMoveX2 = null, lastMoveY2 = null;
     let gameHistory = [];
     let currentMoveIndex = -1;
     let isGenerating = false, generationInterval = null;
@@ -103,6 +103,7 @@
     // ── Leeway: two-phase turn state ──
     let awaitingSecondStone = false;
     let firstStoneX = null, firstStoneY = null;
+    let firstStonePlacedAt = 0;
 
     const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
     const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
@@ -155,7 +156,7 @@
 
     function saveGameState() {
         const bWins = checkWin(0), wWins = checkWin(1);
-        return { board: board.map(r=>[...r]), turn, lastMoveX, lastMoveY,
+        return { board: board.map(r=>[...r]), turn, lastMoveX, lastMoveY, lastMoveX2, lastMoveY2,
                  gameOver: bWins||wWins, blackWins: bWins, whiteWins: wWins, lastWasPieSwap: false,
                  initialX: null, initialY: null, secondX: null, secondY: null, isSkip: false };
     }
@@ -164,6 +165,8 @@
         board = state.board.map(r=>[...r]);
         turn = (state.turn !== undefined) ? state.turn : (currentMoveIndex%2===0 ? 0 : 1);
         lastMoveX = state.lastMoveX; lastMoveY = state.lastMoveY;
+        lastMoveX2 = state.lastMoveX2 !== undefined ? state.lastMoveX2 : null;
+        lastMoveY2 = state.lastMoveY2 !== undefined ? state.lastMoveY2 : null;
         blackWins = state.blackWins; whiteWins = state.whiteWins; gameOver = state.gameOver; isDraw = false;
         // Cancel any pending second-stone selection
         awaitingSecondStone = false; firstStoneX = null; firstStoneY = null;
@@ -174,7 +177,7 @@
     function resetGame(newSize) {
         SIZE = newSize;
         board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
-        turn = 0; lastMoveX = null; lastMoveY = null;
+        turn = 0; lastMoveX = null; lastMoveY = null; lastMoveX2 = null; lastMoveY2 = null;
         gameOver = false; blackWins = false; whiteWins = false; isDraw = false;
         awaitingSecondStone = false; firstStoneX = null; firstStoneY = null;
         const init = saveGameState();
@@ -192,7 +195,10 @@
     function clearLastMoveMarker() {
         if (lastMoveX!==null && lastMoveY!==null)
             document.getElementsByClassName('point')[lastMoveX*SIZE+lastMoveY].classList.remove('last-move');
+        if (lastMoveX2!==null && lastMoveY2!==null)
+            document.getElementsByClassName('point')[lastMoveX2*SIZE+lastMoveY2].classList.remove('last-move');
         lastMoveX = null; lastMoveY = null;
+        lastMoveX2 = null; lastMoveY2 = null;
     }
 
     function setLastMoveMarker(x, y) {
@@ -234,7 +240,7 @@
             stone.className = 'stone';
             if (board[i][j]===0) stone.classList.add('black');
             else if (board[i][j]===1) stone.classList.add('white');
-            if (i===lastMoveX&&j===lastMoveY) point.classList.add('last-move');
+            if ((i===lastMoveX&&j===lastMoveY)||(i===lastMoveX2&&j===lastMoveY2)) point.classList.add('last-move');
             else point.classList.remove('last-move');
         }
     }
@@ -398,7 +404,12 @@
     function completeTurn(x1, y1, x2, y2) {
         if (x2 !== null) {
             board[x2][y2] = turn; // place second stone
-            setLastMoveMarker(x2, y2);
+            clearLastMoveMarker();
+            const pts = document.getElementsByClassName('point');
+            pts[x1*SIZE+y1].classList.add('last-move');
+            pts[x2*SIZE+y2].classList.add('last-move');
+            lastMoveX = x1; lastMoveY = y1;
+            lastMoveX2 = x2; lastMoveY2 = y2;
         } else {
             setLastMoveMarker(x1, y1);
         }
@@ -439,6 +450,7 @@
                 // Legal second stone(s) exist — must place one.
                 awaitingSecondStone = true;
                 firstStoneX = x; firstStoneY = y;
+                firstStonePlacedAt = Date.now();
                 setLastMoveMarker(x, y);
                 setMessage(`Place 2nd stone adjacent (${validSecs.length} valid option${validSecs.length!==1?'s':''}). Click here to cancel.`);
                 renderBoard();
@@ -446,8 +458,10 @@
         } else {
             // ── Phase 2: second stone ──
 
-            // Clicking the first stone cancels the whole move.
+            // Clicking the first stone cancels the whole move, but ignore
+            // clicks within 200 ms of placement (double-click protection).
             if (x === firstStoneX && y === firstStoneY) {
+                if (Date.now() - firstStonePlacedAt < 100) return;
                 cancelSecondStone();
                 return;
             }
@@ -569,8 +583,16 @@
             }
         }
 
-        if (x2 !== null) setLastMoveMarker(x2, y2);
-        else              setLastMoveMarker(fx, fy);
+        if (x2 !== null) {
+            clearLastMoveMarker();
+            const pts = document.getElementsByClassName('point');
+            pts[fx*SIZE+fy].classList.add('last-move');
+            pts[x2*SIZE+y2].classList.add('last-move');
+            lastMoveX = fx; lastMoveY = fy;
+            lastMoveX2 = x2; lastMoveY2 = y2;
+        } else {
+            setLastMoveMarker(fx, fy);
+        }
 
         turn = turn===0?1:0;
         const st = saveGameState();
@@ -738,7 +760,16 @@
                 setMessage("Error: Move creates a forbidden pattern: "+mv); renderBoard(); return false;
             }
 
-            setLastMoveMarker(x2!==null?x2:x, x2!==null?y2:y);
+            if (x2 !== null) {
+                clearLastMoveMarker();
+                const pts = document.getElementsByClassName('point');
+                pts[x*SIZE+y].classList.add('last-move');
+                pts[x2*SIZE+y2].classList.add('last-move');
+                lastMoveX = x; lastMoveY = y;
+                lastMoveX2 = x2; lastMoveY2 = y2;
+            } else {
+                setLastMoveMarker(x, y);
+            }
             tempTurn=tempTurn===0?1:0;
             const st=saveGameState();
             st.turn=tempTurn; st.initialX=x; st.initialY=y;
