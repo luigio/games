@@ -657,7 +657,7 @@
         for (let i=1;i<gameHistory.length;i++) {
             const st=gameHistory[i], prev=gameHistory[i-1];
             if (st.initialX!=null) {
-                const p=prev.turn===0?'B':'W';
+                const p = (1-st.turn)===0?'B':'W';
                 const col=String.fromCharCode(97+st.initialY), row=SIZE-st.initialX;
                 let moveStr = p+col+row;
                 if (st.removals && st.removals.length > 0) {
@@ -712,12 +712,12 @@
         for (let i=1;i<moves.length;i++) {
             const mv=moves[i]; if (!mv) continue;
 
-            if (/^[BW]-$/.test(mv)) continue;
+            if (/^[BW]-$/.test(mv)) { tempTurn=tempTurn===0?1:0; continue; }
 
             const mm=mv.match(/^([BW])([a-z])(\d+)([nsew]{1,2})?$/);
             if (!mm) { setMessage("Error: Invalid move: "+mv); renderBoard(); return false; }
             const [,pc,col,row,remSuffix]=mm, pl=pc==='B'?0:1;
-            if (pl!==tempTurn) { setMessage("Error: Move out of turn: "+mv); renderBoard(); return false; }
+            if (pl!==tempTurn) { tempTurn=tempTurn===0?1:0; } // implicit skip
             const x=ns-parseInt(row), y=col.charCodeAt(0)-97;
             if (x<0||x>=ns||y<0||y>=ns) { setMessage("Error: Move out of bounds: "+mv); renderBoard(); return false; }
             if (board[x][y]!==null) { setMessage("Error: Position occupied: "+mv); renderBoard(); return false; }
