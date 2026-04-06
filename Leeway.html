@@ -104,6 +104,32 @@
     let botReply = false;
     let gameOver = false, blackWins = false, whiteWins = false, isDraw = false;
     let repetitionWarning = false;
+    let repetitionMessageIndex = 0;
+    let repetitionMsgSeen = new Set();
+    const repetitionMessages = [
+        "Repetition noted… cute.",
+        "Oh, we're doing this again, are we?",
+        "Interesting strategy. Terrible, but interesting.",
+        "Yes, very clever. Do it again, I dare you.",
+        "I've seen this position before. So have you.",
+        "That's not a plan, that's a loop.",
+        "Repetition is the mother of… losing.",
+        "Are you okay? That was already played.",
+        "Come on. Really?",
+        "Error 404: New idea not found.",
+        "The board remembers. Do you?",
+        "I'd say 'nice try' but this isn't even that.",
+        "Ma'am, this is a Wendy's.",
+        "You're going in circles. Literally.",
+        "It's not a new move, it's a very old one resting.",
+        "This position filed a complaint.",
+        "Groundhog Day mode: unlocked. Happy now?",
+        "This is an ex-position. It has ceased to be.",
+        "Have you considered… forward?",
+        "I have aged visibly.",
+        "The stones are embarrassed for you.",
+        "This position has shuffled off its mortal coil."
+    ];
 
     // ── Leeway: two-phase turn state ──
     let awaitingSecondStone = false;
@@ -168,7 +194,8 @@
                  lastMoveRemovals: lastMoveRemovals.map(r=>[...r]),
                  cascadeRemovals: [],
                  gameOver: bWins||wWins, blackWins: bWins, whiteWins: wWins, lastWasPieSwap: false,
-                 initialX: null, initialY: null, secondX: null, secondY: null, isSkip: false };
+                 initialX: null, initialY: null, secondX: null, secondY: null, isSkip: false,
+                 repetitionMsgIdx: null };
     }
 
     function loadGameState(state) {
@@ -184,7 +211,11 @@
         awaitingCascadeRemoval = false; clearCascadeHighlights();
         turnUndoStack = [];
         repetitionWarning = false;
-        resolveSkips();
+        if (state.repetitionMsgIdx != null && !repetitionMsgSeen.has(currentMoveIndex)) {
+            repetitionWarning = true;
+            repetitionMessageIndex = state.repetitionMsgIdx;
+            repetitionMsgSeen.add(currentMoveIndex);
+        }
         renderBoard(); updateStatus(); updateLastMoveDisplay();
     }
 
@@ -196,7 +227,7 @@
         gameOver = false; blackWins = false; whiteWins = false; isDraw = false;
         awaitingSecondStone = false; firstStoneX = null; firstStoneY = null;
         awaitingCascadeRemoval = false; cascadeTurnX1=null; cascadeTurnY1=null; cascadeTurnX2=null; cascadeTurnY2=null;
-        repetitionWarning = false;
+        repetitionWarning = false; repetitionMessageIndex = 0; repetitionMsgSeen = new Set();
         const init = saveGameState();
         init.turn = 0; init.initialX = null; init.initialY = null;
         init.secondX = null; init.secondY = null; init.isSkip = false;
@@ -409,13 +440,29 @@
         state.isSkip = false; state.lastWasPieSwap = false;
         state.lastMoveRemovals = lastMoveRemovals.map(r=>[...r]);
         state.cascadeRemovals = currentTurnManualRemovals.map(r=>[...r]);
-        if (currentMoveIndex < gameHistory.length-1)
+        if (currentMoveIndex < gameHistory.length-1) {
             gameHistory = gameHistory.slice(0, currentMoveIndex+1);
+        }
         gameHistory.push(state); currentMoveIndex++;
+        repetitionMsgSeen.delete(currentMoveIndex);
         blackWins = state.blackWins; whiteWins = state.whiteWins; gameOver = state.gameOver;
         isDraw = false; resolveSkips();
-        if (repetitionWarning) repetitionWarning = false;
-        if (!gameOver && isRepetition(currentMoveIndex)) repetitionWarning = true;
+        repetitionWarning = false;
+        if (!gameOver && isRepetition(currentMoveIndex)) {
+            let lastMsgMoveIdx = -1, lastMsgIdx = -1;
+            for (let i = currentMoveIndex - 1; i >= 0; i--) {
+                if (gameHistory[i].repetitionMsgIdx != null) {
+                    lastMsgMoveIdx = i; lastMsgIdx = gameHistory[i].repetitionMsgIdx; break;
+                }
+            }
+            if (lastMsgMoveIdx === -1 || currentMoveIndex - lastMsgMoveIdx >= 5) {
+                const nextIdx = (lastMsgIdx + 1 + repetitionMessages.length) % repetitionMessages.length;
+                gameHistory[currentMoveIndex].repetitionMsgIdx = nextIdx;
+                repetitionMessageIndex = nextIdx;
+                repetitionWarning = true;
+                repetitionMsgSeen.add(currentMoveIndex);
+            }
+        }
         clearMessage();
         renderBoard(); updateStatus(); updateReplayButtons(); updateLastMoveDisplay();
         if (!gameOver) setTimeout(makeBotReply, 0);
@@ -755,8 +802,9 @@
             st.lastMoveRemovals = [];        // make sure saved state is clean
             st.cascadeRemovals = [];
             
-            if (currentMoveIndex < gameHistory.length - 1)
+            if (currentMoveIndex < gameHistory.length - 1) {
                 gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+            }
             
             gameHistory.push(st); 
             currentMoveIndex++;
@@ -804,7 +852,9 @@
         st.isSkip=false; st.lastWasPieSwap=false;
         st.lastMoveRemovals=lastMoveRemovals.map(r=>[...r]);
         st.cascadeRemovals=[];
-        if (currentMoveIndex<gameHistory.length-1) gameHistory=gameHistory.slice(0,currentMoveIndex+1);
+        if (currentMoveIndex<gameHistory.length-1) {
+            gameHistory=gameHistory.slice(0,currentMoveIndex+1);
+        }
         gameHistory.push(st); currentMoveIndex++;
         blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
         isDraw=false; resolveSkips();
@@ -1057,7 +1107,7 @@
     function updateRepetitionStatus() {
         const el = document.getElementById('repetition-status');
         if (repetitionWarning) {
-            el.textContent = "What do you think you're doing?";
+            el.textContent = repetitionMessages[repetitionMessageIndex];
             el.style.display = 'flex';
         } else {
             el.style.display = 'none';
