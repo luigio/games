@@ -767,9 +767,19 @@
 
     function adjustHeaderLayout() {
         const hdr=document.querySelector('.header'),sl=document.querySelector('.status-left'),cr=document.querySelector('.controls-right');
+        const nakedEl=document.getElementById('naked-status');
         sl.style.position=cr.style.position='absolute'; sl.style.left='0'; cr.style.right='0';
-        const ov=sl.offsetWidth+cr.offsetWidth-hdr.offsetWidth;
-        if (ov>0) { sl.style.left=`-${ov/2}px`; cr.style.right=`-${ov/2}px`; }
+        if (nakedEl && nakedEl.style.display!=='none') {
+            const hw=hdr.offsetWidth, lw=sl.offsetWidth, rw=cr.offsetWidth, cw=nakedEl.offsetWidth;
+            const centerLeft=(hw-cw)/2, centerRight=centerLeft+cw;
+            const leftPush=lw>centerLeft ? lw-centerLeft : 0;
+            const rightPush=rw>(hw-centerRight) ? rw-(hw-centerRight) : 0;
+            sl.style.left=leftPush>0?`-${leftPush}px`:'0';
+            cr.style.right=rightPush>0?`-${rightPush}px`:'0';
+        } else {
+            const ov=sl.offsetWidth+cr.offsetWidth-hdr.offsetWidth;
+            if (ov>0) { sl.style.left=`-${ov/2}px`; cr.style.right=`-${ov/2}px`; }
+        }
     }
 
     // ── Init ──
