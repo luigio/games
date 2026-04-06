@@ -43,6 +43,7 @@
 <div class="game-container">
     <div class="header">
         <div class="status-left" id="turn-status"></div>
+        <div id="repetition-status" style="font-family:Arial,sans-serif;font-size:1.2em;white-space:nowrap;position:absolute;left:50%;transform:translateX(-50%);z-index:1;display:none;align-items:center;"></div>
         <div class="controls-right">
             <div id="last-move-display" style="display:flex;align-items:center;gap:0.5em;">
                 <span id="last-move-text"></span>
@@ -102,6 +103,7 @@
     let isGenerating = false, generationInterval = null;
     let botReply = false;
     let gameOver = false, blackWins = false, whiteWins = false, isDraw = false;
+    let repetitionWarning = false;
 
     // ── Leeway: two-phase turn state ──
     let awaitingSecondStone = false;
@@ -181,6 +183,7 @@
         awaitingSecondStone = false; firstStoneX = null; firstStoneY = null;
         awaitingCascadeRemoval = false; clearCascadeHighlights();
         turnUndoStack = [];
+        repetitionWarning = false;
         resolveSkips();
         renderBoard(); updateStatus(); updateLastMoveDisplay();
     }
@@ -193,6 +196,7 @@
         gameOver = false; blackWins = false; whiteWins = false; isDraw = false;
         awaitingSecondStone = false; firstStoneX = null; firstStoneY = null;
         awaitingCascadeRemoval = false; cascadeTurnX1=null; cascadeTurnY1=null; cascadeTurnX2=null; cascadeTurnY2=null;
+        repetitionWarning = false;
         const init = saveGameState();
         init.turn = 0; init.initialX = null; init.initialY = null;
         init.secondX = null; init.secondY = null; init.isSkip = false;
@@ -411,6 +415,8 @@
         gameHistory.push(state); currentMoveIndex++;
         blackWins = state.blackWins; whiteWins = state.whiteWins; gameOver = state.gameOver;
         isDraw = false; resolveSkips();
+        if (repetitionWarning) repetitionWarning = false;
+        if (!gameOver && isRepetition(currentMoveIndex)) repetitionWarning = true;
         clearMessage();
         renderBoard(); updateStatus(); updateReplayButtons(); updateLastMoveDisplay();
         if (!gameOver) setTimeout(makeBotReply, 0);
@@ -703,6 +709,7 @@
         else {
             el.innerHTML=(turn===0?blackStoneSVG:whiteStoneSVG)+' to move';
         }
+        updateRepetitionStatus();
         adjustHeaderLayout();
     }
 
@@ -721,6 +728,7 @@
 
     // Pick and execute a random valid Leeway move for the current player.
     function playRandomMove() {
+        repetitionWarning = false;
         lastMoveRemovals = [];
         currentTurnManualRemovals = [];
         const singles=[], twoStoneFirsts=[];
@@ -1040,6 +1048,29 @@
             .catch(()=>{ setMessage('Failed to copy!'); setTimeout(()=>{ if (document.getElementById('message').textContent==='Failed to copy!') clearMessage(); },2000); });
     }
 
+    // ── Repetition detection ──
+
+    function isRepetition(idx) {
+        const st = gameHistory[idx];
+        const key = st.board.map(r => r.join(',')).join('|');
+        for (let i = 0; i < idx; i++) {
+            if (gameHistory[i].turn === st.turn)
+                if (gameHistory[i].board.map(r => r.join(',')).join('|') === key) return true;
+        }
+        return false;
+    }
+
+    function updateRepetitionStatus() {
+        const el = document.getElementById('repetition-status');
+        if (repetitionWarning) {
+            el.textContent = "What do you think you're doing?";
+            el.style.display = 'flex';
+        } else {
+            el.style.display = 'none';
+            el.textContent = '';
+        }
+    }
+
     // ── Layout helpers ──
 
     function getTotalMaxWidth() {
@@ -1063,9 +1094,19 @@
 
     function adjustHeaderLayout() {
         const hdr=document.querySelector('.header'),sl=document.querySelector('.status-left'),cr=document.querySelector('.controls-right');
+        const repEl=document.getElementById('repetition-status');
         sl.style.position=cr.style.position='absolute'; sl.style.left='0'; cr.style.right='0';
-        const ov=sl.offsetWidth+cr.offsetWidth-hdr.offsetWidth;
-        if (ov>0) { sl.style.left=`-${ov/2}px`; cr.style.right=`-${ov/2}px`; }
+        if (repEl && repEl.style.display!=='none') {
+            const hw=hdr.offsetWidth, lw=sl.offsetWidth, rw=cr.offsetWidth, cw=repEl.offsetWidth;
+            const centerLeft=(hw-cw)/2, centerRight=centerLeft+cw;
+            const leftPush=lw>centerLeft ? lw-centerLeft : 0;
+            const rightPush=rw>(hw-centerRight) ? rw-(hw-centerRight) : 0;
+            sl.style.left=leftPush>0?`-${leftPush}px`:'0';
+            cr.style.right=rightPush>0?`-${rightPush}px`:'0';
+        } else {
+            const ov=sl.offsetWidth+cr.offsetWidth-hdr.offsetWidth;
+            if (ov>0) { sl.style.left=`-${ov/2}px`; cr.style.right=`-${ov/2}px`; }
+        }
     }
 
     // ── Init ──
