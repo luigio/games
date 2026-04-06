@@ -395,7 +395,6 @@
             awaitingCascadeRemoval = true;
             renderBoard();
             setCascadeHighlights(diagonals);
-            setMessage(`Remove one stone from a naked diagonal (${diagonals.length} remaining).`);
         }
     }
 
@@ -460,7 +459,6 @@
             awaitingCascadeRemoval = true;
             const diagonals = getNakedDiagonals();
             setCascadeHighlights(diagonals);
-            setMessage(`Remove one stone from a naked diagonal (${diagonals.length} remaining).`);
         }
         renderBoard();
         if (awaitingSecondStone) highlightSecondStoneOptions();
@@ -546,7 +544,6 @@
             const diagonals = getNakedDiagonals();
             const inDiag = diagonals.some(([[ax,ay],[bx,by]])=>(ax===x&&ay===y)||(bx===x&&by===y));
             if (!inDiag) {
-                setMessage(`Remove one stone from a naked diagonal (${diagonals.length} remaining).`);
                 return;
             }
             // Save undo snapshot before this removal
