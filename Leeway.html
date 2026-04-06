@@ -340,6 +340,16 @@
         return anyRemoved;
     }
 
+    function highlightSecondStoneOptions() {
+        if (!awaitingSecondStone || firstStoneX === null || firstStoneY === null) return;
+        const adjEmpty = getAdjacentEmpty(firstStoneX, firstStoneY);
+        clearCascadeHighlights();               // reuse the exact same gray marker
+        const pts = document.getElementsByClassName('point');
+        for (const [x, y] of adjEmpty) {
+            pts[x * SIZE + y].classList.add('cascade-choice');
+        }
+    }
+
     function setCascadeHighlights(diagonals) {
         clearCascadeHighlights();
         const pts = document.getElementsByClassName('point');
@@ -351,6 +361,21 @@
 
     function clearCascadeHighlights() {
         document.querySelectorAll('.cascade-choice').forEach(el=>el.classList.remove('cascade-choice'));
+    }
+
+    function restorePreviousLastMove() {
+        clearLastMoveMarker();
+        if (currentMoveIndex > 0) {
+            const prevState = gameHistory[currentMoveIndex];
+            if (prevState && prevState.lastMoveX !== undefined) {
+                lastMoveX = prevState.lastMoveX;
+                lastMoveY = prevState.lastMoveY;
+                lastMoveX2 = prevState.lastMoveX2;
+                lastMoveY2 = prevState.lastMoveY2;
+                lastMoveRemovals = (prevState.lastMoveRemovals || []).map(r => [...r]);
+            }
+        }
+        renderBoard();
     }
 
     // After each removal (phase 1 or player cascade click), auto-step then check
@@ -433,6 +458,7 @@
             setMessage(`Remove one stone from a naked diagonal (${diagonals.length} remaining).`);
         }
         renderBoard();
+        if (awaitingSecondStone) highlightSecondStoneOptions();
     }
 
     // ── Leeway: play ──
@@ -448,6 +474,8 @@
             clearLastMoveMarker();
             clearMessage();
             renderBoard();
+            clearCascadeHighlights();
+            restorePreviousLastMove();
         }
     }
 
@@ -500,6 +528,7 @@
                     setMessage(`Place 2nd stone adjacent (${adjEmpty.length} option${adjEmpty.length!==1?'s':''}). Click here to cancel.`);
 
                     turnUndoStack = []; // fresh start for the new two-stone attempt
+                    highlightSecondStoneOptions();
                     renderBoard();
                     return;
                 }
@@ -557,6 +586,7 @@
             lastMoveRemovals = []; turnUndoStack = [];
             setLastMoveMarker(x, y);
             setMessage(`Place 2nd stone adjacent (${adjEmpty.length} option${adjEmpty.length!==1?'s':''}). Click here to cancel.`);
+            highlightSecondStoneOptions();
             renderBoard();
 
         // ── Second stone ──
@@ -585,6 +615,7 @@
             });
 
             board[x][y] = turn;
+            clearCascadeHighlights();
             awaitingSecondStone = false;
             firstStoneX = null; firstStoneY = null;
 
@@ -690,6 +721,8 @@
 
     // Pick and execute a random valid Leeway move for the current player.
     function playRandomMove() {
+        lastMoveRemovals = [];
+        currentTurnManualRemovals = [];
         const singles=[], twoStoneFirsts=[];
         for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++) {
             if (board[x][y]!==null) continue;
@@ -701,19 +734,36 @@
         const allMoves=[...twoStoneFirsts.map(p=>({type:'two',p})),...singles.map(p=>({type:'single',p}))];
         const choice=allMoves[Math.floor(Math.random()*allMoves.length)];
 
-        if (choice.type==='single') {
-            const [fx,fy]=choice.p;
-            board[fx][fy]=turn;
-            setLastMoveMarker(fx,fy);
-            turn=turn===0?1:0;
-            const st=saveGameState();
-            st.initialX=fx; st.initialY=fy; st.secondX=null; st.secondY=null;
-            st.isSkip=false; st.lastWasPieSwap=false;
-            st.lastMoveRemovals=[]; st.cascadeRemovals=[];
-            if (currentMoveIndex<gameHistory.length-1) gameHistory=gameHistory.slice(0,currentMoveIndex+1);
-            gameHistory.push(st); currentMoveIndex++;
-            blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
-            isDraw=false; resolveSkips();
+        if (choice.type === 'single') {
+            const [fx, fy] = choice.p;
+            
+            lastMoveRemovals = [];
+            currentTurnManualRemovals = [];
+            
+            board[fx][fy] = turn;
+            clearLastMoveMarker();
+            setLastMoveMarker(fx, fy);
+            
+            turn = turn === 0 ? 1 : 0;
+            
+            const st = saveGameState();
+            st.initialX = fx; st.initialY = fy; 
+            st.secondX = null; st.secondY = null;
+            st.isSkip = false; st.lastWasPieSwap = false;
+            st.lastMoveRemovals = [];        // make sure saved state is clean
+            st.cascadeRemovals = [];
+            
+            if (currentMoveIndex < gameHistory.length - 1)
+                gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+            
+            gameHistory.push(st); 
+            currentMoveIndex++;
+            
+            blackWins = st.blackWins; 
+            whiteWins = st.whiteWins; 
+            gameOver = st.gameOver;
+            isDraw = false; 
+            resolveSkips();
             return true;
         }
 
