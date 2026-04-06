@@ -455,7 +455,6 @@
             firstStoneX = snap.firstStoneX; firstStoneY = snap.firstStoneY;
             awaitingCascadeRemoval = false; clearCascadeHighlights();
             const adjEmpty = getAdjacentEmpty(firstStoneX, firstStoneY);
-            setMessage(`Place 2nd stone adjacent (${adjEmpty.length} option${adjEmpty.length!==1?'s':''}). Click here to cancel.`);
         } else {
             awaitingSecondStone = false;
             awaitingCascadeRemoval = true;
@@ -531,7 +530,6 @@
                     setLastMoveMarker(keptX, keptY);
 
                     const adjEmpty = getAdjacentEmpty(keptX, keptY);
-                    setMessage(`Place 2nd stone adjacent (${adjEmpty.length} option${adjEmpty.length!==1?'s':''}). Click here to cancel.`);
 
                     turnUndoStack = []; // fresh start for the new two-stone attempt
                     highlightSecondStoneOptions();
@@ -591,7 +589,6 @@
             firstStonePlacedAt = Date.now();
             lastMoveRemovals = []; turnUndoStack = [];
             setLastMoveMarker(x, y);
-            setMessage(`Place 2nd stone adjacent (${adjEmpty.length} option${adjEmpty.length!==1?'s':''}). Click here to cancel.`);
             highlightSecondStoneOptions();
             renderBoard();
 
