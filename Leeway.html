@@ -24,6 +24,7 @@
         .black { background:black; }
         .white { background:white;border:2px solid black; }
         .point.last-move::after { content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:22%;height:22%;border-radius:50%;background:red;z-index:3; }
+        .point.cascade-choice::after { content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:22%;height:22%;border-radius:50%;background:rgb(128,128,128);z-index:3; }
         .replay-controls { display:flex;flex-wrap:nowrap;width:100%;gap:0.5em;overflow:hidden;justify-content:center; }
         .replay-controls button,.replay-controls select { flex:0 1 auto;padding:0.3em 0.5em;font-size:1em;border:2px solid black;background:white;cursor:pointer;transition:background 0.3s ease;min-width:0;text-overflow:clip;overflow:hidden;white-space:nowrap;max-width:100px; }
         button,select { font-size:1em;padding:0.3em 0.5em;border:2px solid black;background:white;cursor:pointer;transition:background 0.3s ease; }
@@ -94,6 +95,8 @@
     let board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
     let turn = 0; // 0=Black, 1=White
     let lastMoveX = null, lastMoveY = null, lastMoveX2 = null, lastMoveY2 = null;
+    let lastMoveRemovals = []; // [x,y] pairs of stones removed by last move
+    let currentTurnManualRemovals = []; // player-chosen cascade removals this turn (for notation)
     let gameHistory = [];
     let currentMoveIndex = -1;
     let isGenerating = false, generationInterval = null;
@@ -104,6 +107,9 @@
     let awaitingSecondStone = false;
     let firstStoneX = null, firstStoneY = null;
     let firstStonePlacedAt = 0;
+    let awaitingCascadeRemoval = false;
+    let cascadeTurnX1 = null, cascadeTurnY1 = null, cascadeTurnX2 = null, cascadeTurnY2 = null;
+    let turnUndoStack = []; // within-turn undo snapshots
 
     const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
     const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
@@ -157,6 +163,8 @@
     function saveGameState() {
         const bWins = checkWin(0), wWins = checkWin(1);
         return { board: board.map(r=>[...r]), turn, lastMoveX, lastMoveY, lastMoveX2, lastMoveY2,
+                 lastMoveRemovals: lastMoveRemovals.map(r=>[...r]),
+                 cascadeRemovals: [],
                  gameOver: bWins||wWins, blackWins: bWins, whiteWins: wWins, lastWasPieSwap: false,
                  initialX: null, initialY: null, secondX: null, secondY: null, isSkip: false };
     }
@@ -167,9 +175,12 @@
         lastMoveX = state.lastMoveX; lastMoveY = state.lastMoveY;
         lastMoveX2 = state.lastMoveX2 !== undefined ? state.lastMoveX2 : null;
         lastMoveY2 = state.lastMoveY2 !== undefined ? state.lastMoveY2 : null;
+        lastMoveRemovals = (state.lastMoveRemovals || []).map(r=>[...r]);
         blackWins = state.blackWins; whiteWins = state.whiteWins; gameOver = state.gameOver; isDraw = false;
-        // Cancel any pending second-stone selection
+        // Cancel any pending second-stone selection or cascade
         awaitingSecondStone = false; firstStoneX = null; firstStoneY = null;
+        awaitingCascadeRemoval = false; clearCascadeHighlights();
+        turnUndoStack = [];
         resolveSkips();
         renderBoard(); updateStatus(); updateLastMoveDisplay();
     }
@@ -178,8 +189,10 @@
         SIZE = newSize;
         board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
         turn = 0; lastMoveX = null; lastMoveY = null; lastMoveX2 = null; lastMoveY2 = null;
+        lastMoveRemovals = []; currentTurnManualRemovals = []; turnUndoStack = [];
         gameOver = false; blackWins = false; whiteWins = false; isDraw = false;
         awaitingSecondStone = false; firstStoneX = null; firstStoneY = null;
+        awaitingCascadeRemoval = false; cascadeTurnX1=null; cascadeTurnY1=null; cascadeTurnX2=null; cascadeTurnY2=null;
         const init = saveGameState();
         init.turn = 0; init.initialX = null; init.initialY = null;
         init.secondX = null; init.secondY = null; init.isSkip = false;
@@ -240,12 +253,12 @@
             stone.className = 'stone';
             if (board[i][j]===0) stone.classList.add('black');
             else if (board[i][j]===1) stone.classList.add('white');
-            if ((i===lastMoveX&&j===lastMoveY)||(i===lastMoveX2&&j===lastMoveY2)) point.classList.add('last-move');
+            if ((i===lastMoveX&&j===lastMoveY)||(i===lastMoveX2&&j===lastMoveY2)||lastMoveRemovals.some(([rx,ry])=>rx===i&&ry===j)) point.classList.add('last-move');
             else point.classList.remove('last-move');
         }
     }
 
-    // ── Leeway: forbidden pattern detection ──
+    // ── Leeway: cascade logic ──
 
     // Returns orthogonally adjacent empty points of (x, y).
     function getAdjacentEmpty(x, y) {
@@ -258,11 +271,20 @@
         return result;
     }
 
-    // Naked diagonal: two diagonally adjacent like-colored stones with no
-    // same-colored stone orthogonally adjacent to BOTH of them.
-    // The two common orthogonal neighbors of (x,y) and (x+dx, y+dy) are
-    // (x+dx, y) and (x, y+dy).
-    function hasNakedDiagonal() {
+    // Returns true if (x,y) has no orthogonally adjacent empty point.
+    function hasNoAdjacentEmpties(x, y) {
+        for (const [dx, dy] of [[0,1],[1,0],[0,-1],[-1,0]]) {
+            const nx = x+dx, ny = y+dy;
+            if (nx>=0 && nx<SIZE && ny>=0 && ny<SIZE && board[nx][ny]===null) return false;
+        }
+        return true;
+    }
+
+    // Find all naked diagonal pairs on the board: [[x1,y1],[x2,y2]].
+    // Naked diagonal: two diagonally adjacent same-color stones whose two common
+    // orthogonal neighbors (nx,y) and (x,ny) are BOTH not that color.
+    function getNakedDiagonals() {
+        const pairs = [], seen = new Set();
         for (let x = 0; x < SIZE; x++) {
             for (let y = 0; y < SIZE; y++) {
                 if (board[x][y] === null) continue;
@@ -271,155 +293,94 @@
                     const nx = x+dx, ny = y+dy;
                     if (nx<0||nx>=SIZE||ny<0||ny>=SIZE) continue;
                     if (board[nx][ny] !== color) continue;
-                    // Common orthogonal neighbors are (nx, y) and (x, ny).
-                    // Both are in-bounds when (x,y) and (nx,ny) are in-bounds.
-                    if (board[nx][y] !== color && board[x][ny] !== color) return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    // Zipper: 3×3 block where one row (or column) is all empty, one is BWB,
-    // and the other is WBW (or vice versa).
-    function hasZipper() {
-        for (let r = 0; r+2 < SIZE; r++) {
-            for (let c = 0; c+2 < SIZE; c++) {
-                // Row-zipper: middle row (r+1) all empty
-                if (board[r+1][c]===null && board[r+1][c+1]===null && board[r+1][c+2]===null) {
-                    const t0=board[r][c], t1=board[r][c+1], t2=board[r][c+2];
-                    const b0=board[r+2][c], b1=board[r+2][c+1], b2=board[r+2][c+2];
-                    if (t0!==null && t1!==null && t2!==null && b0!==null && b1!==null && b2!==null) {
-                        if ((t0===0&&t1===1&&t2===0&&b0===1&&b1===0&&b2===1) ||
-                            (t0===1&&t1===0&&t2===1&&b0===0&&b1===1&&b2===0)) return true;
-                    }
-                }
-                // Col-zipper: middle column (c+1) all empty
-                if (board[r][c+1]===null && board[r+1][c+1]===null && board[r+2][c+1]===null) {
-                    const l0=board[r][c], l1=board[r+1][c], l2=board[r+2][c];
-                    const rr0=board[r][c+2], rr1=board[r+1][c+2], rr2=board[r+2][c+2];
-                    if (l0!==null && l1!==null && l2!==null && rr0!==null && rr1!==null && rr2!==null) {
-                        if ((l0===0&&l1===1&&l2===0&&rr0===1&&rr1===0&&rr2===1) ||
-                            (l0===1&&l1===0&&l2===1&&rr0===0&&rr1===1&&rr2===0)) return true;
+                    if (board[nx][y] !== color && board[x][ny] !== color) {
+                        const a = x*SIZE+y, b = nx*SIZE+ny;
+                        const key = Math.min(a,b)+','+Math.max(a,b);
+                        if (!seen.has(key)) { seen.add(key); pairs.push([[x,y],[nx,ny]]); }
                     }
                 }
             }
         }
-        return false;
+        return pairs;
     }
 
-    // Pinwheel: 2×2 empty area whose 8 orthogonal border cells are all stones
-    // that alternate in color around the perimeter.
-    function hasPinwheel() {
-        for (let r = 0; r+1 < SIZE; r++) {
-            for (let c = 0; c+1 < SIZE; c++) {
-                // All four cells of the 2×2 must be empty
-                if (board[r][c]!==null || board[r][c+1]!==null ||
-                    board[r+1][c]!==null || board[r+1][c+1]!==null) continue;
-                // The 8 orthogonal border cells must be on the board
-                if (r===0 || r+2>=SIZE || c===0 || c+2>=SIZE) continue;
-                // Clockwise from top-left
-                const nbrs = [
-                    board[r-1][c],   board[r-1][c+1],
-                    board[r][c+2],   board[r+1][c+2],
-                    board[r+2][c+1], board[r+2][c],
-                    board[r+1][c-1], board[r][c-1]
-                ];
-                if (nbrs.some(v=>v===null)) continue;
-                const f = nbrs[0];
-                if (nbrs.every((v,i) => v === (i%2===0 ? f : 1-f))) return true;
+    // Phase 1 (immediate after placing two stones): remove all OTHER stones
+    // currently in naked diagonals in a single simultaneous pass.
+    function phase1Removals(px1, py1, px2, py2) {
+        const toRemove = new Set();
+        for (const [[ax,ay],[bx,by]] of getNakedDiagonals()) {
+            if (!(ax===px1&&ay===py1) && !(ax===px2&&ay===py2)) toRemove.add(ax+','+ay);
+            if (!(bx===px1&&by===py1) && !(bx===px2&&by===py2)) toRemove.add(bx+','+by);
+        }
+        toRemove.forEach(k => { const [x,y]=k.split(',').map(Number); board[x][y]=null; lastMoveRemovals.push([x,y]); });
+        return toRemove.size > 0;
+    }
+
+    // Cascade auto-step: repeatedly remove stones that appear in 2+ naked diagonals
+    // (no player choice possible — forced). Returns true if anything was removed.
+    function cascadeAutoStep() {
+        let anyRemoved = false, found = true;
+        while (found) {
+            found = false;
+            const diagonals = getNakedDiagonals();
+            if (!diagonals.length) break;
+            const counts = new Map();
+            for (const [[ax,ay],[bx,by]] of diagonals) {
+                const ka=ax+','+ay, kb=bx+','+by;
+                counts.set(ka, (counts.get(ka)||0)+1);
+                counts.set(kb, (counts.get(kb)||0)+1);
+            }
+            for (const [k,c] of counts) {
+                if (c >= 2) {
+                    const [x,y]=k.split(',').map(Number);
+                    if (board[x][y]!==null) { board[x][y]=null; lastMoveRemovals.push([x,y]); found=true; anyRemoved=true; }
+                }
             }
         }
-        return false;
+        return anyRemoved;
     }
 
-    function hasIllegalPattern() {
-        return hasNakedDiagonal() || hasZipper() || hasPinwheel();
-    }
-
-    // ── Leeway: move validation helpers ──
-
-    // Given that the first stone at (fx, fy) is already on the board,
-    // return all adjacent empty points that yield a legal board state.
-    function getValidSecondStones(fx, fy) {
-        return getAdjacentEmpty(fx, fy).filter(([nx, ny]) => {
-            board[nx][ny] = turn;
-            const ok = !hasIllegalPattern();
-            board[nx][ny] = null;
-            return ok;
-        });
-    }
-
-    // Check whether placing a first stone of `color` at (x, y) is legal,
-    // i.e. there exists at least one way to complete the turn without
-    // leaving a forbidden pattern on the board.
-    function isValidFirstStone(x, y, color) {
-        if (board[x][y] !== null) return false;
-        board[x][y] = color;
-        // A legal second stone exists → turn can be completed via second stone
-        const hasLegalSecond = getAdjacentEmpty(x, y).some(([nx, ny]) => {
-            board[nx][ny] = color;
-            const ok = !hasIllegalPattern();
-            board[nx][ny] = null;
-            return ok;
-        });
-        // No legal second → first stone alone is the final position, must be legal
-        const valid = hasLegalSecond || !hasIllegalPattern();
-        board[x][y] = null;
-        return valid;
-    }
-
-    // A player has a valid move if any empty point accepts a legal first stone.
-    function hasValidMove() {
-        for (let x=0; x<SIZE; x++)
-            for (let y=0; y<SIZE; y++)
-                if (board[x][y]===null && isValidFirstStone(x, y, turn)) return true;
-        return false;
-    }
-
-    // Resolve skips/draw — unchanged logic, uses the updated hasValidMove().
-    function resolveSkips() {
-        if (gameOver) return;
-        if (hasValidMove()) return;
-        turn = turn===0?1:0;
-        if (!hasValidMove()) { isDraw = true; gameOver = true; }
-    }
-
-    // ── Leeway: play ──
-
-    // Cancel an in-progress first-stone placement (removes it from the board).
-    function cancelSecondStone() {
-        if (awaitingSecondStone) {
-            board[firstStoneX][firstStoneY] = null;
-            awaitingSecondStone = false;
-            firstStoneX = null; firstStoneY = null;
-            clearLastMoveMarker();
-            clearMessage();
-            renderBoard();
+    function setCascadeHighlights(diagonals) {
+        clearCascadeHighlights();
+        const pts = document.getElementsByClassName('point');
+        for (const [[ax,ay],[bx,by]] of diagonals) {
+            pts[ax*SIZE+ay].classList.add('cascade-choice');
+            pts[bx*SIZE+by].classList.add('cascade-choice');
         }
     }
 
-    // Finalise a turn after both stones are on the board.
-    // x1/y1 = first stone (already placed); x2/y2 = second stone (null if none).
-    function completeTurn(x1, y1, x2, y2) {
-        if (x2 !== null) {
-            board[x2][y2] = turn; // place second stone
-            clearLastMoveMarker();
-            const pts = document.getElementsByClassName('point');
-            pts[x1*SIZE+y1].classList.add('last-move');
-            pts[x2*SIZE+y2].classList.add('last-move');
-            lastMoveX = x1; lastMoveY = y1;
-            lastMoveX2 = x2; lastMoveY2 = y2;
+    function clearCascadeHighlights() {
+        document.querySelectorAll('.cascade-choice').forEach(el=>el.classList.remove('cascade-choice'));
+    }
+
+    // After each removal (phase 1 or player cascade click), auto-step then check
+    // whether player choice is still needed or turn can be finalized.
+    function continueCascade() {
+        cascadeAutoStep();
+        const diagonals = getNakedDiagonals();
+        if (diagonals.length === 0) {
+            awaitingCascadeRemoval = false;
+            clearCascadeHighlights();
+            finalizeTurn(cascadeTurnX1, cascadeTurnY1, cascadeTurnX2, cascadeTurnY2);
         } else {
-            setLastMoveMarker(x1, y1);
+            awaitingCascadeRemoval = true;
+            renderBoard();
+            setCascadeHighlights(diagonals);
+            setMessage(`Remove one stone from a naked diagonal (${diagonals.length} remaining).`);
         }
-        awaitingSecondStone = false; firstStoneX = null; firstStoneY = null;
+    }
 
+    // Commit the completed turn to history and hand off to next player.
+    function finalizeTurn(x1, y1, x2, y2) {
+        awaitingCascadeRemoval = false; clearCascadeHighlights();
+        turnUndoStack = [];
         turn = turn===0?1:0;
         const state = saveGameState();
         state.initialX = x1; state.initialY = y1;
         state.secondX  = x2; state.secondY  = y2;
         state.isSkip = false; state.lastWasPieSwap = false;
+        state.lastMoveRemovals = lastMoveRemovals.map(r=>[...r]);
+        state.cascadeRemovals = currentTurnManualRemovals.map(r=>[...r]);
         if (currentMoveIndex < gameHistory.length-1)
             gameHistory = gameHistory.slice(0, currentMoveIndex+1);
         gameHistory.push(state); currentMoveIndex++;
@@ -430,70 +391,235 @@
         if (!gameOver) setTimeout(makeBotReply, 0);
     }
 
+    // A player always has a valid move as long as any empty point exists:
+    //   • empty points with no empty orthogonal neighbor → single-stone move
+    //   • empty points with ≥1 empty orthogonal neighbor → two-stone first stone
+    function hasValidMove() {
+        for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++) if (board[x][y]===null) return true;
+        return false;
+    }
+
+    // Resolve skips/draw.
+    function resolveSkips() {
+        if (gameOver) return;
+        if (hasValidMove()) return;
+        turn = turn===0?1:0;
+        if (!hasValidMove()) { isDraw = true; gameOver = true; }
+    }
+
+    // ── Within-turn undo ──
+
+    function popTurnUndo() {
+        if (!turnUndoStack.length) return;
+        const snap = turnUndoStack.pop();
+        board = snap.board.map(r=>[...r]);
+        lastMoveX = snap.lastMoveX; lastMoveY = snap.lastMoveY;
+        lastMoveX2 = snap.lastMoveX2; lastMoveY2 = snap.lastMoveY2;
+        lastMoveRemovals = snap.lastMoveRemovals.map(r=>[...r]);
+        currentTurnManualRemovals = snap.currentTurnManualRemovals.map(r=>[...r]);
+        cascadeTurnX1 = snap.cascadeTurnX1; cascadeTurnY1 = snap.cascadeTurnY1;
+        cascadeTurnX2 = snap.cascadeTurnX2; cascadeTurnY2 = snap.cascadeTurnY2;
+        if (snap.awaitingSecondStone) {
+            awaitingSecondStone = true;
+            firstStoneX = snap.firstStoneX; firstStoneY = snap.firstStoneY;
+            awaitingCascadeRemoval = false; clearCascadeHighlights();
+            const adjEmpty = getAdjacentEmpty(firstStoneX, firstStoneY);
+            setMessage(`Place 2nd stone adjacent (${adjEmpty.length} option${adjEmpty.length!==1?'s':''}). Click here to cancel.`);
+        } else {
+            awaitingSecondStone = false;
+            awaitingCascadeRemoval = true;
+            const diagonals = getNakedDiagonals();
+            setCascadeHighlights(diagonals);
+            setMessage(`Remove one stone from a naked diagonal (${diagonals.length} remaining).`);
+        }
+        renderBoard();
+    }
+
+    // ── Leeway: play ──
+
+    // Cancel a first-stone-in-progress. Cascade turns cannot be cancelled.
+    function cancelSecondStone() {
+        if (awaitingCascadeRemoval) return; // turn committed, must complete cascade
+        if (awaitingSecondStone) {
+            board[firstStoneX][firstStoneY] = null;
+            awaitingSecondStone = false;
+            firstStoneX = null; firstStoneY = null;
+            turnUndoStack = [];
+            clearLastMoveMarker();
+            clearMessage();
+            renderBoard();
+        }
+    }
+
     function play(x, y) {
         if (gameOver) { setMessage("Game is over!"); return; }
 
-        if (!awaitingSecondStone) {
-            // ── Phase 1: first stone ──
-            if (board[x][y] !== null) return;
-            if (!isValidFirstStone(x, y, turn)) {
-                setMessage("Illegal: no valid move here!");
-                return;
+        // ── Cascade removal: player picks which stone to remove ──
+        if (awaitingCascadeRemoval) {
+            // Undo: clicking the point of the last action reverts it
+            if (turnUndoStack.length > 0) {
+                const top = turnUndoStack[turnUndoStack.length-1];
+                if (x === top.lastActionX && y === top.lastActionY) { popTurnUndo(); return; }
             }
-            clearMessage();
-            board[x][y] = turn;
-            const validSecs = getValidSecondStones(x, y);
-            if (validSecs.length === 0) {
-                // No legal second stone — turn ends with first stone only.
-                completeTurn(x, y, null, null);
-            } else {
-                // Legal second stone(s) exist — must place one.
-                awaitingSecondStone = true;
-                firstStoneX = x; firstStoneY = y;
-                firstStonePlacedAt = Date.now();
-                setLastMoveMarker(x, y);
-                setMessage(`Place 2nd stone adjacent (${validSecs.length} valid option${validSecs.length!==1?'s':''}). Click here to cancel.`);
-                renderBoard();
-            }
-        } else {
-            // ── Phase 2: second stone ──
 
-            // Clicking the first stone cancels the whole move, but ignore
-            // clicks within 200 ms of placement (double-click protection).
-            if (x === firstStoneX && y === firstStoneY) {
-                if (Date.now() - firstStonePlacedAt < 100) return;
+            // ── NEW QoL: clicking the FIRST placed stone now treats the SECOND stone as the new FIRST stone
+            //     (exactly symmetric to how clicking the second stone returns you to "awaiting second stone")
+            if (cascadeTurnX1 !== null && cascadeTurnX2 !== null &&
+                x === cascadeTurnX1 && y === cascadeTurnY1) {
+
+                const keptX = cascadeTurnX2;
+                const keptY = cascadeTurnY2;
+
+                // 1. Undo every cascade removal (if any) until we reach the snapshot that was taken
+                //    right after the second stone was placed (board now has only the original first stone)
+                while (turnUndoStack.length > 0) {
+                    const top = turnUndoStack[turnUndoStack.length-1];
+                    if (top.awaitingSecondStone) break;
+                    popTurnUndo();
+                }
+
+                // 2. Pop the second-stone-placement snapshot itself.
+                //    This restores the classic "awaitingSecondStone = true" state with only the original first stone.
+                if (turnUndoStack.length > 0) {
+                    popTurnUndo();
+                }
+
+                // 3. Remove the original first stone and turn the kept stone into the new first stone
+                if (firstStoneX !== null && firstStoneY !== null) {
+                    board[firstStoneX][firstStoneY] = null;
+                }
+                if (keptX !== null && keptY !== null && board[keptX][keptY] === null) {
+                    board[keptX][keptY] = turn;
+                    firstStoneX = keptX;
+                    firstStoneY = keptY;
+                    firstStonePlacedAt = Date.now();
+
+                    setLastMoveMarker(keptX, keptY);
+
+                    const adjEmpty = getAdjacentEmpty(keptX, keptY);
+                    setMessage(`Place 2nd stone adjacent (${adjEmpty.length} option${adjEmpty.length!==1?'s':''}). Click here to cancel.`);
+
+                    turnUndoStack = []; // fresh start for the new two-stone attempt
+                    renderBoard();
+                    return;
+                }
+
+                // fallback (should never happen in normal play)
                 cancelSecondStone();
                 return;
             }
-            if (board[x][y] !== null) {
-                setMessage("Occupied! Click first stone to cancel.");
+
+            if (board[x][y] === null) return;
+            const diagonals = getNakedDiagonals();
+            const inDiag = diagonals.some(([[ax,ay],[bx,by]])=>(ax===x&&ay===y)||(bx===x&&by===y));
+            if (!inDiag) {
+                setMessage(`Remove one stone from a naked diagonal (${diagonals.length} remaining).`);
                 return;
             }
-            if (Math.abs(x-firstStoneX) + Math.abs(y-firstStoneY) !== 1) {
+            // Save undo snapshot before this removal
+            turnUndoStack.push({
+                board: board.map(r=>[...r]),
+                lastMoveX, lastMoveY, lastMoveX2, lastMoveY2,
+                lastMoveRemovals: lastMoveRemovals.map(r=>[...r]),
+                currentTurnManualRemovals: currentTurnManualRemovals.map(r=>[...r]),
+                awaitingSecondStone: false, firstStoneX: null, firstStoneY: null,
+                cascadeTurnX1, cascadeTurnY1, cascadeTurnX2, cascadeTurnY2,
+                lastActionX: x, lastActionY: y
+            });
+            board[x][y] = null;
+            lastMoveRemovals.push([x,y]);
+            currentTurnManualRemovals.push([x,y]);
+            renderBoard();
+            continueCascade();
+            return;
+        }
+
+        // ── First stone ──
+        if (!awaitingSecondStone) {
+            if (board[x][y] !== null) return;
+
+            // Single-stone move: all orthogonal neighbors are occupied or off-board
+            if (hasNoAdjacentEmpties(x, y)) {
+                lastMoveRemovals = []; currentTurnManualRemovals = [];
+                board[x][y] = turn;
+                setLastMoveMarker(x, y);
+                cascadeTurnX1=x; cascadeTurnY1=y; cascadeTurnX2=null; cascadeTurnY2=null;
+                finalizeTurn(x, y, null, null);
+                return;
+            }
+
+            // Two-stone move: place first stone and await second
+            const adjEmpty = getAdjacentEmpty(x, y);
+            board[x][y] = turn;
+            awaitingSecondStone = true;
+            firstStoneX = x; firstStoneY = y;
+            firstStonePlacedAt = Date.now();
+            lastMoveRemovals = []; turnUndoStack = [];
+            setLastMoveMarker(x, y);
+            setMessage(`Place 2nd stone adjacent (${adjEmpty.length} option${adjEmpty.length!==1?'s':''}). Click here to cancel.`);
+            renderBoard();
+
+        // ── Second stone ──
+        } else {
+            if (x===firstStoneX && y===firstStoneY) {
+                if (Date.now()-firstStonePlacedAt < 100) return;
+                cancelSecondStone();
+                return;
+            }
+            if (board[x][y] !== null) { setMessage("Occupied! Click first stone to cancel."); return; }
+            if (Math.abs(x-firstStoneX)+Math.abs(y-firstStoneY) !== 1) {
                 setMessage("2nd stone must be adjacent to first. Click first stone to cancel.");
                 return;
             }
-            // Test legality before committing.
+
+            const x1=firstStoneX, y1=firstStoneY;
+
+            // Save undo snapshot so clicking (x,y) can revert the 2nd stone
+            turnUndoStack.push({
+                board: board.map(r=>[...r]),
+                lastMoveX, lastMoveY, lastMoveX2: null, lastMoveY2: null,
+                lastMoveRemovals: [], currentTurnManualRemovals: [],
+                awaitingSecondStone: true, firstStoneX: x1, firstStoneY: y1,
+                cascadeTurnX1: null, cascadeTurnY1: null, cascadeTurnX2: null, cascadeTurnY2: null,
+                lastActionX: x, lastActionY: y
+            });
+
             board[x][y] = turn;
-            if (hasIllegalPattern()) {
-                board[x][y] = null;
-                setMessage("Illegal: creates a forbidden pattern!");
-                return;
-            }
-            board[x][y] = null; // completeTurn will re-place it
-            completeTurn(firstStoneX, firstStoneY, x, y);
+            awaitingSecondStone = false;
+            firstStoneX = null; firstStoneY = null;
+
+            // Mark both placed stones
+            clearLastMoveMarker();
+            lastMoveRemovals = []; currentTurnManualRemovals = [];
+            const pts = document.getElementsByClassName('point');
+            pts[x1*SIZE+y1].classList.add('last-move');
+            pts[x*SIZE+y].classList.add('last-move');
+            lastMoveX=x1; lastMoveY=y1; lastMoveX2=x; lastMoveY2=y;
+
+            // Phase 1: remove all non-placed stones currently in naked diagonals
+            phase1Removals(x1, y1, x, y);
+
+            cascadeTurnX1=x1; cascadeTurnY1=y1; cascadeTurnX2=x; cascadeTurnY2=y;
+            renderBoard();
+            continueCascade();
         }
     }
 
     // ── Replay ──
 
     function replayStart() {
+        awaitingCascadeRemoval=false; clearCascadeHighlights();
         cancelSecondStone();
         currentMoveIndex=0; loadGameState(gameHistory[0]); clearMessage();
         updateReplayButtons(); updateLastMoveDisplay();
     }
 
     function replayBack() {
+        if (awaitingCascadeRemoval) {
+            // Abort the partial turn and restore the last committed state
+            awaitingCascadeRemoval=false; clearCascadeHighlights();
+            loadGameState(gameHistory[currentMoveIndex]); clearMessage(); updateReplayButtons(); return;
+        }
         if (awaitingSecondStone) { cancelSecondStone(); updateReplayButtons(); return; }
         if (currentMoveIndex>0) {
             currentMoveIndex--;
@@ -503,6 +629,10 @@
     }
 
     function replayForward() {
+        if (awaitingCascadeRemoval || awaitingSecondStone) {
+            return;
+        }
+        awaitingCascadeRemoval=false; clearCascadeHighlights();
         cancelSecondStone();
         if (currentMoveIndex < gameHistory.length-1) {
             currentMoveIndex++;
@@ -512,6 +642,7 @@
     }
 
     function replayEnd() {
+        awaitingCascadeRemoval=false; clearCascadeHighlights();
         cancelSecondStone();
         currentMoveIndex=gameHistory.length-1;
         loadGameState(gameHistory[currentMoveIndex]); clearMessage();
@@ -559,51 +690,72 @@
 
     // Pick and execute a random valid Leeway move for the current player.
     function playRandomMove() {
-        const validFirsts = [];
-        for (let x=0; x<SIZE; x++) for (let y=0; y<SIZE; y++)
-            if (board[x][y]===null && isValidFirstStone(x, y, turn))
-                validFirsts.push([x, y]);
-        if (validFirsts.length === 0) return false;
+        const singles=[], twoStoneFirsts=[];
+        for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++) {
+            if (board[x][y]!==null) continue;
+            if (hasNoAdjacentEmpties(x,y)) singles.push([x,y]);
+            else if (getAdjacentEmpty(x,y).length>0) twoStoneFirsts.push([x,y]);
+        }
+        if (singles.length===0 && twoStoneFirsts.length===0) return false;
 
-        const [fx, fy] = validFirsts[Math.floor(Math.random()*validFirsts.length)];
-        board[fx][fy] = turn;
+        const allMoves=[...twoStoneFirsts.map(p=>({type:'two',p})),...singles.map(p=>({type:'single',p}))];
+        const choice=allMoves[Math.floor(Math.random()*allMoves.length)];
 
-        let x2 = null, y2 = null;
-        const adj = getAdjacentEmpty(fx, fy);
-        if (adj.length > 0) {
-            const validSecs = adj.filter(([nx, ny]) => {
-                board[nx][ny] = turn;
-                const ok = !hasIllegalPattern();
-                board[nx][ny] = null;
-                return ok;
-            });
-            if (validSecs.length > 0) {
-                [x2, y2] = validSecs[Math.floor(Math.random()*validSecs.length)];
-                board[x2][y2] = turn;
-            }
+        if (choice.type==='single') {
+            const [fx,fy]=choice.p;
+            board[fx][fy]=turn;
+            setLastMoveMarker(fx,fy);
+            turn=turn===0?1:0;
+            const st=saveGameState();
+            st.initialX=fx; st.initialY=fy; st.secondX=null; st.secondY=null;
+            st.isSkip=false; st.lastWasPieSwap=false;
+            st.lastMoveRemovals=[]; st.cascadeRemovals=[];
+            if (currentMoveIndex<gameHistory.length-1) gameHistory=gameHistory.slice(0,currentMoveIndex+1);
+            gameHistory.push(st); currentMoveIndex++;
+            blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
+            isDraw=false; resolveSkips();
+            return true;
         }
 
-        if (x2 !== null) {
-            clearLastMoveMarker();
-            const pts = document.getElementsByClassName('point');
-            pts[fx*SIZE+fy].classList.add('last-move');
-            pts[x2*SIZE+y2].classList.add('last-move');
-            lastMoveX = fx; lastMoveY = fy;
-            lastMoveX2 = x2; lastMoveY2 = y2;
-        } else {
-            setLastMoveMarker(fx, fy);
+        // Two-stone move
+        const [fx,fy]=choice.p;
+        board[fx][fy]=turn;
+        const adj=getAdjacentEmpty(fx,fy);
+        if (adj.length===0) { board[fx][fy]=null; return playRandomMove(); }
+        const [x2,y2]=adj[Math.floor(Math.random()*adj.length)];
+        board[x2][y2]=turn;
+
+        // Phase 1 removals
+        lastMoveRemovals = []; currentTurnManualRemovals = [];
+        phase1Removals(fx,fy,x2,y2);
+
+        // Auto-cascade, randomly resolving any player-choice diagonals
+        let safety=SIZE*SIZE*2;
+        while (safety-->0) {
+            cascadeAutoStep();
+            const diags=getNakedDiagonals();
+            if (!diags.length) break;
+            const [[ax,ay],[bx,by]]=diags[Math.floor(Math.random()*diags.length)];
+            if (Math.random()<0.5) { board[ax][ay]=null; lastMoveRemovals.push([ax,ay]); }
+            else { board[bx][by]=null; lastMoveRemovals.push([bx,by]); }
         }
 
-        turn = turn===0?1:0;
-        const st = saveGameState();
-        st.initialX = fx; st.initialY = fy;
-        st.secondX  = x2; st.secondY  = y2;
-        st.isSkip = false; st.lastWasPieSwap = false;
-        if (currentMoveIndex < gameHistory.length-1)
-            gameHistory = gameHistory.slice(0, currentMoveIndex+1);
+        clearLastMoveMarker();
+        const pts=document.getElementsByClassName('point');
+        pts[fx*SIZE+fy].classList.add('last-move');
+        pts[x2*SIZE+y2].classList.add('last-move');
+        lastMoveX=fx; lastMoveY=fy; lastMoveX2=x2; lastMoveY2=y2;
+
+        turn=turn===0?1:0;
+        const st=saveGameState();
+        st.initialX=fx; st.initialY=fy; st.secondX=x2; st.secondY=y2;
+        st.isSkip=false; st.lastWasPieSwap=false;
+        st.lastMoveRemovals=lastMoveRemovals.map(r=>[...r]);
+        st.cascadeRemovals=[];
+        if (currentMoveIndex<gameHistory.length-1) gameHistory=gameHistory.slice(0,currentMoveIndex+1);
         gameHistory.push(st); currentMoveIndex++;
-        blackWins = st.blackWins; whiteWins = st.whiteWins; gameOver = st.gameOver;
-        isDraw = false; resolveSkips();
+        blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
+        isDraw=false; resolveSkips();
         return true;
     }
 
@@ -686,6 +838,8 @@
                 let mv=p+String.fromCharCode(97+st.initialY)+(SIZE-st.initialX);
                 if (st.secondX!=null)
                     mv+=dirFromDelta(st.secondX-st.initialX, st.secondY-st.initialY);
+                if (st.cascadeRemovals && st.cascadeRemovals.length>0)
+                    for (const [rx,ry] of st.cascadeRemovals) mv+='-'+String.fromCharCode(97+ry)+(SIZE-rx);
                 moves.push(mv);
             }
         }
@@ -729,15 +883,22 @@
             // Skip notation: just advance the turn
             if (/^[BW]-$/.test(mv)) { tempTurn = tempTurn===0?1:0; continue; }
 
-            // Accept single stone (Bab) or two-stone (Babns) notation
-            const mm=mv.match(/^([BW])([a-z])(\d+)([nsew])?$/);
+            // Accept single stone (Bab) or two-stone (Babns) notation, with optional removal suffixes (-h8-c6)
+            const mm=mv.match(/^([BW])([a-z])(\d+)([nsew])?((?:-[a-z]\d+)*)$/);
             if (!mm) { setMessage("Error: Invalid move: "+mv); renderBoard(); return false; }
-            const [,pc,col,row,dir]=mm, pl=pc==='B'?0:1;
+            const [,pc,col,row,dir,removalStr]=mm, pl=pc==='B'?0:1;
             if (pl!==tempTurn) { setMessage("Error: Move out of turn: "+mv); renderBoard(); return false; }
 
             const x=ns-parseInt(row), y=col.charCodeAt(0)-97;
             if (x<0||x>=ns||y<0||y>=ns) { setMessage("Error: Move out of bounds: "+mv); renderBoard(); return false; }
             if (board[x][y]!==null) { setMessage("Error: Position occupied: "+mv); renderBoard(); return false; }
+
+            // Parse specified cascade removals from notation
+            const specifiedRemovals=[];
+            if (removalStr) for (const part of removalStr.split('-').filter(Boolean)) {
+                const ry=part.charCodeAt(0)-97, rx=ns-parseInt(part.slice(1));
+                specifiedRemovals.push([rx,ry]);
+            }
 
             board[x][y]=tempTurn;
             let x2=null, y2=null;
@@ -752,12 +913,26 @@
                     board[x][y]=null; setMessage("Error: 2nd stone position occupied: "+mv); renderBoard(); return false;
                 }
                 board[x2][y2]=tempTurn;
-            }
-
-            if (hasIllegalPattern()) {
-                if (x2!==null) board[x2][y2]=null;
-                board[x][y]=null;
-                setMessage("Error: Move creates a forbidden pattern: "+mv); renderBoard(); return false;
+                // Simulate phase 1 removals and cascade
+                lastMoveRemovals=[]; currentTurnManualRemovals=[];
+                phase1Removals(x,y,x2,y2);
+                let specIdx=0, safety=SIZE*SIZE*2;
+                while (safety-->0) {
+                    cascadeAutoStep();
+                    const diags=getNakedDiagonals();
+                    if (!diags.length) break;
+                    // Use specified removal if available, else deterministic fallback
+                    let removed=false;
+                    if (specIdx<specifiedRemovals.length) {
+                        const [rx,ry]=specifiedRemovals[specIdx++];
+                        const inDiag=diags.some(([[ax,ay],[bx,by]])=>(ax===rx&&ay===ry)||(bx===rx&&by===ry));
+                        if (inDiag && board[rx][ry]!==null) {
+                            board[rx][ry]=null; lastMoveRemovals.push([rx,ry]);
+                            currentTurnManualRemovals.push([rx,ry]); removed=true;
+                        }
+                    }
+                    if (!removed) { const [[ax,ay]]=diags; board[ax][ay]=null; lastMoveRemovals.push([ax,ay]); }
+                }
             }
 
             if (x2 !== null) {
@@ -768,12 +943,15 @@
                 lastMoveX = x; lastMoveY = y;
                 lastMoveX2 = x2; lastMoveY2 = y2;
             } else {
+                lastMoveRemovals=[]; currentTurnManualRemovals=[];
                 setLastMoveMarker(x, y);
             }
             tempTurn=tempTurn===0?1:0;
             const st=saveGameState();
             st.turn=tempTurn; st.initialX=x; st.initialY=y;
             st.secondX=x2; st.secondY=y2; st.isSkip=false; st.lastWasPieSwap=false;
+            st.lastMoveRemovals=lastMoveRemovals.map(r=>[...r]);
+            st.cascadeRemovals=currentTurnManualRemovals.map(r=>[...r]);
             gameHistory.push(st); currentMoveIndex++;
             blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
         }
@@ -799,6 +977,8 @@
         else {
             let mv=p+String.fromCharCode(97+rs.initialY)+(SIZE-rs.initialX);
             if (rs.secondX!=null) mv+=dirFromDelta(rs.secondX-rs.initialX, rs.secondY-rs.initialY);
+            if (rs.cascadeRemovals && rs.cascadeRemovals.length>0)
+                for (const [rx,ry] of rs.cascadeRemovals) mv+='-'+String.fromCharCode(97+ry)+(SIZE-rx);
             txt.textContent=mv; btn.style.display='inline-flex';
         }
     }
