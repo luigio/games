@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connection Sandbox</title>
+    <title>Linkaway</title>
     <style>
         html, body { margin:0;padding:0;height:100vh;width:100vw;overflow:hidden;background-color:#f0f0f0;display:flex;justify-content:center;align-items:center; }
         .game-container { display:flex;flex-direction:column;width:100vw;max-width:100%; }
@@ -125,8 +125,7 @@
                 const point = document.createElement('div');
                 point.className = 'point';
                 point.dataset.x = i; point.dataset.y = j;
-                point.addEventListener('mousedown', e => { if (e.button === 0) play(i, j, 0); else if (e.button === 2) play(i, j, 1); });
-                point.addEventListener('contextmenu', e => e.preventDefault());
+                point.onmousedown = () => play(i, j);
                 point.appendChild(document.createElement('div')).className = 'stone';
                 gridDiv.appendChild(point);
             }
@@ -148,6 +147,28 @@
 
         linesDiv.appendChild(canvas);
         updateStatus(); updateLastMoveDisplay(); updateButtonTooltips(); adjustHeaderLayout();
+    }
+
+    function getChain(x, y, color, visited=new Set()) {
+        if (x<0||x>=SIZE||y<0||y>=SIZE||visited.has(`${x},${y}`)||board[x][y]!==color) return [];
+        visited.add(`${x},${y}`);
+        const chain = [[x,y]];
+        for (const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0]]) chain.push(...getChain(x+dx,y+dy,color,visited));
+        return chain;
+    }
+
+    function checkWin(color) {
+        const visited = new Set();
+        if (color===0) { // Black: top row → bottom row
+            for (let y=0;y<SIZE;y++)
+                if (board[0][y]===0&&!visited.has(`0,${y}`))
+                    if (getChain(0,y,0,visited).some(([x])=>x===SIZE-1)) return true;
+        } else { // White: left col → right col
+            for (let x=0;x<SIZE;x++)
+                if (board[x][0]===1&&!visited.has(`${x},0`))
+                    if (getChain(x,0,1,visited).some(([,y])=>y===SIZE-1)) return true;
+        }
+        return false;
     }
 
     function saveGameState() {
@@ -196,25 +217,152 @@
     function setMessage(msg) { document.getElementById('message').textContent = msg; }
     function clearMessage()  { document.getElementById('message').textContent = ''; }
 
-    function getChain(x, y, color, visited=new Set()) {
-        if (x<0||x>=SIZE||y<0||y>=SIZE||visited.has(`${x},${y}`)||board[x][y]!==color) return [];
-        visited.add(`${x},${y}`);
-        const chain = [[x,y]];
-        for (const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0]]) chain.push(...getChain(x+dx,y+dy,color,visited));
-        return chain;
+    // ── Linkaway constraint checkers ──
+
+    // An empty diagonal: a 2×2 area with two same-colored stones on one diagonal
+    // and two empty points on the other diagonal.
+    function wouldCreateEmptyDiagonal(x, y, color) {
+        for (let d = 0; d < 4; d++) {
+            const dr = d < 2 ? -1 : 1;
+            const dc = d & 1 ? 1 : -1;
+            const nx = x + dr, ny = y + dc;
+            if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE) continue;
+            if (board[nx][ny] !== color) continue;
+            if (board[nx][y] === null && board[x][ny] === null) return true;
+        }
+        return false;
     }
 
-    function checkWin(color) {
-        const visited = new Set();
-        if (color===0) { // Black: top row → bottom row
-            for (let y=0;y<SIZE;y++)
-                if (board[0][y]===0&&!visited.has(`0,${y}`))
-                    if (getChain(0,y,0,visited).some(([x])=>x===SIZE-1)) return true;
-        } else { // White: left col → right col
-            for (let x=0;x<SIZE;x++)
-                if (board[x][0]===1&&!visited.has(`${x},0`))
-                    if (getChain(x,0,1,visited).some(([,y])=>y===SIZE-1)) return true;
+    // An adjacent 2: a 2×2 area with exactly two orthogonally adjacent empty points
+    // and one stone of each color.
+    function wouldCreateAdjacent2(x, y, color) {
+        for (const [r, c] of [[x-1,y-1],[x-1,y],[x,y-1],[x,y]]) {
+            if (r<0||r>SIZE-2||c<0||c>SIZE-2) continue;
+            const cells=[[r,c],[r,c+1],[r+1,c],[r+1,c+1]];
+            const get=(cr,cc)=>(cr===x&&cc===y)?color:board[cr][cc];
+            const empties=[], counts=[0,0];
+            for (const [cr,cc] of cells) {
+                const v=get(cr,cc);
+                if (v===null) empties.push([cr,cc]); else counts[v]++;
+            }
+            if (empties.length!==2||counts[0]!==1||counts[1]!==1) continue;
+            const [[e1r,e1c],[e2r,e2c]]=empties;
+            if (Math.abs(e1r-e2r)+Math.abs(e1c-e2c)===1) return true;
         }
+        return false;
+    }
+
+    // A straight 3: a 2×3 (or 3×2) area with four empty points and two non-adjacent,
+    // opposite-colored stones on the same row or column.
+    function wouldCreateStraight3(x, y, color) {
+        const get=(cr,cc)=>(cr===x&&cc===y)?color:board[cr][cc];
+
+        // 2-row × 3-col patterns
+        for (let r=x-1; r<=x; r++) {
+            for (let c=y-2; c<=y; c++) {
+                if (r<0||r>SIZE-2||c<0||c>SIZE-3) continue;
+                const cells=[[r,c],[r,c+1],[r,c+2],[r+1,c],[r+1,c+1],[r+1,c+2]];
+                for (const [[s1r,s1c],[s2r,s2c]] of [[[r,c],[r,c+2]],[[r+1,c],[r+1,c+2]]]) {
+                    const v1=get(s1r,s1c), v2=get(s2r,s2c);
+                    if (!((v1===0&&v2===1)||(v1===1&&v2===0))) continue;
+                    const others=cells.filter(([cr,cc])=>!(cr===s1r&&cc===s1c)&&!(cr===s2r&&cc===s2c));
+                    if (others.every(([cr,cc])=>get(cr,cc)===null)) return true;
+                }
+            }
+        }
+
+        // 3-row × 2-col patterns
+        for (let r=x-2; r<=x; r++) {
+            for (let c=y-1; c<=y; c++) {
+                if (r<0||r>SIZE-3||c<0||c>SIZE-2) continue;
+                const cells=[[r,c],[r,c+1],[r+1,c],[r+1,c+1],[r+2,c],[r+2,c+1]];
+                for (const [[s1r,s1c],[s2r,s2c]] of [[[r,c],[r+2,c]],[[r,c+1],[r+2,c+1]]]) {
+                    const v1=get(s1r,s1c), v2=get(s2r,s2c);
+                    if (!((v1===0&&v2===1)||(v1===1&&v2===0))) continue;
+                    const others=cells.filter(([cr,cc])=>!(cr===s1r&&cc===s1c)&&!(cr===s2r&&cc===s2c));
+                    if (others.every(([cr,cc])=>get(cr,cc)===null)) return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // A straight 4: a 4×2 (or 2×4) area with a black stone in one corner, a white
+    // stone in another corner in the same row or column but not adjacent to the black
+    // stone, and six empty points.
+    function wouldCreateStraight4(x, y, color) {
+        const opp = 1 - color;
+
+        // ── 4 rows × 2 cols ──
+        for (let r = x - 3; r <= x; r++) {
+            if (r < 0 || r > SIZE - 4) continue;
+            for (let c = y - 1; c <= y; c++) {
+                if (c < 0 || c > SIZE - 2) continue;
+                const dr = x - r, dc = y - c;
+                if (!((dr===0&&dc===0)||(dr===0&&dc===1)||(dr===3&&dc===0)||(dr===3&&dc===1))) continue;
+                const g = (or, oc) => (r+or===x && c+oc===y) ? color : board[r+or][c+oc];
+                // Pair L: same column (col 0), new stone in col 0
+                if (dc === 0) {
+                    const a = g(0,0), b = g(3,0);
+                    if ((a===color&&b===opp)||(a===opp&&b===color)) {
+                        if (g(0,1)===null && g(1,0)===null && g(1,1)===null &&
+                            g(2,0)===null && g(2,1)===null && g(3,1)===null) return true;
+                    }
+                }
+                // Pair R: same column (col 1), new stone in col 1
+                if (dc === 1) {
+                    const a = g(0,1), b = g(3,1);
+                    if ((a===color&&b===opp)||(a===opp&&b===color)) {
+                        if (g(0,0)===null && g(1,0)===null && g(1,1)===null &&
+                            g(2,0)===null && g(2,1)===null && g(3,0)===null) return true;
+                    }
+                }
+            }
+        }
+
+        // ── 2 rows × 4 cols ──
+        for (let r = x - 1; r <= x; r++) {
+            if (r < 0 || r > SIZE - 2) continue;
+            for (let c = y - 3; c <= y; c++) {
+                if (c < 0 || c > SIZE - 4) continue;
+                const dr = x - r, dc = y - c;
+                if (!((dr===0&&dc===0)||(dr===0&&dc===3)||(dr===1&&dc===0)||(dr===1&&dc===3))) continue;
+                const g = (or, oc) => (r+or===x && c+oc===y) ? color : board[r+or][c+oc];
+                // Pair T: same row (row 0), new stone in row 0
+                if (dr === 0) {
+                    const a = g(0,0), b = g(0,3);
+                    if ((a===color&&b===opp)||(a===opp&&b===color)) {
+                        if (g(0,1)===null && g(0,2)===null && g(1,0)===null &&
+                            g(1,1)===null && g(1,2)===null && g(1,3)===null) return true;
+                    }
+                }
+                // Pair B: same row (row 1), new stone in row 1
+                if (dr === 1) {
+                    const a = g(1,0), b = g(1,3);
+                    if ((a===color&&b===opp)||(a===opp&&b===color)) {
+                        if (g(0,0)===null && g(0,1)===null && g(0,2)===null &&
+                            g(0,3)===null && g(1,1)===null && g(1,2)===null) return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    function isValidMove(x, y, color) {
+        if (board[x][y] !== null) return false;
+        if (wouldCreateEmptyDiagonal(x, y, color)) return false;
+        if (wouldCreateAdjacent2(x, y, color)) return false;
+        if (wouldCreateStraight3(x, y, color)) return false;
+        if (wouldCreateStraight4(x, y, color)) return false;
+        return true;
+    }
+
+    function hasValidMoveForColor(color) {
+        for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++)
+            if (isValidMove(x, y, color)) return true;
         return false;
     }
 
@@ -232,9 +380,7 @@
     }
 
     function hasValidMove() {
-        for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++)
-            if (board[x][y]===null) return true;
-        return false;
+        return hasValidMoveForColor(turn);
     }
 
     // Resolve skips/draw for the current position — updates turn/isDraw/gameOver in memory only,
@@ -248,15 +394,22 @@
 
     // ── Play ──
 
-    function play(x, y, color) {
+    function play(x, y) {
+        if (gameOver) { setMessage("Game is over!"); return; }
+        if (board[x][y] !== null) return;
+
+        if (wouldCreateEmptyDiagonal(x, y, turn))  { setMessage("Creates an empty diagonal!"); return; }
+        if (wouldCreateAdjacent2(x, y, turn))      { setMessage("Creates an adjacent 2!"); return; }
+        if (wouldCreateStraight3(x, y, turn))      { setMessage("Creates a straight 3!"); return; }
+        if (wouldCreateStraight4(x, y, turn))      { setMessage("Creates a straight 4!"); return; }
+
         clearMessage();
-        const isCapture = (board[x][y] === color);
-        board[x][y] = isCapture ? null : color;
+        board[x][y] = turn;
         setLastMoveMarker(x, y);
 
-        turn = color===0?1:0;
+        turn = turn===0?1:0;
         const state = saveGameState();
-        state.initialX=x; state.initialY=y; state.isSkip=false; state.lastWasPieSwap=false; state.placedColor=color; state.isCapture=isCapture;
+        state.initialX=x; state.initialY=y; state.isSkip=false; state.lastWasPieSwap=false;
         if (currentMoveIndex < gameHistory.length-1)
             gameHistory = gameHistory.slice(0, currentMoveIndex+1);
         gameHistory.push(state); currentMoveIndex++;
@@ -340,7 +493,7 @@
         if (!botReply || gameOver || isGenerating) return;
         const valid = [];
         for (let x = 0; x < SIZE; x++) for (let y = 0; y < SIZE; y++)
-            if (board[x][y] === null) valid.push([x, y]);
+            if (isValidMove(x, y, turn)) valid.push([x, y]);
         if (valid.length === 0) return;
         const [x, y] = valid[Math.floor(Math.random() * valid.length)];
         board[x][y] = turn;
@@ -405,7 +558,7 @@
 
             const valid=[];
             for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++)
-                if (board[x][y]===null) valid.push([x,y]);
+                if (isValidMove(x, y, turn)) valid.push([x,y]);
 
             if (valid.length===0) { stopGeneration(); return; }
 
@@ -429,9 +582,9 @@
     function generateGameRecordText() {
         const moves=[SIZE+'x'+SIZE];
         for (let i=1;i<gameHistory.length;i++) {
-            const st=gameHistory[i];
+            const st=gameHistory[i], prev=gameHistory[i-1];
             if (st.initialX!=null) {
-                const p=st.isCapture?'X':(st.placedColor===0?'B':'W');
+                const p=prev.turn===0?'B':'W';
                 const col=String.fromCharCode(97+st.initialY), row=SIZE-st.initialX;
                 moves.push(p+col+row);
             }
@@ -445,7 +598,7 @@
         if (opt==='file') {
             const a=document.createElement('a');
             a.href=URL.createObjectURL(new Blob([text],{type:'text/plain'}));
-            a.download='connection_sandbox_game.txt'; a.click();
+            a.download='linkaway_game.txt'; a.click();
         } else if (opt==='clipboard') {
             navigator.clipboard.writeText(text).then(()=>setMessage('Copied to clipboard!'));
         }
@@ -469,29 +622,37 @@
         if (sm[1]!==sm[2]||ns<3||ns>19) { setMessage("Error: Invalid board size."); return false; }
         resetGame(ns); document.getElementById('board-size').value=ns;
 
+        let tempTurn=0;
         for (let i=1;i<moves.length;i++) {
             const mv=moves[i]; if (!mv) continue;
 
             // Accept (ignore) legacy skip notation for backward compatibility
             if (/^[BW]-$/.test(mv)) continue;
 
-            const mm=mv.match(/^([BWX])([a-z])(\d+)$/);
+            const mm=mv.match(/^([BW])([a-z])(\d+)$/);
             if (!mm) { setMessage("Error: Invalid move: "+mv); renderBoard(); return false; }
-            const [,pc,col,row]=mm;
+            const [,pc,col,row]=mm, pl=pc==='B'?0:1;
+            if (pl!==tempTurn) { setMessage("Error: Move out of turn: "+mv); renderBoard(); return false; }
             const x=ns-parseInt(row), y=col.charCodeAt(0)-97;
             if (x<0||x>=ns||y<0||y>=ns) { setMessage("Error: Move out of bounds: "+mv); renderBoard(); return false; }
+            if (board[x][y]!==null) { setMessage("Error: Position occupied: "+mv); renderBoard(); return false; }
+            if (!isValidMove(x, y, tempTurn)) { setMessage("Error: Move violates Linkaway rules: "+mv); renderBoard(); return false; }
 
-            const isCapture=(pc==='X');
-            const pl=isCapture?(board[x][y]??0):( pc==='B'?0:1);
-            board[x][y]=isCapture?null:pl;
+            turn=tempTurn;
+            board[x][y]=tempTurn;
             setLastMoveMarker(x,y);
-            turn=pl===0?1:0;
-            const st=saveGameState(); st.turn=turn; st.initialX=x; st.initialY=y; st.isSkip=false; st.lastWasPieSwap=false; st.placedColor=pl; st.isCapture=isCapture;
+            tempTurn=tempTurn===0?1:0;
+            // Resolve skip: if next player has no valid move, switch to opponent
+            if (!hasValidMoveForColor(tempTurn)) {
+                const opp = tempTurn===0?1:0;
+                if (hasValidMoveForColor(opp)) tempTurn = opp;
+            }
+            const st=saveGameState(); st.turn=tempTurn; st.initialX=x; st.initialY=y; st.isSkip=false; st.lastWasPieSwap=false;
             gameHistory.push(st); currentMoveIndex++;
             blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
         }
 
-        isDraw=false; resolveSkips();
+        turn=tempTurn; isDraw=false; resolveSkips();
         renderBoard(); updateStatus(); updateReplayButtons(); updateLastMoveDisplay(); clearMessage();
         return true;
     }
@@ -506,8 +667,8 @@
     function updateLastMoveDisplay() {
         const txt=document.getElementById('last-move-text'), btn=document.getElementById('copy-move');
         if (currentMoveIndex<=0||gameHistory.length<=1) { txt.textContent=''; btn.style.display='none'; return; }
-        const rs=gameHistory[currentMoveIndex];
-        const p=rs.isCapture?'X':(rs.placedColor===0?'B':'W');
+        const rs=gameHistory[currentMoveIndex], prev=gameHistory[currentMoveIndex-1];
+        const p=prev?(prev.turn===0?'B':'W'):'B';
         if (!rs||rs.initialX==null) { txt.textContent=''; btn.style.display='none'; }
         else {
             txt.textContent=p+String.fromCharCode(97+rs.initialY)+(SIZE-rs.initialX);
