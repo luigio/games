@@ -198,7 +198,7 @@
         if (x<0||x>=SIZE||y<0||y>=SIZE||visited.has(`${x},${y}`)||board[x][y]!==color) return [];
         visited.add(`${x},${y}`);
         const chain = [[x,y]];
-        for (const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0]]) chain.push(...getChain(x+dx,y+dy,color,visited));
+        for (const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]) chain.push(...getChain(x+dx,y+dy,color,visited));
         return chain;
     }
 
