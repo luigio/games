@@ -227,7 +227,7 @@
             ctx.beginPath(); ctx.moveTo(pos, cellSize/2); ctx.lineTo(pos, boardSize-cellSize/2); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(cellSize/2, pos); ctx.lineTo(boardSize-cellSize/2, pos); ctx.stroke();
         }
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 5;
         ctx.strokeStyle = 'black';
         ctx.beginPath(); ctx.moveTo(cellSize/2, cellSize/2); ctx.lineTo(boardSize-cellSize/2, cellSize/2); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(cellSize/2, boardSize-cellSize/2); ctx.lineTo(boardSize-cellSize/2, boardSize-cellSize/2); ctx.stroke();
@@ -235,6 +235,32 @@
         ctx.beginPath(); ctx.moveTo(cellSize/2, cellSize/2); ctx.lineTo(cellSize/2, boardSize-cellSize/2); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(boardSize-cellSize/2, cellSize/2); ctx.lineTo(boardSize-cellSize/2, boardSize-cellSize/2); ctx.stroke();
 
+        // Miter the four corners: each 5×5 overlap square is split along a 45° diagonal
+        // into two filled triangles so the black (horizontal) and white (vertical) edges
+        // meet cleanly with no crude overlap.
+        {
+            const e = ctx.lineWidth / 2; // 2.5px — half the border stroke width
+            const h = cellSize / 2;      // center of the corner squares
+            const W = boardSize;
+            function tri(color, x1,y1, x2,y2, x3,y3) {
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3);
+                ctx.closePath(); ctx.fill();
+            }
+            // Top-left: diagonal from outer (h-e,h-e) to inner (h+e,h+e)
+            tri('black', h-e,h-e, h+e,h-e, h+e,h+e);   // upper-right → black (top edge)
+            tri('white', h-e,h-e, h-e,h+e, h+e,h+e);   // lower-left  → white (left edge)
+            // Top-right: diagonal from outer (W-h+e,h-e) to inner (W-h-e,h+e)
+            tri('black', W-h-e,h-e, W-h+e,h-e, W-h-e,h+e);  // upper-left  → black (top edge)
+            tri('white', W-h+e,h-e, W-h+e,h+e, W-h-e,h+e);  // lower-right → white (right edge)
+            // Bottom-left: diagonal from outer (h-e,W-h+e) to inner (h+e,W-h-e)
+            tri('black', h-e,W-h+e, h+e,W-h+e, h+e,W-h-e);  // lower-right → black (bottom edge)
+            tri('white', h-e,W-h-e, h+e,W-h-e, h-e,W-h+e);  // upper-left  → white (left edge)
+            // Bottom-right: diagonal from outer (W-h+e,W-h+e) to inner (W-h-e,W-h-e)
+            tri('black', W-h-e,W-h+e, W-h+e,W-h+e, W-h-e,W-h-e);  // lower-left  → black (bottom edge)
+            tri('white', W-h+e,W-h-e, W-h+e,W-h+e, W-h-e,W-h-e);  // upper-right → white (right edge)
+        }
+        
         linesDiv.appendChild(canvas);
         updateStatus(); updateLastMoveDisplay(); updateButtonTooltips(); adjustHeaderLayout();
     }

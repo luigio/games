@@ -293,8 +293,17 @@
             <button onmousedown="replayForward()">></button>
             <button onmousedown="replayEnd()">>></button>
             <button id="random-button" onmousedown="generateRandomGame()">Random game</button>
-            <button id="save-button" onmousedown="saveGame()">Save</button>
-            <button id="load-button" onmousedown="triggerLoadGame()">Load</button>
+            <select id="save-options" onchange="handleSave()">
+                <option value="" disabled selected hidden>Save</option>
+                <option value="file">To file</option>
+                <option value="clipboard">To clipboard</option>
+            </select>
+
+            <select id="load-options" onchange="handleLoad()">
+                <option value="" disabled selected hidden>Load</option>
+                <option value="file">From file</option>
+                <option value="clipboard">From clipboard</option>
+            </select>
             <select id="board-size" onchange="changeBoardSize()">
                 <option value="3">3×3</option>
                 <option value="4">4×4</option>
@@ -383,7 +392,7 @@
         }
 
         // Draw thick edges last (black for top/bottom, white for left/right)
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 5;
         // Top edge (black)
         ctx.strokeStyle = 'black';
         ctx.beginPath();
@@ -407,6 +416,32 @@
         ctx.lineTo(boardSize - cellSize / 2, boardSize - cellSize / 2);
         ctx.stroke();
 
+        // Miter the four corners: each 5×5 overlap square is split along a 45° diagonal
+        // into two filled triangles so the black (horizontal) and white (vertical) edges
+        // meet cleanly with no crude overlap.
+        {
+            const e = ctx.lineWidth / 2; // 2.5px — half the border stroke width
+            const h = cellSize / 2;      // center of the corner squares
+            const W = boardSize;
+            function tri(color, x1,y1, x2,y2, x3,y3) {
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3);
+                ctx.closePath(); ctx.fill();
+            }
+            // Top-left: diagonal from outer (h-e,h-e) to inner (h+e,h+e)
+            tri('black', h-e,h-e, h+e,h-e, h+e,h+e);   // upper-right → black (top edge)
+            tri('white', h-e,h-e, h-e,h+e, h+e,h+e);   // lower-left  → white (left edge)
+            // Top-right: diagonal from outer (W-h+e,h-e) to inner (W-h-e,h+e)
+            tri('black', W-h-e,h-e, W-h+e,h-e, W-h-e,h+e);  // upper-left  → black (top edge)
+            tri('white', W-h+e,h-e, W-h+e,h+e, W-h-e,h+e);  // lower-right → white (right edge)
+            // Bottom-left: diagonal from outer (h-e,W-h+e) to inner (h+e,W-h-e)
+            tri('black', h-e,W-h+e, h+e,W-h+e, h+e,W-h-e);  // lower-right → black (bottom edge)
+            tri('white', h-e,W-h-e, h+e,W-h-e, h-e,W-h+e);  // upper-left  → white (left edge)
+            // Bottom-right: diagonal from outer (W-h+e,W-h+e) to inner (W-h-e,W-h-e)
+            tri('black', W-h-e,W-h+e, W-h+e,W-h+e, W-h-e,W-h-e);  // lower-left  → black (bottom edge)
+            tri('white', W-h+e,W-h-e, W-h+e,W-h+e, W-h-e,W-h-e);  // upper-right → white (right edge)
+        }
+        
         linesDiv.appendChild(canvas);
         updateStatus();
         updateLastMoveDisplay();
@@ -415,21 +450,23 @@
     }
 
     function saveGameState() {
-        const blackWins = checkWin(0);
-        const whiteWins = checkWin(1);
+        const bWins = checkWin(0);
+        const wWins = checkWin(1);
         return {
             board: board.map(row => [...row]),
+            turn: turn,
             lastMoveX: lastMoveX,
             lastMoveY: lastMoveY,
-            gameOver: blackWins || whiteWins,
-            blackWins: blackWins,
-            whiteWins: whiteWins
+            gameOver: bWins || wWins,
+            blackWins: bWins,
+            whiteWins: wWins,
+            lastWasPieSwap: false
         };
     }
 
     function loadGameState(state) {
         board = state.board.map(row => [...row]);
-        turn = currentMoveIndex % 2 === 0 ? 0 : 1; // Even: Black to move, Odd: White to move
+        turn = (state.turn !== undefined) ? state.turn : (currentMoveIndex % 2 === 0 ? 0 : 1);
         lastMoveX = state.lastMoveX;
         lastMoveY = state.lastMoveY;
         blackWins = state.blackWins;
@@ -451,6 +488,7 @@
         blackWins = false;
         whiteWins = false;
         const initialState = saveGameState();
+        initialState.turn = 0;
         initialState.initialX = null;
         initialState.initialY = null;
         initialState.swapX = null;
@@ -597,6 +635,7 @@
                 state.swapX = x;
                 state.swapY = y;
                 state.isSkip = false;
+                state.lastWasPieSwap = false;
                 if (currentMoveIndex < gameHistory.length - 1) {
                     gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
                 }
@@ -632,7 +671,13 @@
             return;
         }
 
-        if (board[x][y] !== null) return;
+        if (board[x][y] !== null) {
+            // Pie rule: White clicks Black's first stone to swap sides
+            if (canPieSwap() && board[x][y] === 0 && x === lastMoveX && y === lastMoveY) {
+                performPieSwap();
+            }
+            return;
+        }
 
         const oldBoard = board.map(row => [...row]);
         board[x][y] = turn;
@@ -669,6 +714,7 @@
             state.swapX = null;
             state.swapY = null;
             state.isSkip = false;
+            state.lastWasPieSwap = false;
             if (currentMoveIndex < gameHistory.length - 1) {
                 gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
             }
@@ -689,6 +735,7 @@
                 skipState.swapX = null;
                 skipState.swapY = null;
                 skipState.isSkip = true;
+                skipState.lastWasPieSwap = false;
                 gameHistory.push(skipState);
                 currentMoveIndex++;
                 renderBoard();
@@ -864,12 +911,11 @@
         let statusText = "";
 
         if (gameOver) {
-            statusText = `${blackWins ? blackStoneSVG : whiteStoneSVG} wins!`;
+            statusText = (blackWins ? blackStoneSVG : whiteStoneSVG) + ' wins!';
         } else {
-            statusText = `${turn === 0 ? blackStoneSVG : whiteStoneSVG} to move`;
-            if (gameHistory[currentMoveIndex].isSkip) {
-                statusText += ` | Turn skipped`;
-            }
+            statusText = (turn === 0 ? blackStoneSVG : whiteStoneSVG) + ' to move';
+            //if (canPieSwap()) statusText += ' (or click Black\u2019s stone to swap)';
+            if (gameHistory[currentMoveIndex] && gameHistory[currentMoveIndex].isSkip) statusText += ' | Turn skipped';
         }
 
         turnStatus.innerHTML = statusText;
@@ -998,6 +1044,12 @@
                 return;
             }
 
+            // Pie rule: randomly decide to swap on White's first move
+            if (canPieSwap() && Math.random() < 0.5) {
+                performPieSwap();
+                return;
+            }
+
             const validMoves = [];
             for (let x = 0; x < SIZE; x++) {
                 for (let y = 0; y < SIZE; y++) {
@@ -1035,6 +1087,7 @@
                 skipState.swapX = null;
                 skipState.swapY = null;
                 skipState.isSkip = true;
+                skipState.lastWasPieSwap = false;
                 if (currentMoveIndex < gameHistory.length - 1) {
                     gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
                 }
@@ -1071,6 +1124,7 @@
                 setLastMoveMarker(move.x, move.y);
             }
 
+            turn = turn === 0 ? 1 : 0;
             renderBoard();
             const state = saveGameState();
             state.initialX = initialX;
@@ -1078,6 +1132,7 @@
             state.swapX = swapX;
             state.swapY = swapY;
             state.isSkip = false;
+            state.lastWasPieSwap = false;
             if (currentMoveIndex < gameHistory.length - 1) {
                 gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
             }
@@ -1086,7 +1141,6 @@
             blackWins = state.blackWins;
             whiteWins = state.whiteWins;
             gameOver = state.gameOver;
-            turn = turn === 0 ? 1 : 0;
 
             updateStatus();
             updateReplayButtons();
@@ -1094,259 +1148,237 @@
         }, 1);
     }
 
-    function triggerLoadGame() {
-        document.getElementById('load-input').click();
+    // ── Pie rule ──
+    function canPieSwap() {
+        return turn === 1 && currentMoveIndex === 1 && !gameOver && !isGenerating && swapTargets === null;
     }
 
-    function saveGame() {
-        const boardSizeStr = `${SIZE}x${SIZE}`;
-        const moveList = [boardSizeStr];
-        
-        for (let i = 1; i < gameHistory.length; i++) {
-            const state = gameHistory[i];
-            const player = (i - 1) % 2 === 0 ? 'B' : 'W';
-            
-            if (state.isSkip) {
-                moveList.push(`${player}-`);
+    function performPieSwap() {
+        if (!canPieSwap()) { setMessage("Swap only available as White's first move."); return; }
+        if (currentMoveIndex < gameHistory.length - 1) {
+            const next = gameHistory[currentMoveIndex + 1];
+            if (next.lastWasPieSwap) {
+                currentMoveIndex++;
+                loadGameState(gameHistory[currentMoveIndex]);
+                updateReplayButtons();
+                return;
             } else {
-                if (state.initialX === undefined || state.initialY === undefined) continue;
-                const initialCol = String.fromCharCode(97 + state.initialY);
-                const initialRow = SIZE - state.initialX;
-                let moveStr = `${player}${initialCol}${initialRow}`;
-                if (state.swapX !== null && state.swapY !== null) {
-                    const swapCol = String.fromCharCode(97 + state.swapY);
-                    const swapRow = SIZE - state.swapX;
-                    const isCapture = state.board[state.initialX][state.initialY] === null;
-                    moveStr += `${isCapture ? 'x' : '-'}${swapCol}${swapRow}`;
-                }
-                moveList.push(moveStr);
+                gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
             }
         }
-        const gameText = moveList.join(' ');
-        const blob = new Blob([gameText], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'reneo_game.txt';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        const state = saveGameState();
+        state.turn = 1;
+        state.initialX = null; state.initialY = null;
+        state.swapX = null; state.swapY = null;
+        state.isSkip = false; state.lastWasPieSwap = true;
+        gameHistory.push(state);
+        currentMoveIndex++;
+        renderBoard();
+        updateStatus();
+        updateLastMoveDisplay();
+        updateReplayButtons();
+    }
+
+    function generateGameRecordText() {
+        const moveList = [SIZE + 'x' + SIZE];
+        for (let i = 1; i < gameHistory.length; i++) {
+            const state = gameHistory[i];
+            const prevState = gameHistory[i - 1];
+            const player = prevState.turn === 0 ? 'B' : 'W';
+            if (state.lastWasPieSwap) {
+                moveList.push('WSwap');
+            } else if (state.isSkip) {
+                moveList.push(player + '-');
+            } else {
+                if (state.initialX == null) continue;
+                const col = String.fromCharCode(97 + state.initialY);
+                const row = SIZE - state.initialX;
+                let m = player + col + row;
+                if (state.swapX !== null && state.swapY !== null) {
+                    const sc = String.fromCharCode(97 + state.swapY);
+                    const sr = SIZE - state.swapX;
+                    const isCapture = state.board[state.initialX][state.initialY] === null;
+                    m += (isCapture ? 'x' : '-') + sc + sr;
+                }
+                moveList.push(m);
+            }
+        }
+        return moveList.join(' ');
+    }
+
+    function handleSave() {
+        const sel = document.getElementById('save-options');
+        const opt = sel.value; if (!opt) return;
+        const text = generateGameRecordText();
+        if (opt === 'file') {
+            const blob = new Blob([text], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'reneo_game.txt'; a.click();
+            URL.revokeObjectURL(url);
+        } else if (opt === 'clipboard') {
+            navigator.clipboard.writeText(text).then(() => setMessage('Copied to clipboard!'));
+        }
+        sel.value = '';
+    }
+
+    function handleLoad() {
+        const sel = document.getElementById('load-options');
+        const opt = sel.value;
+        if (opt === 'file') document.getElementById('load-input').click();
+        else if (opt === 'clipboard') navigator.clipboard.readText().then(text => processGameRecordText(text));
+        sel.value = '';
+    }
+
+        function processGameRecordText(rawText) {
+        const moveText = (rawText || '').trim();
+        if (!moveText) { setMessage("Error: Empty game record."); return false; }
+        const moves = moveText.split(/\s+/);
+        const sizeMatch = moves[0].match(/^(\d+)[-x×*\uFFFD](\d+)$/);
+        if (!sizeMatch) { setMessage("Error: Must start with board size (e.g. 13x13)."); return false; }
+        const newSize = parseInt(sizeMatch[1]);
+        if (sizeMatch[1] !== sizeMatch[2] || newSize < 3 || newSize > 19) {
+            setMessage("Error: Invalid board size."); return false;
+        }
+        resetGame(newSize);
+        document.getElementById('board-size').value = newSize;
+
+        let tempTurn = 0;
+        let lastMoveWasSkip = false;
+
+        for (let i = 1; i < moves.length; i++) {
+            const move = moves[i];
+            if (!move) continue;
+
+            if (move.toLowerCase() === 'wswap') {
+                if (tempTurn !== 1 || currentMoveIndex !== 1) {
+                    setMessage("Error: WSwap only legal as White's first move."); renderBoard(); return false;
+                }
+                turn = 1;
+                const st = saveGameState();
+                st.turn = 1; st.initialX = null; st.initialY = null;
+                st.swapX = null; st.swapY = null; st.isSkip = false; st.lastWasPieSwap = true;
+                gameHistory.push(st); currentMoveIndex++;
+                lastMoveWasSkip = false;
+                continue;
+            }
+
+            const skipMatch = move.match(/^([BW])-$/);
+            if (skipMatch) {
+                const player = skipMatch[1] === 'B' ? 0 : 1;
+                if (player !== tempTurn) { setMessage("Error: Move out of turn: " + move); renderBoard(); return false; }
+                turn = tempTurn; tempTurn = tempTurn === 0 ? 1 : 0;
+                lastMoveWasSkip = true;
+                const ss = saveGameState();
+                ss.turn = tempTurn; ss.initialX = null; ss.initialY = null;
+                ss.swapX = null; ss.swapY = null; ss.isSkip = true; ss.lastWasPieSwap = false;
+                gameHistory.push(ss); currentMoveIndex++;
+                blackWins = ss.blackWins; whiteWins = ss.whiteWins; gameOver = ss.gameOver;
+                continue;
+            }
+
+            const moveMatch = move.match(/^([BW])([a-z])(\d+)(?:([-x])([a-z])(\d+))?$/);
+            if (!moveMatch) { setMessage("Error: Invalid move: " + move); renderBoard(); return false; }
+            const [, playerChar, col, row, , swapCol, swapRow] = moveMatch;
+            const player = playerChar === 'B' ? 0 : 1;
+            if (player !== tempTurn) { setMessage("Error: Move out of turn: " + move); renderBoard(); return false; }
+
+            const x = newSize - parseInt(row);
+            const y = col.charCodeAt(0) - 97;
+            if (x < 0 || x >= newSize || y < 0 || y >= newSize) {
+                setMessage("Error: Move out of bounds: " + move); renderBoard(); return false;
+            }
+            if (board[x][y] !== null) { setMessage("Error: Position occupied: " + move); renderBoard(); return false; }
+
+            turn = tempTurn;
+            board[x][y] = tempTurn;
+            setLastMoveMarker(x, y);
+
+            let st;
+            if (swapCol && swapRow) {
+                const sx = newSize - parseInt(swapRow);
+                const sy = swapCol.charCodeAt(0) - 97;
+                const enemy = tempTurn === 0 ? 1 : 0;
+                if (board[sx][sy] !== enemy) { setMessage("Error: Invalid swap in: " + move); renderBoard(); return false; }
+                const crossEn = getCrosscutEnemies(x, y, tempTurn);
+                if (!crossEn.some(([ex, ey]) => ex === sx && ey === sy)) {
+                    setMessage("Error: Swap not crosscut: " + move); renderBoard(); return false;
+                }
+                board[sx][sy] = tempTurn; board[x][y] = enemy;
+                if (isPartOfCrosscut(x, y)) board[x][y] = null;
+                setLastMoveMarker(sx, sy);
+                tempTurn = tempTurn === 0 ? 1 : 0;
+                st = saveGameState();
+                st.turn = tempTurn; st.initialX = x; st.initialY = y;
+                st.swapX = sx; st.swapY = sy; st.isSkip = false; st.lastWasPieSwap = false;
+            } else {
+                tempTurn = tempTurn === 0 ? 1 : 0;
+                st = saveGameState();
+                st.turn = tempTurn; st.initialX = x; st.initialY = y;
+                st.swapX = null; st.swapY = null; st.isSkip = false; st.lastWasPieSwap = false;
+            }
+            gameHistory.push(st); currentMoveIndex++;
+            blackWins = st.blackWins; whiteWins = st.whiteWins; gameOver = st.gameOver;
+            lastMoveWasSkip = false;
+        }
+
+        if (!gameOver && !lastMoveWasSkip && !hasValidMove(tempTurn)) {
+            turn = tempTurn === 0 ? 1 : 0;
+            const ss = saveGameState();
+            ss.turn = tempTurn; ss.initialX = null; ss.initialY = null;
+            ss.swapX = null; ss.swapY = null; ss.isSkip = true; ss.lastWasPieSwap = false;
+            gameHistory.push(ss); currentMoveIndex++;
+        }
+
+        turn = tempTurn;
+        renderBoard(); updateStatus(); updateReplayButtons(); updateLastMoveDisplay(); clearMessage();
+        return true;
     }
 
     function loadGame(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
+        const file = event.target.files[0]; if (!file) return;
         const reader = new FileReader();
-        reader.onload = function(e) {
-            const moveText = e.target.result.trim();
-            if (!moveText) {
-                setMessage("Error: Empty file.");
-                return;
-            }
-
-            const moves = moveText.split(' ');
-            const sizeMatch = moves[0].match(/^(\d+)[-x×*\uFFFD](\d+)$/);
-            if (!sizeMatch) {
-                setMessage("Error: File must start with board size (e.g., '19x19').");
-                return;
-            }
-            const [_, width, height] = sizeMatch;
-            const newSize = parseInt(width);
-            if (width !== height || newSize < 3 || newSize > 19) {
-                setMessage("Error: Invalid board size. Must be square and between 3x3 and 19x19.");
-                return;
-            }
-
-            resetGame(newSize);
-            const boardSizeSelect = document.getElementById('board-size');
-            boardSizeSelect.value = newSize;
-
-            let tempTurn = 0; // Start with Black
-            let lastMoveWasSkip = false;
-            let lastPlayer = null;
-
-            for (let i = 1; i < moves.length; i++) {
-                const move = moves[i];
-                if (!move) continue;
-
-                const skipMatch = move.match(/^([BW])-$/);
-                if (skipMatch) {
-                    const player = skipMatch[1] === 'B' ? 0 : 1;
-                    if (player !== tempTurn) {
-                        setMessage(`Error: Move '${move}' is out of turn order.`);
-                        renderBoard();
-                        return;
-                    }
-                    tempTurn = tempTurn === 0 ? 1 : 0;
-                    lastMoveWasSkip = true;
-                    lastPlayer = player;
-
-                    const skipState = saveGameState();
-                    skipState.initialX = null;
-                    skipState.initialY = null;
-                    skipState.swapX = null;
-                    skipState.swapY = null;
-                    skipState.isSkip = true;
-                    if (currentMoveIndex < gameHistory.length - 1) {
-                        gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
-                    }
-                    gameHistory.push(skipState);
-                    currentMoveIndex++;
-                    blackWins = skipState.blackWins;
-                    whiteWins = skipState.whiteWins;
-                    gameOver = skipState.gameOver;
-                    continue;
-                }
-
-                const moveMatch = move.match(/^([BW])([a-z])(\d+)(?:([-x])([a-z])(\d+))?$/);
-                if (!moveMatch) {
-                    setMessage(`Error: Invalid move format '${move}'.`);
-                    renderBoard();
-                    return;
-                }
-
-                const [, playerChar, col, row, separator, swapCol, swapRow] = moveMatch;
-                const player = playerChar === 'B' ? 0 : 1;
-
-                if (player !== tempTurn) {
-                    setMessage(`Error: Move '${move}' is out of turn order.`);
-                    renderBoard();
-                    return;
-                }
-
-                const x = SIZE - parseInt(row);
-                const y = col.charCodeAt(0) - 97;
-
-                if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) {
-                    setMessage(`Error: Move '${move}' out of bounds for ${SIZE}x${SIZE} board.`);
-                    renderBoard();
-                    return;
-                }
-
-                if (board[x][y] !== null) {
-                    setMessage(`Error: Position already occupied in move '${move}'.`);
-                    renderBoard();
-                    return;
-                }
-
-                board[x][y] = tempTurn;
-                setLastMoveMarker(x, y);
-
-                let state;
-                if (swapCol && swapRow) {
-                    const swapX = SIZE - parseInt(swapRow);
-                    const swapY = swapCol.charCodeAt(0) - 97;
-                    if (swapX < 0 || swapX >= SIZE || swapY < 0 || swapY >= SIZE) {
-                        setMessage(`Error: Swap position '${swapCol}${swapRow}' out of bounds in move '${move}'.`);
-                        renderBoard();
-                        return;
-                    }
-
-                    const enemy = tempTurn === 0 ? 1 : 0;
-                    if (board[swapX][swapY] !== enemy) {
-                        setMessage(`Error: Invalid swap target in move '${move}'.`);
-                        renderBoard();
-                        return;
-                    }
-
-                    const enemies = getCrosscutEnemies(x, y, tempTurn);
-                    if (!enemies.some(([ex, ey]) => ex === swapX && ey === swapY)) {
-                        setMessage(`Error: Swap in '${move}' not part of a crosscut.`);
-                        renderBoard();
-                        return;
-                    }
-
-                    board[swapX][swapY] = tempTurn;
-                    board[x][y] = enemy;
-                    if (isPartOfCrosscut(x, y)) {
-                        board[x][y] = null;
-                    }
-                    setLastMoveMarker(swapX, swapY);
-
-                    state = saveGameState();
-                    state.initialX = x;
-                    state.initialY = y;
-                    state.swapX = swapX;
-                    state.swapY = swapY;
-                    state.isSkip = false;
-                } else {
-                    state = saveGameState();
-                    state.initialX = x;
-                    state.initialY = y;
-                    state.swapX = null;
-                    state.swapY = null;
-                    state.isSkip = false;
-                }
-
-                if (currentMoveIndex < gameHistory.length - 1) {
-                    gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
-                }
-                gameHistory.push(state);
-                currentMoveIndex++;
-                blackWins = state.blackWins;
-                whiteWins = state.whiteWins;
-                gameOver = state.gameOver;
-
-                tempTurn = tempTurn === 0 ? 1 : 0;
-                lastMoveWasSkip = false;
-                lastPlayer = player;
-            }
-
-            if (!gameOver && !lastMoveWasSkip && !hasValidMove(tempTurn)) {
-                tempTurn = tempTurn === 0 ? 1 : 0;
-                const skipState = saveGameState();
-                skipState.initialX = null;
-                skipState.initialY = null;
-                skipState.swapX = null;
-                skipState.swapY = null;
-                skipState.isSkip = true;
-                gameHistory.push(skipState);
-                currentMoveIndex++;
-            }
-
-            turn = tempTurn; // Sync turn with final state
-            renderBoard();
-            updateStatus();
-            updateReplayButtons();
-            clearMessage();
-        };
+        reader.onload = e => processGameRecordText(e.target.result);
         reader.readAsText(file);
         event.target.value = '';
     }
 
-    function updateLastMoveDisplay() {
+        function updateLastMoveDisplay() {
         const lastMoveText = document.getElementById('last-move-text');
         const copyButton = document.getElementById('copy-move');
-        
+
         if (currentMoveIndex <= 0 || gameHistory.length <= 1) {
             lastMoveText.textContent = '';
             copyButton.style.display = 'none';
             return;
         }
 
-        // Find the last non-skip move
-        let lastRealMoveIndex = currentMoveIndex;
-        while (lastRealMoveIndex > 0 && gameHistory[lastRealMoveIndex].isSkip) {
-            lastRealMoveIndex--;
+        const state = gameHistory[currentMoveIndex];
+        if (state.lastWasPieSwap) {
+            lastMoveText.textContent = 'WSwap';
+            copyButton.style.display = 'inline-flex';
+            return;
         }
-        
-        const state = gameHistory[lastRealMoveIndex];
-        const player = (lastRealMoveIndex - 1) % 2 === 0 ? 'B' : 'W';
 
-        if (state.isSkip || state.initialX === null || state.initialY === null) {
+        // Find the last non-skip, non-pie move
+        let idx = currentMoveIndex;
+        while (idx > 0 && (gameHistory[idx].isSkip || gameHistory[idx].lastWasPieSwap)) idx--;
+        const realState = gameHistory[idx];
+        const prevState = gameHistory[idx - 1];
+        const player = prevState ? (prevState.turn === 0 ? 'B' : 'W') : 'B';
+
+        if (!realState || realState.isSkip || realState.lastWasPieSwap || realState.initialX == null) {
             lastMoveText.textContent = '';
             copyButton.style.display = 'none';
         } else {
-            const initialCol = String.fromCharCode(97 + state.initialY);
-            const initialRow = SIZE - state.initialX;
-            let moveStr = `${player}${initialCol}${initialRow}`;
-            if (state.swapX !== null && state.swapY !== null) {
-                const swapCol = String.fromCharCode(97 + state.swapY);
-                const swapRow = SIZE - state.swapX;
-                const isCapture = state.board[state.initialX][state.initialY] === null;
-                moveStr += `${isCapture ? 'x' : '-'}${swapCol}${swapRow}`;
+            const col = String.fromCharCode(97 + realState.initialY);
+            const row = SIZE - realState.initialX;
+            let moveStr = player + col + row;
+            if (realState.swapX !== null && realState.swapY !== null) {
+                const sc = String.fromCharCode(97 + realState.swapY);
+                const sr = SIZE - realState.swapX;
+                const isCapture = realState.board[realState.initialX][realState.initialY] === null;
+                moveStr += (isCapture ? 'x' : '-') + sc + sr;
             }
             lastMoveText.textContent = moveStr;
             copyButton.style.display = 'inline-flex';
@@ -1386,11 +1418,15 @@
     document.getElementById('copy-move').addEventListener('mousedown', copyLastMove);
 
     const boardSizeSelect = document.getElementById('board-size');
+    const saveSelect = document.getElementById('save-options');
+    const loadSelect = document.getElementById('load-options');
 
-    boardSizeSelect.addEventListener('keydown', (event) => {
-        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
-            event.preventDefault();
-        }
+    [boardSizeSelect, saveSelect, loadSelect].forEach(sel => {
+        sel.addEventListener('keydown', (event) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                event.preventDefault();
+            }
+        });
     });
 
     window.addEventListener('resize', () => {
@@ -1415,6 +1451,7 @@
     document.querySelectorAll('.replay-controls select').forEach(select => {
         select.addEventListener('change', () => {
             updateButtonTooltips();
+            if (select.id === 'save-options' || select.id === 'load-options') select.value = '';
             select.blur();
         });
     });
@@ -1423,7 +1460,7 @@
         const activeElement = document.activeElement;
         const isInputFocused = activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT' || activeElement.tagName === 'TEXTAREA';
 
-        const keysToPrevent = ['r', 'i', 'o', 'a', 's', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+        const keysToPrevent = ['r', 'i', 'o', 'a', 's', 'x', 'z', 'c', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
 
         if (isInputFocused && activeElement.tagName === 'SELECT' && ['ArrowUp', 'ArrowDown', 'Space'].includes(event.key)) {
         } else if (isInputFocused && (event.key.toLowerCase() === 'c' && (event.metaKey || event.ctrlKey))) {
@@ -1452,12 +1489,26 @@
                     boardSizeSelectEl.dispatchEvent(new Event('change'));
                 }
                 break;
-            case 'a':
-                triggerLoadGame();
+            case 'a': {
+                const ls = document.getElementById('load-options');
+                if (ls) { ls.value = 'file'; ls.dispatchEvent(new Event('change')); }
                 break;
-            case 's':
-                saveGame();
+            }
+            case 's': {
+                const ss = document.getElementById('save-options');
+                if (ss) { ss.value = 'file'; ss.dispatchEvent(new Event('change')); }
                 break;
+            }
+            case 'z': {
+                const ls = document.getElementById('load-options');
+                if (ls) { ls.value = 'clipboard'; ls.dispatchEvent(new Event('change')); }
+                break;
+            }
+            case 'x': {
+                const ss = document.getElementById('save-options');
+                if (ss) { ss.value = 'clipboard'; ss.dispatchEvent(new Event('change')); }
+                break;
+            }
             case 'c':
                 copyLastMove();
                 break;
