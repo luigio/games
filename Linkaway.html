@@ -198,8 +198,7 @@
     }
 
     function saveGameState() {
-        //const bWins = checkWin(0), wWins = checkWin(1);
-        const bWins = false, wWins = false;
+        const bWins = checkWin(0), wWins = checkWin(1);
         return { board: board.map(r=>[...r]), turn, lastMoveX, lastMoveY,
                  gameOver: bWins||wWins, blackWins: bWins, whiteWins: wWins, lastWasPieSwap: false };
     }
