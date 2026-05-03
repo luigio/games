@@ -409,6 +409,11 @@
         for (const [x, y] of adjEmpty) {
             pts[x * SIZE + y].classList.add('cascade-choice');
         }
+        // On Black's very first turn, clicking the first stone can finish the move with 1 stone;
+        // highlight it in gray so the player knows it's a valid "end turn here" option.
+        if (currentMoveIndex === 0) {
+            pts[firstStoneX * SIZE + firstStoneY].classList.add('cascade-choice');
+        }
     }
 
     function setCascadeHighlights(diagonals) {
@@ -666,6 +671,18 @@
         } else {
             if (x===firstStoneX && y===firstStoneY) {
                 if (Date.now()-firstStonePlacedAt < 100) return;
+                // On Black's very first turn, clicking the placed stone finalizes it as a single-stone move.
+                if (currentMoveIndex === 0) {
+                    const sx = firstStoneX, sy = firstStoneY;
+                    awaitingSecondStone = false;
+                    firstStoneX = null; firstStoneY = null;
+                    turnUndoStack = [];
+                    clearCascadeHighlights();
+                    lastMoveRemovals = []; currentTurnManualRemovals = [];
+                    cascadeTurnX1 = sx; cascadeTurnY1 = sy; cascadeTurnX2 = null; cascadeTurnY2 = null;
+                    continueCascade();
+                    return;
+                }
                 cancelSecondStone();
                 return;
             }
