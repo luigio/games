@@ -477,9 +477,7 @@
 
     function updateStatus() {
         const el=document.getElementById('turn-status');
-        if (awaitingSecondPlacement) {
-            el.innerHTML=(turn===0?blackStoneSVG:whiteStoneSVG)+' place 2nd stone';
-        } else if (gameOver) {
+        if (gameOver) {
             if (isDraw) el.innerHTML='Draw!';
             else el.innerHTML=(blackWins?blackStoneSVG:whiteStoneSVG)+' wins!';
         } else {
