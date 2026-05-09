@@ -99,6 +99,9 @@
     let isGenerating = false, generationInterval = null;
     let botReply = false;
     let gameOver = false, blackWins = false, whiteWins = false, isDraw = false;
+    // Anchor counts: for each color, a Map from anchorKey (r*SIZE+c) → reference count.
+    // Maintained incrementally; kept in sync with the current board state.
+    let gAnchorCounts = [new Map(), new Map()];
 
     const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
     const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
@@ -176,8 +179,8 @@
     }
 
     function getChain(x, y, color, visited=new Set()) {
-        if (x<0||x>=SIZE||y<0||y>=SIZE||visited.has(`${x},${y}`)||board[x][y]!==color) return [];
-        visited.add(`${x},${y}`);
+        if (x<0||x>=SIZE||y<0||y>=SIZE||visited.has(x*SIZE+y)||board[x][y]!==color) return [];
+        visited.add(x*SIZE+y);
         const chain = [[x,y]];
         for (const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0]]) chain.push(...getChain(x+dx,y+dy,color,visited));
         return chain;
@@ -187,11 +190,11 @@
         const visited = new Set();
         if (color===0) { // Black: top row → bottom row
             for (let y=0;y<SIZE;y++)
-                if (board[0][y]===0&&!visited.has(`0,${y}`))
+                if (board[0][y]===0&&!visited.has(y))
                     if (getChain(0,y,0,visited).some(([x])=>x===SIZE-1)) return true;
         } else { // White: left col → right col
             for (let x=0;x<SIZE;x++)
-                if (board[x][0]===1&&!visited.has(`${x},0`))
+                if (board[x][0]===1&&!visited.has(x*SIZE))
                     if (getChain(x,0,1,visited).some(([,y])=>y===SIZE-1)) return true;
         }
         return false;
@@ -208,6 +211,7 @@
         turn = (state.turn !== undefined) ? state.turn : (currentMoveIndex%2===0 ? 0 : 1);
         lastMoveX = state.lastMoveX; lastMoveY = state.lastMoveY;
         blackWins = state.blackWins; whiteWins = state.whiteWins; gameOver = state.gameOver; isDraw = false;
+        recomputeAnchors();
         resolveSkips();
         renderBoard(); updateStatus(); updateLastMoveDisplay();
     }
@@ -217,6 +221,7 @@
         board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
         turn = 0; lastMoveX = null; lastMoveY = null;
         gameOver = false; blackWins = false; whiteWins = false; isDraw = false;
+        gAnchorCounts = [new Map(), new Map()];
         const init = saveGameState();
         init.turn = 0; init.initialX = null; init.initialY = null; init.isSkip = false;
         gameHistory = [init]; currentMoveIndex = 0;
@@ -241,6 +246,65 @@
 
     function setMessage(msg) { document.getElementById('message').textContent = msg; }
     function clearMessage()  { document.getElementById('message').textContent = ''; }
+
+    // ── Anchor helpers ──
+
+    // Returns bend info {col, key} if the rectangle (r,c,h,w) forms a bend, else null.
+    // A bend: 2 same-color stones on one corner diagonal, 1 opposite-color stone (the anchor)
+    // on one corner, 1 empty corner, interior all empty.
+    function getBend(r, c, h, w, getCell) {
+        for (let ri=r; ri<=r+h-1; ri++)
+            for (let ci=c; ci<=c+w-1; ci++)
+                if (!((ri===r||ri===r+h-1)&&(ci===c||ci===c+w-1)) && getCell(ri,ci)!==null) return null;
+        const v00=getCell(r,c), v01=getCell(r,c+w-1), v10=getCell(r+h-1,c), v11=getCell(r+h-1,c+w-1);
+        let nulls=0;
+        if(v00===null)nulls++; if(v01===null)nulls++; if(v10===null)nulls++; if(v11===null)nulls++;
+        if(nulls!==1) return null;
+        for(const col of [0,1]){
+            const opp=1-col;
+            let nc=0,no=0;
+            if(v00===col)nc++; if(v01===col)nc++; if(v10===col)nc++; if(v11===col)nc++;
+            if(v00===opp)no++; if(v01===opp)no++; if(v10===opp)no++; if(v11===opp)no++;
+            if(nc!==2||no!==1) continue;
+            if(!((v00===col&&v11===col)||(v01===col&&v10===col))) continue;
+            if(v00===opp) return {col:opp, key:r*SIZE+c};
+            if(v01===opp) return {col:opp, key:r*SIZE+(c+w-1)};
+            if(v10===opp) return {col:opp, key:(r+h-1)*SIZE+c};
+            return {col:opp, key:(r+h-1)*SIZE+(c+w-1)};
+        }
+        return null;
+    }
+
+    // Rebuild gAnchorCounts from scratch (O(N²)). Call after loading a board state.
+    function recomputeAnchors() {
+        gAnchorCounts=[new Map(),new Map()];
+        for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++)
+            for(const [h,w] of [[2,3],[3,2],[2,4],[4,2]]){
+                if(r+h-1>=SIZE||c+w-1>=SIZE) continue;
+                const b=getBend(r,c,h,w,(rr,cc)=>board[rr][cc]);
+                if(b!==null){const m=gAnchorCounts[b.col];m.set(b.key,(m.get(b.key)||0)+1);}
+            }
+    }
+
+    // Place a stone and incrementally update gAnchorCounts (O(1)).
+    function placeStone(x, y, color) {
+        const shapes=[[2,3],[3,2],[2,4],[4,2]];
+        const rects=[];
+        for(const [h,w] of shapes){
+            const rMin=Math.max(0,x-(h-1)),rMax=Math.min(SIZE-h,x);
+            const cMin=Math.max(0,y-(w-1)),cMax=Math.min(SIZE-w,y);
+            for(let r=rMin;r<=rMax;r++) for(let c=cMin;c<=cMax;c++) rects.push([r,c,h,w]);
+        }
+        const getter=(rr,cc)=>board[rr][cc];
+        const oldBends=rects.map(([r,c,h,w])=>getBend(r,c,h,w,getter));
+        board[x][y]=color;
+        const newBends=rects.map(([r,c,h,w])=>getBend(r,c,h,w,getter));
+        for(let i=0;i<rects.length;i++){
+            const ob=oldBends[i],nb=newBends[i];
+            if(ob!==null){const m=gAnchorCounts[ob.col];const cnt=(m.get(ob.key)||0)-1;if(cnt<=0)m.delete(ob.key);else m.set(ob.key,cnt);}
+            if(nb!==null){const m=gAnchorCounts[nb.col];m.set(nb.key,(m.get(nb.key)||0)+1);}
+        }
+    }
 
     // ── Nadi constraint checkers ──
 
@@ -283,60 +347,25 @@
         return false;
     }
 
-    // Curl rule: a curl is a connected component of bends (black or white) where two bends
-    // are connected when they share 2 or more corner positions. Connectivity is across colors.
-    // The move is illegal if it would cause black bends to span more than one curl, or white
-    // bends to span more than one curl.
-    // Returns the violating color (0 or 1), or -1 if OK.
-    function wouldViolateCurlRule(x, y, color) {
-        const get = (r, c) => (r === x && c === y) ? color : board[r][c];
-
-        // Collect all bends of both colors.
-        const bends = [];   // { stones: Set<pos>, color: 0|1 }
-        for (let r = 0; r < SIZE; r++) {
-            for (let c = 0; c < SIZE; c++) {
-                for (const [h, w] of [[2,3],[3,2]]) {
-                    if (r+h-1 >= SIZE || c+w-1 >= SIZE) continue;
-                    let ok = true;
-                    for (let ri = r; ri <= r+h-1 && ok; ri++)
-                        for (let ci = c; ci <= c+w-1 && ok; ci++)
-                            if (!((ri===r||ri===r+h-1)&&(ci===c||ci===c+w-1)) && get(ri,ci)!==null) ok=false;
-                    if (!ok) continue;
-                    const v00=get(r,c), v01=get(r,c+w-1), v10=get(r+h-1,c), v11=get(r+h-1,c+w-1);
-                    const vals=[v00,v01,v10,v11];
-                    if (vals.filter(v=>v===null).length!==1) continue;
-                    for (const col of [0,1]) {
-                        const opp = 1-col;
-                        if (vals.filter(v=>v===col).length!==2||vals.filter(v=>v===opp).length!==1) continue;
-                        if (!((v00===col&&v11===col)||(v01===col&&v10===col))) continue;
-                        const stones = new Set();
-                        for (const [rr,cc,vv] of [[r,c,v00],[r,c+w-1,v01],[r+h-1,c,v10],[r+h-1,c+w-1,v11]])
-                            if (vv !== null) stones.add(rr*SIZE+cc);
-                        bends.push({ stones, color: col });
-                    }
-                }
+    // Single-anchor rule: each color may have at most one distinct anchor position.
+    // Check by cloning the tiny gAnchorCounts maps and applying a local delta
+    // for the ~28 rectangles that contain (x,y) — O(1) instead of O(N²).
+    function wouldCreateSecondAnchor(x, y, color) {
+        const counts=[new Map(gAnchorCounts[0]),new Map(gAnchorCounts[1])];
+        const get=(rr,cc)=>(rr===x&&cc===y)?color:board[rr][cc];
+        const getter=(rr,cc)=>board[rr][cc];
+        for(const [h,w] of [[2,3],[3,2],[2,4],[4,2]]){
+            const rMin=Math.max(0,x-(h-1)),rMax=Math.min(SIZE-h,x);
+            const cMin=Math.max(0,y-(w-1)),cMax=Math.min(SIZE-w,y);
+            for(let r=rMin;r<=rMax;r++) for(let c=cMin;c<=cMax;c++){
+                const ob=getBend(r,c,h,w,getter);
+                const nb=getBend(r,c,h,w,get);
+                if(ob!==null){const m=counts[ob.col];const cnt=(m.get(ob.key)||0)-1;if(cnt<=0)m.delete(ob.key);else m.set(ob.key,cnt);}
+                if(nb!==null){const m=counts[nb.col];m.set(nb.key,(m.get(nb.key)||0)+1);}
             }
         }
-
-        const n = bends.length;
-        if (n <= 1) return -1;
-
-        // Union-Find over all bends (mixed color), merging on shared corner positions.
-        const parent = Array.from({length: n}, (_,i) => i);
-        function find(i) { return parent[i]===i ? i : (parent[i]=find(parent[i])); }
-        for (let i = 0; i < n; i++)
-            for (let j = i+1; j < n; j++) {
-                let shared = 0;
-                for (const s of bends[i].stones) if (bends[j].stones.has(s)) shared++;
-                if (shared >= 2) parent[find(i)] = find(j);
-            }
-
-        // Check each color: its bends must all fall in the same component.
-        for (const col of [0,1]) {
-            const roots = new Set();
-            for (let i = 0; i < n; i++) if (bends[i].color === col) roots.add(find(i));
-            if (roots.size > 1) return col;
-        }
+        if(counts[0].size>1) return 0;
+        if(counts[1].size>1) return 1;
         return -1;
     }
 
@@ -344,7 +373,7 @@
         if (board[x][y] !== null) return false;
         if (wouldCreateNakedDiagonal(x, y, color)) return false;
         if (wouldCreateSwitch(x, y, color)) return false;
-        if (wouldViolateCurlRule(x, y, color) >= 0) return false;
+        if (wouldCreateSecondAnchor(x, y, color) >= 0) return false;
         return true;
     }
 
@@ -388,11 +417,11 @@
 
         if (wouldCreateNakedDiagonal(x, y, turn)) { setMessage("Creates a naked diagonal!"); return; }
         if (wouldCreateSwitch(x, y, turn))         { setMessage("Creates a switch!"); return; }
-        const curlViolation = wouldViolateCurlRule(x, y, turn);
-        if (curlViolation >= 0) { setMessage("Creates a second "+(curlViolation===0?"black":"white")+" curl!"); return; }
+        const anchorViolation = wouldCreateSecondAnchor(x, y, turn);
+        if (anchorViolation >= 0) { setMessage("Creates a second "+(anchorViolation===0?"black":"white")+" anchor!"); return; }
 
         clearMessage();
-        board[x][y] = turn;
+        placeStone(x, y, turn);
         setLastMoveMarker(x, y);
 
         turn = turn===0?1:0;
@@ -484,7 +513,7 @@
             if (isValidMove(x, y, turn)) valid.push([x, y]);
         if (valid.length === 0) return;
         const [x, y] = valid[Math.floor(Math.random() * valid.length)];
-        board[x][y] = turn;
+        placeStone(x, y, turn);
         setLastMoveMarker(x, y);
         turn = turn === 0 ? 1 : 0;
         const state = saveGameState();
@@ -551,7 +580,7 @@
             if (valid.length===0) { stopGeneration(); return; }
 
             const [x,y]=valid[Math.floor(Math.random()*valid.length)];
-            board[x][y]=turn;
+            placeStone(x,y,turn);
             setLastMoveMarker(x,y);
             turn=turn===0?1:0;
             const st=saveGameState();
@@ -627,7 +656,7 @@
             if (!isValidMove(x, y, tempTurn)) { setMessage("Error: Move violates Nadi rules: "+mv); renderBoard(); return false; }
 
             turn=tempTurn;
-            board[x][y]=tempTurn;
+            placeStone(x,y,tempTurn);
             setLastMoveMarker(x,y);
             tempTurn=tempTurn===0?1:0;
             // Resolve skip: if next player has no valid move, switch to opponent
