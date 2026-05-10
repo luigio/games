@@ -99,6 +99,7 @@
     let isGenerating = false, generationInterval = null;
     let botReply = false;
     let gameOver = false, blackWins = false, whiteWins = false, isDraw = false;
+    let lastPlayX = null, lastPlayY = null, lastPlayAt = 0;
 
     const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
     const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
@@ -289,6 +290,8 @@
     // ── Play ──
 
     function play(x, y, color) {
+        if (x === lastPlayX && y === lastPlayY && Date.now() - lastPlayAt < 100) return;
+        lastPlayX = x; lastPlayY = y; lastPlayAt = Date.now();
         clearMessage();
         const isCapture = (board[x][y] === color);
         board[x][y] = isCapture ? null : color;
