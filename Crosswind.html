@@ -250,60 +250,67 @@
         return false;
     }
 
-    // Knight bend: in any 2×3 or 3×2 sub-grid, exactly three empty points,
+    // Bend: in any 2×n or n×2 sub-grid (n ≥ 3), all interior cells are empty,
     // two like-colored stones in opposite corners, one opposite-color stone in
     // a third corner, and the fourth corner empty.
-    function hasKnightBend(brd) {
-        // 2 rows × 3 cols (middle two cells must be empty)
+    // Returns the number of bend instances on the board.
+    function countBends(brd) {
+        let count = 0;
+        // 2 rows × n cols (n >= 3): interior columns c+1 … c+n-2 must be empty
         for (let r=0;r<SIZE-1;r++) {
             for (let c=0;c<SIZE-2;c++) {
-                if (brd[r][c+1]!==null || brd[r+1][c+1]!==null) continue;
-                const tl=brd[r][c], tr=brd[r][c+2], bl=brd[r+1][c], br=brd[r+1][c+2];
-                // opposite pair (TL,BR) same color; third corner opposite color; fourth corner empty
-                if (tl!==null && tl===br) { const o=1-tl;
-                    if (tr===o && bl===null) return true;
-                    if (bl===o && tr===null) return true; }
-                // opposite pair (TR,BL) same color; third corner opposite color; fourth corner empty
-                if (tr!==null && tr===bl) { const o=1-tr;
-                    if (tl===o && br===null) return true;
-                    if (br===o && tl===null) return true; }
+                for (let len=3;c+len-1<SIZE;len++) {
+                    // Incrementally check the new interior cell (was the previous right corner)
+                    if (brd[r][c+len-2]!==null || brd[r+1][c+len-2]!==null) break;
+                    const tl=brd[r][c], tr=brd[r][c+len-1], bl=brd[r+1][c], br=brd[r+1][c+len-1];
+                    if (tl!==null && tl===br) { const o=1-tl;
+                        if (tr===o && bl===null) count++;
+                        if (bl===o && tr===null) count++; }
+                    if (tr!==null && tr===bl) { const o=1-tr;
+                        if (tl===o && br===null) count++;
+                        if (br===o && tl===null) count++; }
+                }
             }
         }
-        // 3 rows × 2 cols (middle two cells must be empty)
+        // n rows × 2 cols (n >= 3): interior rows r+1 … r+n-2 must be empty
         for (let r=0;r<SIZE-2;r++) {
             for (let c=0;c<SIZE-1;c++) {
-                if (brd[r+1][c]!==null || brd[r+1][c+1]!==null) continue;
-                const tl=brd[r][c], tr=brd[r][c+1], bl=brd[r+2][c], br=brd[r+2][c+1];
-                if (tl!==null && tl===br) { const o=1-tl;
-                    if (tr===o && bl===null) return true;
-                    if (bl===o && tr===null) return true; }
-                if (tr!==null && tr===bl) { const o=1-tr;
-                    if (tl===o && br===null) return true;
-                    if (br===o && tl===null) return true; }
+                for (let len=3;r+len-1<SIZE;len++) {
+                    if (brd[r+len-2][c]!==null || brd[r+len-2][c+1]!==null) break;
+                    const tl=brd[r][c], tr=brd[r][c+1], bl=brd[r+len-1][c], br=brd[r+len-1][c+1];
+                    if (tl!==null && tl===br) { const o=1-tl;
+                        if (tr===o && bl===null) count++;
+                        if (bl===o && tr===null) count++; }
+                    if (tr!==null && tr===bl) { const o=1-tr;
+                        if (tl===o && br===null) count++;
+                        if (br===o && tl===null) count++; }
+                }
             }
         }
-        return false;
+        return count;
     }
 
-    // Long switch: in any 2×4 or 4×2 sub-grid, all four non-corner cells are empty
+    // Switch: in any 2×n or n×2 sub-grid (n >= 3), all interior cells are empty
     // and the four corners form two black + two white opposite pairs.
-    function hasLongSwitch(brd) {
-        // 2 rows × 4 cols
+    function hasSwitch(brd) {
+        // 2 rows x n cols (n >= 3)
         for (let r=0;r<SIZE-1;r++) {
-            for (let c=0;c<SIZE-3;c++) {
-                if (brd[r][c+1]!==null||brd[r][c+2]!==null||
-                    brd[r+1][c+1]!==null||brd[r+1][c+2]!==null) continue;
-                const tl=brd[r][c],tr=brd[r][c+3],bl=brd[r+1][c],br=brd[r+1][c+3];
-                if (tl!==null&&tr!==null&&bl!==null&&br!==null && tl===br&&tr===bl&&tl!==tr) return true;
+            for (let c=0;c<SIZE-2;c++) {
+                for (let len=3;c+len-1<SIZE;len++) {
+                    if (brd[r][c+len-2]!==null || brd[r+1][c+len-2]!==null) break;
+                    const tl=brd[r][c],tr=brd[r][c+len-1],bl=brd[r+1][c],br=brd[r+1][c+len-1];
+                    if (tl!==null&&tr!==null&&bl!==null&&br!==null && tl===br&&tr===bl&&tl!==tr) return true;
+                }
             }
         }
-        // 4 rows × 2 cols
-        for (let r=0;r<SIZE-3;r++) {
+        // n rows x 2 cols (n >= 3)
+        for (let r=0;r<SIZE-2;r++) {
             for (let c=0;c<SIZE-1;c++) {
-                if (brd[r+1][c]!==null||brd[r+1][c+1]!==null||
-                    brd[r+2][c]!==null||brd[r+2][c+1]!==null) continue;
-                const tl=brd[r][c],tr=brd[r][c+1],bl=brd[r+3][c],br=brd[r+3][c+1];
-                if (tl!==null&&tr!==null&&bl!==null&&br!==null && tl===br&&tr===bl&&tl!==tr) return true;
+                for (let len=3;r+len-1<SIZE;len++) {
+                    if (brd[r+len-2][c]!==null || brd[r+len-2][c+1]!==null) break;
+                    const tl=brd[r][c],tr=brd[r][c+1],bl=brd[r+len-1][c],br=brd[r+len-1][c+1];
+                    if (tl!==null&&tr!==null&&bl!==null&&br!==null && tl===br&&tr===bl&&tl!==tr) return true;
+                }
             }
         }
         return false;
@@ -328,8 +335,8 @@
         const brd = board.map(r=>[...r]);
         brd[x][y] = color;
         if (hasNakedDiagonal(brd))  return "Naked diagonal!";
-        if (hasKnightBend(brd))     return "Knight bend!";
-        if (hasLongSwitch(brd))     return "Long switch!";
+        if (countBends(brd) > 1)    return "Bend!";
+        if (hasSwitch(brd))         return "Switch!";
         if (hasLooseCrosscut(brd))  return "Loose crosscut!";
         return null;
     }
