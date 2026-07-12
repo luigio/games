@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wishbone</title>
+    <style>
+        html, body { margin:0;padding:0;height:100vh;width:100vw;overflow:hidden;background-color:#f0f0f0;display:flex;justify-content:center;align-items:center; }
+        .game-container { display:flex;flex-direction:column;width:100vw;max-width:100%; }
+        .header { width:min(100vw,calc(100vh - 100px));height:50px;position:relative;display:flex;justify-content:space-between;align-items:center;margin:0 auto;overflow:visible; }
+        .status-left { font-family:Arial,sans-serif;font-size:1.2em;display:flex;align-items:center;white-space:nowrap;position:absolute;left:0;z-index:1;padding-right:0.5em; }
+        .controls-right { font-family:Arial,sans-serif;display:flex;align-items:center;white-space:nowrap;position:absolute;right:0;z-index:1;gap:0.5em; }
+        .board-container { display:flex;justify-content:center;align-items:center;width:100%;background-color:#f0f0f0; }
+        .footer { width:100%;height:50px;display:flex;justify-content:center;align-items:center; }
+        .board { width:min(100vw,calc(100vh - 100px));height:min(100vw,calc(100vh - 100px));background-color:#d9a359;position:relative;display:flex;justify-content:center;align-items:center; }
+        #last-move-text { font-family:Arial,sans-serif;font-size:1.2em;white-space:nowrap; }
+        #copy-move { font-size:1.2em;padding:0;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center; }
+        .copy-icon { width:1em;height:1em;vertical-align:middle; }
+        #copy-move:hover .copy-icon path { fill:#555; }
+        .grid { display:grid;width:100%;height:100%;position:relative; }
+        .lines { position:absolute;width:100%;height:100%;z-index:0; }
+        .point { position:relative;cursor:pointer; }
+        .stone { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;border-radius:50%;box-sizing:border-box; }
+        .black { background:black; }
+        .white { background:white;border:2px solid black; }
+        .point.last-move::after { content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:22%;height:22%;border-radius:50%;background:red;z-index:3; }
+        .replay-controls { display:flex;flex-wrap:nowrap;width:100%;gap:0.5em;overflow:hidden;justify-content:center; }
+        .replay-controls button,.replay-controls select { flex:0 1 auto;padding:0.3em 0.5em;font-size:1em;border:2px solid black;background:white;cursor:pointer;transition:background 0.3s ease;min-width:0;text-overflow:clip;overflow:hidden;white-space:nowrap;max-width:100px; }
+        button,select { font-size:1em;padding:0.3em 0.5em;border:2px solid black;background:white;cursor:pointer;transition:background 0.3s ease; }
+        button:not(:disabled):hover,select:hover { background:#FFF5E9; }
+        select { cursor:pointer;text-align:center; }
+        .replay-controls button:disabled { cursor:not-allowed;opacity:0.5; }
+        .stone-icon { width:1em;height:1em;vertical-align:middle;margin-right:0.5em; }
+        #message { font-family:Arial,sans-serif;position:absolute;left:calc(50vw + 50vh - 30px);top:50%;transform:translateY(-50%);font-size:1.2em;color:#d32f2f;width:20vw;text-align:left; }
+        #random-button { flex:0 1 auto;min-width:0; }
+        #bot-reply-button { flex:0 1 auto;min-width:0;max-width:8em; }
+        .sq { padding:0 !important; display:flex !important; align-items:center; justify-content:center; flex-shrink:0; }
+        #save-options, #load-options { flex:0 1 auto;min-width:0;text-align:center; }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div class="header">
+        <div class="status-left" id="turn-status"></div>
+        <div class="controls-right">
+            <div id="last-move-display" style="display:flex;align-items:center;gap:0.5em;">
+                <span id="last-move-text"></span>
+                <button id="copy-move" title="Copy last move" style="display:none;">
+                    <svg class="copy-icon" viewBox="0 0 24 24"><path fill="black" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="board-container">
+        <div class="board" id="board">
+            <div class="lines" id="lines"></div>
+            <div class="grid" id="grid"></div>
+        </div>
+        <div id="message"></div>
+    </div>
+    <div class="footer">
+        <div class="replay-controls">
+            <button class="sq" onmousedown="replayStart()" title="Go to start" data-tooltip="Go to start"><<</button>
+            <button class="sq" onmousedown="replayBack()" title="Previous move" data-tooltip="Previous move"><</button>
+            <button class="sq" onmousedown="replayForward()" title="Next move" data-tooltip="Next move">></button>
+            <button class="sq" onmousedown="replayEnd()" title="Go to end" data-tooltip="Go to end">>></button>
+            <button class="sq" id="random-button" onmousedown="generateRandomGame()" title="Generate random game" data-tooltip="Generate random game" data-tooltip-alt="Stop generation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="7" cy="17" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="17" r="1.5" fill="currentColor" stroke="none"/></svg></button>
+            <button class="sq" id="bot-reply-button" onmousedown="toggleBotReply()" title="Bot reply" data-tooltip="Bot reply is OFF" data-tooltip-alt="Bot reply is ON"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="4" y="2" width="16" height="20" rx="2"/><rect x="1" y="8" width="3" height="5" rx="1"/><rect x="20" y="8" width="3" height="5" rx="1"/><line x1="7" y1="8.75" x2="10.5" y2="8.75"/><line x1="13.5" y1="8.75" x2="17" y2="8.75"/><line x1="8" y1="17" x2="16" y2="17"/></svg></button>
+            <select id="save-options" onchange="handleSave()" data-tooltip="Save game">
+                <option value="" disabled selected hidden>Save</option>
+                <option value="file">To file</option>
+                <option value="clipboard">To clipboard</option>
+            </select>
+            <select id="load-options" onchange="handleLoad()" data-tooltip="Load game">
+                <option value="" disabled selected hidden>Load</option>
+                <option value="file">From file</option>
+                <option value="clipboard">From clipboard</option>
+            </select>
+            <select id="board-size" onchange="changeBoardSize()" data-tooltip="Board size">
+                <option value="3">3×3</option><option value="4">4×4</option><option value="5">5×5</option>
+                <option value="6">6×6</option><option value="7">7×7</option><option value="8">8×8</option>
+                <option value="9">9×9</option><option value="10">10×10</option><option value="11">11×11</option>
+                <option value="12">12×12</option><option value="13" selected>13×13</option><option value="14">14×14</option>
+                <option value="15">15×15</option><option value="16">16×16</option><option value="17">17×17</option>
+                <option value="18">18×18</option><option value="19">19×19</option>
+            </select>
+            <input type="file" id="load-input" style="display:none;" accept=".txt" onchange="loadGame(event)">
+        </div>
+    </div>
+</div>
+
+<script>
+    let SIZE = 13;
+    let board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+    let turn = 0; // 0=Black, 1=White
+    let lastMoveX = null, lastMoveY = null;
+    let gameHistory = [];
+    let currentMoveIndex = -1;
+    let isGenerating = false, generationInterval = null;
+    let botReply = false;
+    let gameOver = false, blackWins = false, whiteWins = false, isDraw = false;
+
+    const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
+    const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
+
+    // ── Board / state management ──
+
+    function initBoard() {
+        const gridDiv = document.getElementById('grid');
+        gridDiv.innerHTML = '';
+        const linesDiv = document.getElementById('lines');
+        linesDiv.innerHTML = '';
+
+        const canvas = document.createElement('canvas');
+        const boardSize = document.getElementById('board').offsetWidth;
+        canvas.width = boardSize; canvas.height = boardSize;
+        const ctx = canvas.getContext('2d');
+        const cellSize = boardSize / SIZE;
+
+        gridDiv.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+        gridDiv.style.gridTemplateRows    = `repeat(${SIZE}, 1fr)`;
+
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const point = document.createElement('div');
+                point.className = 'point';
+                point.dataset.x = i; point.dataset.y = j;
+                point.onmousedown = () => play(i, j);
+                point.appendChild(document.createElement('div')).className = 'stone';
+                gridDiv.appendChild(point);
+            }
+        }
+
+        ctx.strokeStyle = 'black'; ctx.lineWidth = 1;
+        for (let i = 0; i < SIZE; i++) {
+            const pos = cellSize/2 + i*cellSize;
+            ctx.beginPath(); ctx.moveTo(pos, cellSize/2); ctx.lineTo(pos, boardSize-cellSize/2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cellSize/2, pos); ctx.lineTo(boardSize-cellSize/2, pos); ctx.stroke();
+        }
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = 'black';
+        ctx.beginPath(); ctx.moveTo(cellSize/2, cellSize/2); ctx.lineTo(boardSize-cellSize/2, cellSize/2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cellSize/2, boardSize-cellSize/2); ctx.lineTo(boardSize-cellSize/2, boardSize-cellSize/2); ctx.stroke();
+        ctx.strokeStyle = 'white';
+        ctx.beginPath(); ctx.moveTo(cellSize/2, cellSize/2); ctx.lineTo(cellSize/2, boardSize-cellSize/2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(boardSize-cellSize/2, cellSize/2); ctx.lineTo(boardSize-cellSize/2, boardSize-cellSize/2); ctx.stroke();
+
+        // Miter the four corners: each 5×5 overlap square is split along a 45° diagonal
+        // into two filled triangles so the black (horizontal) and white (vertical) edges
+        // meet cleanly with no crude overlap.
+        {
+            const e = ctx.lineWidth / 2; // 2.5px — half the border stroke width
+            const h = cellSize / 2;      // center of the corner squares
+            const W = boardSize;
+            function tri(color, x1,y1, x2,y2, x3,y3) {
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3);
+                ctx.closePath(); ctx.fill();
+            }
+            // Top-left: diagonal from outer (h-e,h-e) to inner (h+e,h+e)
+            tri('black', h-e,h-e, h+e,h-e, h+e,h+e);   // upper-right → black (top edge)
+            tri('white', h-e,h-e, h-e,h+e, h+e,h+e);   // lower-left  → white (left edge)
+            // Top-right: diagonal from outer (W-h+e,h-e) to inner (W-h-e,h+e)
+            tri('black', W-h-e,h-e, W-h+e,h-e, W-h-e,h+e);  // upper-left  → black (top edge)
+            tri('white', W-h+e,h-e, W-h+e,h+e, W-h-e,h+e);  // lower-right → white (right edge)
+            // Bottom-left: diagonal from outer (h-e,W-h+e) to inner (h+e,W-h-e)
+            tri('black', h-e,W-h+e, h+e,W-h+e, h+e,W-h-e);  // lower-right → black (bottom edge)
+            tri('white', h-e,W-h-e, h+e,W-h-e, h-e,W-h+e);  // upper-left  → white (left edge)
+            // Bottom-right: diagonal from outer (W-h+e,W-h+e) to inner (W-h-e,W-h-e)
+            tri('black', W-h-e,W-h+e, W-h+e,W-h+e, W-h-e,W-h-e);  // lower-left  → black (bottom edge)
+            tri('white', W-h+e,W-h-e, W-h+e,W-h+e, W-h-e,W-h-e);  // upper-right → white (right edge)
+        }
+        
+        linesDiv.appendChild(canvas);
+        updateStatus(); updateLastMoveDisplay(); updateButtonTooltips(); adjustHeaderLayout();
+    }
+
+    function saveGameState() {
+        const bWins = checkWin(0), wWins = checkWin(1);
+        return { board: board.map(r=>[...r]), turn, lastMoveX, lastMoveY,
+                 gameOver: bWins||wWins, blackWins: bWins, whiteWins: wWins, lastWasPieSwap: false };
+    }
+
+    function loadGameState(state) {
+        board = state.board.map(r=>[...r]);
+        turn = (state.turn !== undefined) ? state.turn : (currentMoveIndex%2===0 ? 0 : 1);
+        lastMoveX = state.lastMoveX; lastMoveY = state.lastMoveY;
+        blackWins = state.blackWins; whiteWins = state.whiteWins; gameOver = state.gameOver; isDraw = false;
+        resolveSkips();
+        renderBoard(); updateStatus(); updateLastMoveDisplay();
+    }
+
+    function resetGame(newSize) {
+        SIZE = newSize;
+        board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+        turn = 0; lastMoveX = null; lastMoveY = null;
+        gameOver = false; blackWins = false; whiteWins = false; isDraw = false;
+        const init = saveGameState();
+        init.turn = 0; init.initialX = null; init.initialY = null; init.isSkip = false;
+        gameHistory = [init]; currentMoveIndex = 0;
+        clearMessage(); initBoard(); renderBoard(); updateReplayButtons(); updateLastMoveDisplay();
+    }
+
+    function changeBoardSize() {
+        resetGame(parseInt(document.getElementById('board-size').value));
+    }
+
+    function clearLastMoveMarker() {
+        if (lastMoveX!==null && lastMoveY!==null)
+            document.getElementsByClassName('point')[lastMoveX*SIZE+lastMoveY].classList.remove('last-move');
+        lastMoveX = null; lastMoveY = null;
+    }
+
+    function setLastMoveMarker(x, y) {
+        clearLastMoveMarker();
+        document.getElementsByClassName('point')[x*SIZE+y].classList.add('last-move');
+        lastMoveX = x; lastMoveY = y;
+    }
+
+    function setMessage(msg) { document.getElementById('message').textContent = msg; }
+    function clearMessage()  { document.getElementById('message').textContent = ''; }
+
+    function getChain(x, y, color, visited=new Set()) {
+        if (x<0||x>=SIZE||y<0||y>=SIZE||visited.has(`${x},${y}`)||board[x][y]!==color) return [];
+        visited.add(`${x},${y}`);
+        const chain = [[x,y]];
+        for (const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]) chain.push(...getChain(x+dx,y+dy,color,visited));
+        return chain;
+    }
+
+    function checkWin(color) {
+        const visited = new Set();
+        if (color===0) { // Black: top row → bottom row
+            for (let y=0;y<SIZE;y++)
+                if (board[0][y]===0&&!visited.has(`0,${y}`))
+                    if (getChain(0,y,0,visited).some(([x])=>x===SIZE-1)) return true;
+        } else { // White: left col → right col
+            for (let x=0;x<SIZE;x++)
+                if (board[x][0]===1&&!visited.has(`${x},0`))
+                    if (getChain(x,0,1,visited).some(([,y])=>y===SIZE-1)) return true;
+        }
+        return false;
+    }
+
+    function renderBoard() {
+        const points = document.getElementsByClassName('point');
+        for (let i=0;i<SIZE;i++) for (let j=0;j<SIZE;j++) {
+            const point = points[i*SIZE+j];
+            const stone = point.firstChild;
+            stone.className = 'stone';
+            if (board[i][j]===0) stone.classList.add('black');
+            else if (board[i][j]===1) stone.classList.add('white');
+            if (i===lastMoveX&&j===lastMoveY) point.classList.add('last-move');
+            else point.classList.remove('last-move');
+        }
+    }
+
+    function hasValidMove() {
+        for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++) {
+            if (board[x][y]===null) {
+                board[x][y]=turn;
+                const legal=!hasIllegalPattern(board,turn,x,y);
+                board[x][y]=null;
+                if (legal) return true;
+            }
+        }
+        return false;
+    }
+
+    // Resolve skips/draw for the current position — updates turn/isDraw/gameOver in memory only,
+    // never pushes to history. Called after every state load and after every move.
+    function resolveSkips() {
+        if (gameOver) return;
+        if (hasValidMove()) return;
+        turn = turn===0?1:0;
+        if (!hasValidMove()) { isDraw = true; gameOver = true; }
+    }
+
+    // ── Wishbone: illegal pattern detection ──
+
+    // A move at (x,y) by `color` is illegal if there exists a friendly stone A
+    // diagonally adjacent to (x,y) for which none of the three exceptions holds:
+    //   Exception 1: a friendly stone is orthogonally adjacent to both (x,y) and A.
+    //   Exception 2: an empty point is orthogonally adjacent to both, and that empty point is
+    //                itself diagonally adjacent to a friendly stone not adjacent to either (x,y) or A.
+    //   Exception 3: (x,y) has 2 orthogonal neighbors (any color) that are not adjacent to A,
+    //                and the placement does not form a crosscut with A.
+    function hasIllegalPattern(b, color, x, y) {
+        const diags = [[1,1],[1,-1],[-1,1],[-1,-1]];
+
+        for (const [dx, dy] of diags) {
+            const fx = x+dx, fy = y+dy;
+            if (fx<0||fx>=SIZE||fy<0||fy>=SIZE) continue;
+            if (b[fx][fy] !== color) continue;
+
+            // The two points orthogonally adjacent to both (x,y) and A=(fx,fy)
+            const commons = [[x+dx, y], [x, y+dy]];
+            let allowed = false;
+
+            for (const [px, py] of commons) {
+                if (px<0||px>=SIZE||py<0||py>=SIZE) continue;
+
+                if (b[px][py] === color) {
+                    // Exception 1: friendly stone bridges the diagonal
+                    allowed = true; break;
+                }
+
+                if (b[px][py] === null) {
+                    // Exception 2: empty bridge point — check its diagonal neighbors for a
+                    // friendly stone that is itself not orthogonally adjacent to either (x,y) or A
+                    for (const [ex, ey] of diags) {
+                        const qx = px+ex, qy = py+ey;
+                        if (qx<0||qx>=SIZE||qy<0||qy>=SIZE) continue;
+                        if (b[qx][qy] !== color) continue;
+                        const adjToPlaced = (Math.abs(qx-x)+Math.abs(qy-y)===1);
+                        const adjToDiag   = (Math.abs(qx-fx)+Math.abs(qy-fy)===1);
+                        if (!adjToPlaced && !adjToDiag) { allowed = true; break; }
+                    }
+                    if (allowed) break;
+                }
+            }
+
+            if (!allowed) {
+                // Exception 3: the two orthogonal neighbors of (x,y) that cannot be adjacent to A
+                // are (x-dx,y) and (x,y-dy). If both are occupied and no crosscut is formed, allow.
+                const ox1x=x-dx, ox1y=y, ox2x=x, ox2y=y-dy;
+                const opp = 1-color;
+                const n1ok = ox1x>=0&&ox1x<SIZE&&ox1y>=0&&ox1y<SIZE && b[ox1x][ox1y]===color;
+                const n2ok = ox2x>=0&&ox2x<SIZE&&ox2y>=0&&ox2y<SIZE && b[ox2x][ox2y]===color;
+                if (n1ok && n2ok) {
+                    // Crosscut check: common neighbors (x+dx,y) and (x,y+dy) are both opponent
+                    const c1ok = !(fx>=0&&fx<SIZE&&y>=0&&y<SIZE && b[fx][y]===opp);
+                    const c2ok = !(x>=0&&x<SIZE&&fy>=0&&fy<SIZE && b[x][fy]===opp);
+                    if (c1ok || c2ok) allowed = true; // no crosscut → allow
+                }
+            }
+
+            if (!allowed) return true; // illegal diagonal connection
+        }
+
+        return false;
+    }
+
+    // ── Play ──
+
+    function play(x, y) {
+        if (gameOver) { setMessage("Game is over!"); return; }
+        if (board[x][y] !== null) return;
+
+        board[x][y] = turn;
+        if (hasIllegalPattern(board, turn, x, y)) { board[x][y] = null; setMessage("Illegal move!"); return; }
+        clearMessage();
+        setLastMoveMarker(x, y);
+
+        turn = turn===0?1:0;
+        const state = saveGameState();
+        state.initialX=x; state.initialY=y; state.isSkip=false; state.lastWasPieSwap=false;
+        if (currentMoveIndex < gameHistory.length-1)
+            gameHistory = gameHistory.slice(0, currentMoveIndex+1);
+        gameHistory.push(state); currentMoveIndex++;
+        blackWins=state.blackWins; whiteWins=state.whiteWins; gameOver=state.gameOver;
+        isDraw=false; resolveSkips();
+
+        renderBoard(); updateStatus();
+        updateReplayButtons(); updateLastMoveDisplay();
+        if (!gameOver) setTimeout(makeBotReply, 0);
+    }
+
+    // ── Replay ──
+
+    function replayStart() {
+        currentMoveIndex=0; loadGameState(gameHistory[0]); clearMessage();
+        updateReplayButtons(); updateLastMoveDisplay();
+    }
+
+    function replayBack() {
+        if (currentMoveIndex>0) {
+            currentMoveIndex--;
+            loadGameState(gameHistory[currentMoveIndex]); clearMessage();
+            updateReplayButtons();
+        }
+    }
+
+    function replayForward() {
+        if (currentMoveIndex < gameHistory.length-1) {
+            currentMoveIndex++;
+            loadGameState(gameHistory[currentMoveIndex]); clearMessage();
+            updateReplayButtons();
+        }
+    }
+
+    function replayEnd() {
+        currentMoveIndex=gameHistory.length-1;
+        loadGameState(gameHistory[currentMoveIndex]); clearMessage();
+        updateReplayButtons(); updateLastMoveDisplay();
+    }
+
+    function updateReplayButtons() {
+        const s=document.querySelector('button[onmousedown="replayStart()"]');
+        const b=document.querySelector('button[onmousedown="replayBack()"]');
+        const f=document.querySelector('button[onmousedown="replayForward()"]');
+        const e=document.querySelector('button[onmousedown="replayEnd()"]');
+        const r=document.getElementById('random-button');
+        if (isGenerating) { s.disabled=b.disabled=f.disabled=e.disabled=true; r.disabled=false; }
+        else {
+            s.disabled=b.disabled=(currentMoveIndex===0);
+            f.disabled=e.disabled=(currentMoveIndex===gameHistory.length-1);
+            r.disabled=false;
+        }
+    }
+
+    function updateStatus() {
+        const el=document.getElementById('turn-status');
+        if (gameOver) {
+            if (isDraw) el.innerHTML='Draw!';
+            else el.innerHTML=(blackWins?blackStoneSVG:whiteStoneSVG)+' wins!';
+        }
+        else {
+            el.innerHTML=(turn===0?blackStoneSVG:whiteStoneSVG)+' to move';
+        }
+        adjustHeaderLayout();
+    }
+
+    // ── Random game ──
+
+    const BOT_ON_SVG  = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="4" y="2" width="16" height="20" rx="2"/><rect x="1" y="8" width="3" height="5" rx="1"/><rect x="20" y="8" width="3" height="5" rx="1"/><rect x="7" y="7" width="3.5" height="3.5" rx="0.5"/><rect x="13.5" y="7" width="3.5" height="3.5" rx="0.5"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`;
+    const BOT_OFF_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="4" y="2" width="16" height="20" rx="2"/><rect x="1" y="8" width="3" height="5" rx="1"/><rect x="20" y="8" width="3" height="5" rx="1"/><line x1="7" y1="8.75" x2="10.5" y2="8.75"/><line x1="13.5" y1="8.75" x2="17" y2="8.75"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`;
+
+    function toggleBotReply() {
+        botReply = !botReply;
+        const btn = document.getElementById('bot-reply-button');
+        btn.innerHTML = botReply ? BOT_ON_SVG : BOT_OFF_SVG;
+        btn.title = btn.dataset.tooltip = botReply ? 'Bot reply is ON' : 'Bot reply is OFF';
+        if (botReply) setTimeout(makeBotReply, 0);
+    }
+
+    function makeBotReply() {
+        if (!botReply || gameOver || isGenerating) return;
+        const valid = [];
+        for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++) {
+            if (board[x][y]===null) {
+                board[x][y]=turn;
+                if (!hasIllegalPattern(board,turn,x,y)) valid.push([x,y]);
+                board[x][y]=null;
+            }
+        }
+        if (valid.length === 0) return;
+        const [x, y] = valid[Math.floor(Math.random() * valid.length)];
+        board[x][y] = turn;
+        setLastMoveMarker(x, y);
+        turn = turn === 0 ? 1 : 0;
+        const state = saveGameState();
+        state.initialX = x; state.initialY = y; state.isSkip = false; state.lastWasPieSwap = false;
+        if (currentMoveIndex < gameHistory.length - 1)
+            gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+        gameHistory.push(state); currentMoveIndex++;
+        blackWins = state.blackWins; whiteWins = state.whiteWins; gameOver = state.gameOver;
+        isDraw=false; resolveSkips();
+        renderBoard(); updateStatus(); updateReplayButtons(); updateLastMoveDisplay();
+    }
+
+    const DICE_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="7" cy="17" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="17" r="1.5" fill="currentColor" stroke="none"/></svg>`;
+    const STOP_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:block;"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
+
+    function fixSquareButtons() {
+        document.querySelectorAll('.sq').forEach(btn => {
+            btn.style.width = '';
+            btn.style.width = btn.offsetHeight + 'px';
+        });
+    }
+
+    function fixSaveLoadWidths() {
+        for (const [id, label] of [['save-options', 'Save'], ['load-options', 'Load']]) {
+            const sel = document.getElementById(id);
+            const clone = sel.cloneNode(false);
+            const opt = document.createElement('option');
+            opt.textContent = label;
+            clone.appendChild(opt);
+            clone.style.cssText = 'position:absolute;visibility:hidden;width:auto;';
+            document.body.appendChild(clone);
+            const w = clone.offsetWidth;
+            document.body.removeChild(clone);
+            sel.style.width = w + 'px';
+        }
+    }
+
+    function stopGeneration() {
+        if (generationInterval) {
+            clearInterval(generationInterval); generationInterval=null; isGenerating=false;
+            const r=document.getElementById('random-button');
+            r.innerHTML=DICE_SVG; r.setAttribute('onmousedown','generateRandomGame()');
+            r.title=r.dataset.tooltip='Generate random game';
+            updateReplayButtons(); renderBoard();
+        }
+    }
+
+    function generateRandomGame() {
+        if (isGenerating) { stopGeneration(); return; }
+        if (gameOver) resetGame(SIZE);
+        isGenerating=true;
+        const r=document.getElementById('random-button');
+        r.innerHTML=STOP_SVG;
+        r.title=r.dataset.tooltip='Stop generation';
+        r.setAttribute('onmousedown','stopGeneration()'); updateReplayButtons();
+
+        generationInterval=setInterval(()=>{
+            if (gameOver) { stopGeneration(); return; }
+
+            const valid=[];
+            for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++) {
+                if (board[x][y]===null) {
+                    board[x][y]=turn;
+                    if (!hasIllegalPattern(board,turn,x,y)) valid.push([x,y]);
+                    board[x][y]=null;
+                }
+            }
+
+            if (valid.length===0) { stopGeneration(); return; }
+
+            const [x,y]=valid[Math.floor(Math.random()*valid.length)];
+            board[x][y]=turn;
+            setLastMoveMarker(x,y);
+            turn=turn===0?1:0;
+            const st=saveGameState();
+            st.initialX=x;st.initialY=y;st.isSkip=false;st.lastWasPieSwap=false;
+            if (currentMoveIndex<gameHistory.length-1) gameHistory=gameHistory.slice(0,currentMoveIndex+1);
+            gameHistory.push(st); currentMoveIndex++;
+            blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
+            isDraw=false; resolveSkips();
+            renderBoard(); updateStatus(); updateReplayButtons(); updateLastMoveDisplay();
+            if (gameOver) stopGeneration();
+        },1);
+    }
+
+    // ── Save / Load ──
+
+    function generateGameRecordText() {
+        const moves=[SIZE+'x'+SIZE];
+        for (let i=1;i<gameHistory.length;i++) {
+            const st=gameHistory[i], prev=gameHistory[i-1];
+            if (st.initialX!=null) {
+                const p=prev.turn===0?'B':'W';
+                const col=String.fromCharCode(97+st.initialY), row=SIZE-st.initialX;
+                moves.push(p+col+row);
+            }
+        }
+        return moves.join(' ');
+    }
+
+    function handleSave() {
+        const sel=document.getElementById('save-options'), opt=sel.value; if (!opt) return;
+        const text=generateGameRecordText();
+        if (opt==='file') {
+            const a=document.createElement('a');
+            a.href=URL.createObjectURL(new Blob([text],{type:'text/plain'}));
+            a.download='wishbone_game.txt'; a.click();
+        } else if (opt==='clipboard') {
+            navigator.clipboard.writeText(text).then(()=>setMessage('Copied to clipboard!'));
+        }
+        sel.value='';
+    }
+
+    function handleLoad() {
+        const sel=document.getElementById('load-options'), opt=sel.value;
+        if (opt==='file') document.getElementById('load-input').click();
+        else if (opt==='clipboard') navigator.clipboard.readText().then(t=>processGameRecordText(t));
+        sel.value='';
+    }
+
+    function processGameRecordText(rawText) {
+        const moveText=(rawText||'').trim();
+        if (!moveText) { setMessage("Error: Empty game record."); return false; }
+        const moves=moveText.split(/\s+/);
+        const sm=moves[0].match(/^(\d+)[-x×*\uFFFD](\d+)$/);
+        if (!sm) { setMessage("Error: Must start with board size (e.g. 13x13)."); return false; }
+        const ns=parseInt(sm[1]);
+        if (sm[1]!==sm[2]||ns<3||ns>19) { setMessage("Error: Invalid board size."); return false; }
+        resetGame(ns); document.getElementById('board-size').value=ns;
+
+        let tempTurn=0;
+        for (let i=1;i<moves.length;i++) {
+            const mv=moves[i]; if (!mv) continue;
+
+            // Accept (ignore) legacy skip notation for backward compatibility
+            if (/^[BW]-$/.test(mv)) continue;
+
+            const mm=mv.match(/^([BW])([a-z])(\d+)$/);
+            if (!mm) { setMessage("Error: Invalid move: "+mv); renderBoard(); return false; }
+            const [,pc,col,row]=mm, pl=pc==='B'?0:1;
+            if (pl!==tempTurn) { setMessage("Error: Move out of turn: "+mv); renderBoard(); return false; }
+            const x=ns-parseInt(row), y=col.charCodeAt(0)-97;
+            if (x<0||x>=ns||y<0||y>=ns) { setMessage("Error: Move out of bounds: "+mv); renderBoard(); return false; }
+            if (board[x][y]!==null) { setMessage("Error: Position occupied: "+mv); renderBoard(); return false; }
+
+            turn=tempTurn;
+            board[x][y]=tempTurn;
+            if (hasIllegalPattern(board,tempTurn,x,y)) { board[x][y]=null; setMessage("Error: Illegal move (pattern violation): "+mv); renderBoard(); return false; }
+            setLastMoveMarker(x,y);
+            tempTurn=tempTurn===0?1:0;
+            const st=saveGameState(); st.turn=tempTurn; st.initialX=x; st.initialY=y; st.isSkip=false; st.lastWasPieSwap=false;
+            gameHistory.push(st); currentMoveIndex++;
+            blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
+        }
+
+        turn=tempTurn; isDraw=false; resolveSkips();
+        renderBoard(); updateStatus(); updateReplayButtons(); updateLastMoveDisplay(); clearMessage();
+        return true;
+    }
+
+    function loadGame(event) {
+        const f=event.target.files[0]; if (!f) return;
+        const r=new FileReader();
+        r.onload=e=>processGameRecordText(e.target.result);
+        r.readAsText(f); event.target.value='';
+    }
+
+    function updateLastMoveDisplay() {
+        const txt=document.getElementById('last-move-text'), btn=document.getElementById('copy-move');
+        if (currentMoveIndex<=0||gameHistory.length<=1) { txt.textContent=''; btn.style.display='none'; return; }
+        const rs=gameHistory[currentMoveIndex], prev=gameHistory[currentMoveIndex-1];
+        const p=prev?(prev.turn===0?'B':'W'):'B';
+        if (!rs||rs.initialX==null) { txt.textContent=''; btn.style.display='none'; }
+        else {
+            txt.textContent=p+String.fromCharCode(97+rs.initialY)+(SIZE-rs.initialX);
+            btn.style.display='inline-flex';
+        }
+    }
+
+    function copyLastMove() {
+        const t=document.getElementById('last-move-text').textContent;
+        if (t) navigator.clipboard.writeText(t)
+            .then(()=>{ setMessage('Move copied!'); setTimeout(()=>{ if (document.getElementById('message').textContent==='Move copied!') clearMessage(); },2000); })
+            .catch(()=>{ setMessage('Failed to copy!'); setTimeout(()=>{ if (document.getElementById('message').textContent==='Failed to copy!') clearMessage(); },2000); });
+    }
+
+    // ── Layout helpers ──
+
+    function getTotalMaxWidth() {
+        const controls=document.querySelector('.replay-controls'), els=controls.querySelectorAll('button,select');
+        const s=getComputedStyle(els[0]);
+        const ew=parseFloat(s.maxWidth)+parseFloat(s.paddingLeft)+parseFloat(s.paddingRight)+parseFloat(s.borderLeftWidth)+parseFloat(s.borderRightWidth);
+        return ew*els.length+parseFloat(getComputedStyle(controls).gap)*(els.length-1);
+    }
+
+    function updateButtonTooltips() {
+        const els=[...document.querySelectorAll('.replay-controls button'),...document.querySelectorAll('.replay-controls select')];
+        const wide=window.innerWidth>=getTotalMaxWidth();
+        els.forEach(el=>{
+            const tooltip=el.dataset.tooltip;
+            if (!tooltip) return;
+            const squareButton = el.classList.contains('sq');
+            if (squareButton||!wide) el.setAttribute('title',tooltip);
+            else el.removeAttribute('title');
+        });
+    }
+
+    function adjustHeaderLayout() {
+        const hdr=document.querySelector('.header'),sl=document.querySelector('.status-left'),cr=document.querySelector('.controls-right');
+        sl.style.position=cr.style.position='absolute'; sl.style.left='0'; cr.style.right='0';
+        const ov=sl.offsetWidth+cr.offsetWidth-hdr.offsetWidth;
+        if (ov>0) { sl.style.left=`-${ov/2}px`; cr.style.right=`-${ov/2}px`; }
+    }
+
+    // ── Init ──
+    resetGame(SIZE); updateButtonTooltips(); adjustHeaderLayout(); fixSquareButtons(); fixSaveLoadWidths();
+    document.getElementById('copy-move').addEventListener('mousedown', copyLastMove);
+
+    [document.getElementById('board-size'),document.getElementById('save-options'),document.getElementById('load-options')].forEach(sel=>{
+        sel.addEventListener('keydown',e=>{ if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault(); });
+    });
+
+    window.addEventListener('resize',()=>{
+        initBoard(); renderBoard(); updateButtonTooltips(); fixSquareButtons(); fixSaveLoadWidths();
+        adjustHeaderLayout();
+    });
+
+    window.addEventListener('wheel',e=>{ e.preventDefault(); if (e.deltaY>0) replayForward(); else replayBack(); },{passive:false});
+
+    document.addEventListener('DOMContentLoaded', updateButtonTooltips);
+    document.querySelectorAll('.replay-controls select').forEach(sel=>{
+        sel.addEventListener('change',()=>{ updateButtonTooltips(); if (sel.id==='save-options'||sel.id==='load-options') sel.value=''; sel.blur(); });
+    });
+
+    window.addEventListener('keydown',e=>{
+        const ae=document.activeElement, inp=ae.tagName==='INPUT'||ae.tagName==='SELECT'||ae.tagName==='TEXTAREA';
+        const keys=['r','b','i','o','a','s','x','z','c','arrowup','arrowdown','arrowleft','arrowright'];
+        if (inp&&ae.tagName==='SELECT'&&['ArrowUp','ArrowDown','Space'].includes(e.key)) {}
+        else if (inp&&e.key.toLowerCase()==='c'&&(e.metaKey||e.ctrlKey)) {}
+        else if (keys.includes(e.key.toLowerCase())) e.preventDefault();
+        else return;
+        const bss=document.getElementById('board-size');
+        switch(e.key.toLowerCase()) {
+            case 'r': isGenerating?stopGeneration():generateRandomGame(); break;
+            case 'b': toggleBotReply(); break;
+            case 'i': if(bss&&document.activeElement!==bss){bss.selectedIndex=Math.max(0,bss.selectedIndex-1);bss.dispatchEvent(new Event('change'));} break;
+            case 'o': if(bss&&document.activeElement!==bss){bss.selectedIndex=Math.min(bss.options.length-1,bss.selectedIndex+1);bss.dispatchEvent(new Event('change'));} break;
+            case 'a': {const l=document.getElementById('load-options');if(l){l.value='file';l.dispatchEvent(new Event('change'));}} break;
+            case 's': {const s=document.getElementById('save-options');if(s){s.value='file';s.dispatchEvent(new Event('change'));}} break;
+            case 'z': {const l=document.getElementById('load-options');if(l){l.value='clipboard';l.dispatchEvent(new Event('change'));}} break;
+            case 'x': {const s=document.getElementById('save-options');if(s){s.value='clipboard';s.dispatchEvent(new Event('change'));}} break;
+            case 'c': copyLastMove(); break;
+        }
+        if (ae.tagName!=='SELECT'&&!inp) {
+            switch(e.key) {
+                case 'ArrowUp': replayStart(); break; case 'ArrowDown': replayEnd(); break;
+                case 'ArrowLeft': replayBack(); break; case 'ArrowRight': replayForward(); break;
+            }
+        }
+    });
+</script>
+</body>
+</html>
