@@ -357,11 +357,14 @@
     let turn = 0; // 0 for Black, 1 for White, convenience variable
     let lastMoveX = null;
     let lastMoveY = null;
+    let lastMoveX2 = null; // second point of the last completed move's marker
+    let lastMoveY2 = null;
     let gameHistory = [];
     let currentMoveIndex = -1;
     let isGenerating = false;
     let generationInterval = null;
     let swapTargets = null;
+    let pendingSelectedAt = 0; // timestamp a swap source was selected, for double-click cooloff
     let gameOver = false;
     let blackWins = false;
     let whiteWins = false;
@@ -487,6 +490,8 @@
             turn: turn,
             lastMoveX: lastMoveX,
             lastMoveY: lastMoveY,
+            lastMoveX2: lastMoveX2,
+            lastMoveY2: lastMoveY2,
             gameOver: bWins || wWins || stuck,
             blackWins: bWins,
             whiteWins: wWins,
@@ -499,6 +504,8 @@
         turn = (state.turn !== undefined) ? state.turn : (currentMoveIndex % 2 === 0 ? 0 : 1);
         lastMoveX = state.lastMoveX;
         lastMoveY = state.lastMoveY;
+        lastMoveX2 = (state.lastMoveX2 !== undefined) ? state.lastMoveX2 : null;
+        lastMoveY2 = (state.lastMoveY2 !== undefined) ? state.lastMoveY2 : null;
         blackWins = state.blackWins;
         whiteWins = state.whiteWins;
         gameOver = state.gameOver;
@@ -516,6 +523,8 @@
         turn = 0; // Black moves first
         lastMoveX = null;
         lastMoveY = null;
+        lastMoveX2 = null;
+        lastMoveY2 = null;
         gameOver = false;
         blackWins = false;
         whiteWins = false;
@@ -529,6 +538,7 @@
         gameHistory = [initialState];
         currentMoveIndex = 0;
         swapTargets = null;
+        pendingSelectedAt = 0;
         clearMessage();
         initBoard();
         renderBoard();
@@ -543,20 +553,59 @@
     }
 
     function clearLastMoveMarker() {
+        const points = document.getElementsByClassName('point');
         if (lastMoveX !== null && lastMoveY !== null) {
-            const points = document.getElementsByClassName('point');
             points[lastMoveX * SIZE + lastMoveY].classList.remove('last-move');
+        }
+        if (lastMoveX2 !== null && lastMoveY2 !== null) {
+            points[lastMoveX2 * SIZE + lastMoveY2].classList.remove('last-move');
         }
         lastMoveX = null;
         lastMoveY = null;
+        lastMoveX2 = null;
+        lastMoveY2 = null;
     }
 
+    // Marks a single point (used while a swap source is selected but its
+    // partner hasn't been chosen yet).
     function setLastMoveMarker(x, y) {
         clearLastMoveMarker();
         const points = document.getElementsByClassName('point');
         points[x * SIZE + y].classList.add('last-move');
         lastMoveX = x;
         lastMoveY = y;
+    }
+
+    // Marks both points affected by a completed move.
+    function setLastMoveMarkers(x1, y1, x2, y2) {
+        clearLastMoveMarker();
+        const points = document.getElementsByClassName('point');
+        points[x1 * SIZE + y1].classList.add('last-move');
+        points[x2 * SIZE + y2].classList.add('last-move');
+        lastMoveX = x1;
+        lastMoveY = y1;
+        lastMoveX2 = x2;
+        lastMoveY2 = y2;
+    }
+
+    // Re-displays the marker for the last actually-completed move, discarding
+    // whatever marker a cancelled in-progress selection had put on the board.
+    function restorePreviousLastMove() {
+        const state = gameHistory[currentMoveIndex];
+        lastMoveX = state ? state.lastMoveX : null;
+        lastMoveY = state ? state.lastMoveY : null;
+        lastMoveX2 = (state && state.lastMoveX2 !== undefined) ? state.lastMoveX2 : null;
+        lastMoveY2 = (state && state.lastMoveY2 !== undefined) ? state.lastMoveY2 : null;
+        renderBoard();
+    }
+
+    // Cancels a swap that has a source selected but no partner chosen yet.
+    function cancelPendingSwap() {
+        swapTargets = null;
+        pendingSelectedAt = 0;
+        clearMessage();
+        restorePreviousLastMove();
+        updateReplayButtons();
     }
 
     function setMessage(msg) {
@@ -679,6 +728,15 @@
         }
 
         if (swapTargets !== null) {
+            // Clicking the already-selected source stone again cancels the
+            // pending move. A brief cooloff after selection guards against
+            // faulty mice that fire a spurious extra click.
+            if (x === lastMoveX && y === lastMoveY) {
+                if (Date.now() - pendingSelectedAt < 100) return;
+                cancelPendingSwap();
+                return;
+            }
+
             // A source stone is already selected; only a highlighted partner
             // cell completes the swap.
             if (swapTargets.some(([tx, ty]) => tx === x && ty === y)) {
@@ -687,7 +745,7 @@
                 board[sx][sy] = board[x][y];
                 board[x][y] = tmp;
                 clearMessage();
-                setLastMoveMarker(x, y);
+                setLastMoveMarkers(sx, sy, x, y);
                 turn = turn === 0 ? 1 : 0;
 
                 const state = saveGameState();
@@ -713,7 +771,7 @@
 
                 if (!gameOver) setTimeout(makeBotReply, 0);
             } else {
-                setMessage("Please select a highlighted stone to swap with.");
+                setMessage("Please select a highlighted stone to swap with, or click the first stone again to cancel.");
             }
             return;
         }
@@ -723,6 +781,7 @@
         const partners = getLegalPartners(x, y);
         if (partners.length > 0) {
             swapTargets = partners;
+            pendingSelectedAt = Date.now();
             setLastMoveMarker(x, y);
             clearMessage();
             renderBoard();
@@ -805,7 +864,7 @@
                 } else if (board[i][j] === 1) {
                     stone.classList.add('white');
                 }
-                if (i === lastMoveX && j === lastMoveY) {
+                if ((i === lastMoveX && j === lastMoveY) || (i === lastMoveX2 && j === lastMoveY2)) {
                     point.classList.add('last-move');
                 } else {
                     point.classList.remove('last-move');
@@ -949,7 +1008,7 @@
         const tmp = board[sx][sy];
         board[sx][sy] = board[dx][dy];
         board[dx][dy] = tmp;
-        setLastMoveMarker(dx, dy);
+        setLastMoveMarkers(sx, sy, dx, dy);
 
         turn = turn === 0 ? 1 : 0;
         renderBoard();
@@ -1114,7 +1173,7 @@
             const tmp = board[sx][sy];
             board[sx][sy] = board[dx][dy];
             board[dx][dy] = tmp;
-            setLastMoveMarker(dx, dy);
+            setLastMoveMarkers(sx, sy, dx, dy);
 
             tempTurn = tempTurn === 0 ? 1 : 0;
             const st = saveGameState();
@@ -1222,6 +1281,10 @@
 
     window.addEventListener('wheel', (event) => {
         event.preventDefault();
+        if (swapTargets !== null) {
+            if (event.deltaY < 0) cancelPendingSwap();
+            return;
+        }
         if (event.deltaY > 0) replayForward();
         else if (event.deltaY < 0) replayBack();
     }, { passive: false });
