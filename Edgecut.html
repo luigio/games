@@ -622,66 +622,128 @@
         return Math.min(v, SIZE - 1 - v);
     }
 
-    // Returns the legal swap-pairs for the 2x2 block whose top-left corner is
-    // (i, j), if that block currently forms a crosscut (a diagonal BW/WB
-    // pattern). Of the block's four orthogonal pairs (top, bottom, left,
-    // right), only the one(s) tied for minimum distance to their nearer board
-    // edge are legal -- ties mean more than one pair can qualify.
-    function crosscutPairsAt(i, j) {
-        if (i < 0 || j < 0 || i > SIZE - 2 || j > SIZE - 2) return [];
-        const a = board[i][j], b = board[i][j + 1], c = board[i + 1][j], d = board[i + 1][j + 1];
-        if (a === null || b === null || c === null || d === null) return [];
-        if (!(a === d && b === c && a !== b)) return [];
+    // "Distance from center" of the 2x2 crosscut block whose top-left corner is
+    // (i, j): larger = closer to the board's center, smaller = closer to the
+    // outer edge (0 = the block touches the edge).
+    function mValue(i, j) {
+        return Math.min(rho(i), rho(i + 1), rho(j), rho(j + 1));
+    }
 
-        const topD = rho(i), botD = rho(i + 1), leftD = rho(j), rightD = rho(j + 1);
-        const m = Math.min(topD, botD, leftD, rightD);
-        const pairs = [];
-        if (topD === m) pairs.push([[i, j], [i, j + 1]]);
-        if (botD === m) pairs.push([[i + 1, j], [i + 1, j + 1]]);
-        if (leftD === m) pairs.push([[i, j], [i + 1, j]]);
-        if (rightD === m) pairs.push([[i, j + 1], [i + 1, j + 1]]);
-        return pairs;
+    // Whether the 2x2 block with top-left corner (i, j) currently forms a
+    // crosscut (a diagonal BW/WB pattern).
+    function isCrosscut(i, j) {
+        if (i < 0 || j < 0 || i > SIZE - 2 || j > SIZE - 2) return false;
+        const a = board[i][j], b = board[i][j + 1], c = board[i + 1][j], d = board[i + 1][j + 1];
+        if (a === null || b === null || c === null || d === null) return false;
+        return a === d && b === c && a !== b;
+    }
+
+    // Every 2x2 block (given by its top-left corner) that contains cell (x, y).
+    function blocksTouchingCell(x, y) {
+        const blocks = [];
+        for (const i of [x - 1, x]) {
+            if (i < 0 || i > SIZE - 2) continue;
+            for (const j of [y - 1, y]) {
+                if (j < 0 || j > SIZE - 2) continue;
+                blocks.push([i, j]);
+            }
+        }
+        return blocks;
+    }
+
+    // Whether swapping the orthogonally-adjacent cells (x1,y1) and (x2,y2) is a
+    // legal move: the pair must be one of the 4 edges of a crosscut currently
+    // on the board (swapping it always destroys that crosscut -- "kills" it).
+    // The swap can also change the crosscut-status of any OTHER 2x2 block that
+    // shares a cell with the swapped pair -- only those blocks can possibly
+    // change, so only they need to be re-checked. Among the blocks that lose
+    // crosscut status ("killed"), take the one closest to the center; every
+    // block that newly gains crosscut status ("created") must be strictly
+    // farther from the center than that.
+    function isLegalSwap(x1, y1, x2, y2) {
+        if (x2 < 0 || x2 >= SIZE || y2 < 0 || y2 >= SIZE) return false;
+
+        const touch1 = blocksTouchingCell(x1, y1);
+        const touch2 = blocksTouchingCell(x2, y2);
+
+        // The pair must be an edge of at least one block that has BOTH cells
+        // as corners and currently forms a crosscut. (Checking "some touched
+        // block changed status" is NOT an equivalent test: a block touching
+        // only x1,y1 -- with x2,y2 not even one of its corners -- can flip
+        // status purely from that single cell changing, which would wrongly
+        // count as legal if we didn't check this explicitly.)
+        const hasQualifyingParent = touch1.some(([i, j]) =>
+            isCrosscut(i, j) && touch2.some(([i2, j2]) => i2 === i && j2 === j)
+        );
+        if (!hasQualifyingParent) return false;
+
+        const affected = [];
+        const seen = new Set();
+        for (const [i, j] of [...touch1, ...touch2]) {
+            const key = i + ',' + j;
+            if (!seen.has(key)) { seen.add(key); affected.push([i, j]); }
+        }
+        const before = affected.map(([i, j]) => isCrosscut(i, j));
+
+        const tmp = board[x1][y1];
+        board[x1][y1] = board[x2][y2];
+        board[x2][y2] = tmp;
+
+        const killed = [], created = [];
+        affected.forEach(([i, j], idx) => {
+            const was = before[idx], now = isCrosscut(i, j);
+            if (was && !now) killed.push([i, j]);
+            else if (!was && now) created.push([i, j]);
+        });
+
+        board[x2][y2] = board[x1][y1]; // undo the trial swap
+        board[x1][y1] = tmp;
+
+        // killed is guaranteed non-empty here (the qualifying parent block
+        // above is always destroyed by the swap -- see comment on
+        // getAllLegalMoves), but the check is kept as a safety net.
+        if (killed.length === 0) return false;
+        if (created.length === 0) return true;
+        const centerOfKilled = Math.max(...killed.map(([i, j]) => mValue(i, j)));
+        return created.every(([i, j]) => mValue(i, j) < centerOfKilled);
     }
 
     // Every legal swap-pair currently available anywhere on the board.
     function getAllLegalMoves() {
-        const moves = [];
+        const candidates = new Map();
         for (let i = 0; i <= SIZE - 2; i++) {
             for (let j = 0; j <= SIZE - 2; j++) {
-                moves.push(...crosscutPairsAt(i, j));
+                if (!isCrosscut(i, j)) continue;
+                const edges = [
+                    [[i, j], [i, j + 1]],
+                    [[i + 1, j], [i + 1, j + 1]],
+                    [[i, j], [i + 1, j]],
+                    [[i, j + 1], [i + 1, j + 1]]
+                ];
+                for (const [[x1, y1], [x2, y2]] of edges) {
+                    candidates.set(`${x1},${y1}-${x2},${y2}`, [[x1, y1], [x2, y2]]);
+                }
             }
+        }
+        const moves = [];
+        for (const [[x1, y1], [x2, y2]] of candidates.values()) {
+            if (isLegalSwap(x1, y1, x2, y2)) moves.push([[x1, y1], [x2, y2]]);
         }
         return moves;
     }
 
     function hasValidMove() {
-        for (let i = 0; i <= SIZE - 2; i++) {
-            for (let j = 0; j <= SIZE - 2; j++) {
-                if (crosscutPairsAt(i, j).length > 0) return true;
-            }
-        }
-        return false;
+        return getAllLegalMoves().length > 0;
     }
 
-    // The cells that a click on (x, y) could legally swap with: the other half
-    // of any minimal-distance pair, from any crosscut (x, y) is a corner of,
-    // that includes (x, y).
+    // The cells that a click on (x, y) could legally swap with.
     function getLegalPartners(x, y) {
         const partners = [];
-        const corners = [[x - 1, y - 1], [x - 1, y], [x, y - 1], [x, y]];
-        for (const [i, j] of corners) {
-            for (const [p1, p2] of crosscutPairsAt(i, j)) {
-                if (p1[0] === x && p1[1] === y) partners.push(p2);
-                else if (p2[0] === x && p2[1] === y) partners.push(p1);
-            }
+        for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+            if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE) continue;
+            if (isLegalSwap(x, y, nx, ny)) partners.push([nx, ny]);
         }
-        const seen = new Set();
-        return partners.filter(([px, py]) => {
-            const key = px + ',' + py;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-        });
+        return partners;
     }
 
     function getChain(x, y, color, visited = new Set()) {
