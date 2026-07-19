@@ -20,6 +20,7 @@
         .grid { display:grid;width:100%;height:100%;position:relative; }
         .lines { position:absolute;width:100%;height:100%;z-index:0; }
         .crosscuts { position:absolute;width:100%;height:100%;z-index:0;pointer-events:none; }
+        .merges { position:absolute;width:100%;height:100%;z-index:1;pointer-events:none; }
         .point { position:relative;cursor:pointer; }
         .stone { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;border-radius:50%;box-sizing:border-box; }
         .black { background:black; }
@@ -57,6 +58,7 @@
             <div class="lines" id="lines"></div>
             <div class="crosscuts" id="crosscuts"></div>
             <div class="grid" id="grid"></div>
+            <div class="merges" id="merges"></div>
         </div>
         <div id="message"></div>
     </div>
@@ -113,6 +115,7 @@
         const linesDiv = document.getElementById('lines');
         linesDiv.innerHTML = '';
         document.getElementById('crosscuts').innerHTML = '';
+        document.getElementById('merges').innerHTML = '';
 
         const canvas = document.createElement('canvas');
         const boardSize = document.getElementById('board').offsetWidth;
@@ -292,22 +295,146 @@
         return edges;
     }
 
-    // Draws a 75%-opacity square of the owner's color over each owned crosscut.
+    // Fills each owned crosscut with its owner's color. Black stones have no outline, so a
+    // black-owned crosscut already merges seamlessly with its stones. For white-owned crosscuts,
+    // the two white (owner) stones are masked so their own quadrant facing the crosscut is cut
+    // away entirely (fill + outline together, in one paint pass) revealing the white fill square
+    // beneath — a true merge with no compositing seam. The two black (non-owner) stones get a
+    // matching black arc, of the same thickness as a normal stone outline, drawn on their
+    // quadrant facing the crosscut, so their edge stays clearly delineated against the fill.
+    const CORNER_MASK_SECTOR = { br:[90,180], tl:[270,360], bl:[180,270], tr:[0,90] };   // conic-gradient angles (0deg = up, clockwise)
+    const CORNER_ARC_SECTOR  = { br:[0,90],   tl:[180,270], bl:[90,180],  tr:[270,360] }; // screen angles (0deg = right, clockwise)
+
     function renderCrosscuts() {
         const div = document.getElementById('crosscuts');
+        const mergeDiv = document.getElementById('merges');
         div.innerHTML = '';
-        const boardPx = document.getElementById('board').offsetWidth;
-        const cellSize = boardPx / SIZE;
-        for (const cc of getCrosscuts()) {
-            if (cc.owner===null) continue;
+        mergeDiv.innerHTML = '';
+        const boardEl = document.getElementById('board');
+        const boardRect = boardEl.getBoundingClientRect();
+        const points = document.getElementsByClassName('point');
+
+        // Point positions are laid out by CSS Grid (repeat(SIZE, 1fr)), which distributes
+        // fractional pixel remainders across columns/rows using its own internal rounding.
+        // That can drift, column by column, from a naive `boardPx/SIZE * index` JS calculation
+        // — the drift compounds with distance from the top-left corner, so a stone can end up
+        // rendered a fraction of a pixel away from where such a formula assumes it is. Since the
+        // crosscut fill square and arcs need to align exactly with the stones for the mask cut
+        // to be fully covered, we read each point's *actual* rendered center via
+        // getBoundingClientRect instead of computing it, so there's no drift to align against.
+        function centerOf(x, y) {
+            const r = points[x*SIZE+y].getBoundingClientRect();
+            return { x: r.left - boardRect.left + r.width/2, y: r.top - boardRect.top + r.height/2, r: r.width/2 };
+        }
+
+        // Reset any mask left over from a previous render.
+        for (let i=0;i<points.length;i++) {
+            const stone = points[i].firstChild;
+            stone.style.maskImage = 'none';
+            stone.style.webkitMaskImage = 'none';
+        }
+
+        // A stone can be the "owner corner" of two different crosscuts at once (it sits at the
+        // shared corner of two diagonally-adjacent 2x2 blocks), each wanting to cut away a
+        // different quadrant. Corners are accumulated per-stone and merged into a single mask
+        // at the end, instead of each call overwriting the previous one (which used to leave
+        // an earlier-masked quadrant's outline fully visible again).
+        const cutCorners = new Map(); // stone index -> Set of corner names
+        const QUADRANT_ORDER = ['tr','br','bl','tl']; // fixed 0-90-180-270-360 order, matches CORNER_MASK_SECTOR
+
+        function maskAwayCorner(x, y, corner) {
+            const idx = x*SIZE+y;
+            if (!cutCorners.has(idx)) cutCorners.set(idx, new Set());
+            cutCorners.get(idx).add(corner);
+        }
+
+        function applyStoneMasks() {
+            for (const [idx, corners] of cutCorners) {
+                const stone = points[idx].firstChild;
+                let stops = '';
+                for (let i=0;i<4;i++) {
+                    const q = QUADRANT_ORDER[i];
+                    const color = corners.has(q) ? 'transparent' : 'white';
+                    stops += `${color} ${i*90}deg ${(i+1)*90}deg, `;
+                }
+                const g = `conic-gradient(from 0deg, ${stops.slice(0,-2)})`;
+                stone.style.maskImage = g;
+                stone.style.webkitMaskImage = g;
+            }
+        }
+
+        const arcs = [];
+        function addArc(x, y, corner) {
+            const { x: cx, y: cy, r: radius } = centerOf(x, y);
+            // Outer edge stays fixed at radius+2 (same visible boundary against the crosscut
+            // fill, so the line's on-screen appearance is unchanged). The stroke is widened
+            // purely inward, past the stone's true edge and into the stone itself, so the
+            // extra width is invisible (black-on-black) but guarantees full coverage across
+            // the anti-aliased seam between the independently-rendered stone circle and arc
+            // stroke, which could otherwise let a hairline of the fill color show through.
+            const outerR = radius + 2;
+            const strokeWidth = 4;
+            const r = outerR - strokeWidth/2; // centerline
+            const [s,e] = CORNER_ARC_SECTOR[corner];
+            const sr = s*Math.PI/180, er = e*Math.PI/180;
+            const x1 = cx + r*Math.cos(sr), y1 = cy + r*Math.sin(sr);
+            const x2 = cx + r*Math.cos(er), y2 = cy + r*Math.sin(er);
+            arcs.push(`<path d="M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}" stroke="black" stroke-width="${strokeWidth}" fill="none"/>`);
+        }
+
+        // Two passes: white-owned squares first (padded, since white masks need to hide under
+        // them), then black-owned squares (exact, unpadded — they never back a mask, so they
+        // don't need it). Drawing black-owned squares second means that at any border between
+        // a white-owned and a black-owned crosscut, black's crisp true-boundary edge paints on
+        // top, cleanly covering white's padding overshoot instead of the two colors competing
+        // for that 1-2px strip (which used to leave a stray sliver of one color, or the other,
+        // bleeding across the boundary).
+        const crosscuts = getCrosscuts().filter(cc => cc.owner!==null);
+        function drawSquare(cc, pad) {
             const sq = document.createElement('div');
             sq.style.position = 'absolute';
-            sq.style.left = (cellSize/2 + cc.c*cellSize) + 'px';
-            sq.style.top = (cellSize/2 + cc.r*cellSize) + 'px';
-            sq.style.width = cellSize + 'px';
-            sq.style.height = cellSize + 'px';
-            sq.style.backgroundColor = cc.owner===0 ? 'rgba(0,0,0,1)' : 'rgba(255,255,255,1)';
+            const tl = centerOf(cc.r, cc.c), br = centerOf(cc.r+1, cc.c+1);
+            sq.style.left = (tl.x - pad) + 'px';
+            sq.style.top = (tl.y - pad) + 'px';
+            sq.style.width = (br.x - tl.x + pad*2) + 'px';
+            sq.style.height = (br.y - tl.y + pad*2) + 'px';
+            sq.style.backgroundColor = cc.owner===0 ? 'rgb(0,0,0)' : 'rgb(255,255,255)';
             div.appendChild(sq);
+        }
+
+        for (const cc of crosscuts) {
+            if (cc.owner!==1) continue;
+            // Anchored to the actual rendered centers of the crosscut's top-left and
+            // bottom-right stones (not a computed cellSize*index formula), so the fill square's
+            // edges always exactly coincide with the real grid lines connecting those points —
+            // fully covering the masked-away pie-slice quadrants regardless of any CSS Grid
+            // sub-pixel rounding. A small 1px pad guards against ordinary anti-aliasing softness
+            // at the mask's hard edge; the overshoot lands under each stone's own opaque,
+            // unmasked quadrants, so it's never actually visible.
+            drawSquare(cc, 1);
+
+            if (cc.colorA===1) { // "\" diagonal is white: white stones at (r,c) & (r+1,c+1); black stones at (r,c+1) & (r+1,c)
+                maskAwayCorner(cc.r, cc.c, 'br');
+                maskAwayCorner(cc.r+1, cc.c+1, 'tl');
+                addArc(cc.r, cc.c+1, 'bl');
+                addArc(cc.r+1, cc.c, 'tr');
+            } else { // "/" diagonal is white: white stones at (r,c+1) & (r+1,c); black stones at (r,c) & (r+1,c+1)
+                maskAwayCorner(cc.r, cc.c+1, 'bl');
+                maskAwayCorner(cc.r+1, cc.c, 'tr');
+                addArc(cc.r, cc.c, 'br');
+                addArc(cc.r+1, cc.c+1, 'tl');
+            }
+        }
+
+        for (const cc of crosscuts) {
+            if (cc.owner!==0) continue;
+            drawSquare(cc, 0); // no mask ever relies on a black-owned square, so no pad needed
+        }
+
+        applyStoneMasks();
+
+        if (arcs.length) {
+            mergeDiv.innerHTML = `<svg width="${boardRect.width}" height="${boardRect.height}" style="position:absolute;top:0;left:0;">${arcs.join('')}</svg>`;
         }
     }
 
