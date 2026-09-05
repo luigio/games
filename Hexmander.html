@@ -273,7 +273,7 @@
     // =====================================================================
     //  GLOBAL STATE
     // =====================================================================
-    let SIZE = 5;
+    let SIZE = parseInt(document.getElementById('board-size').value);
     let hexBoard = new Map(); // key: "q,r", value: {color, shape} | null
     let turn = 'black';
     let lastMoveQ = null;

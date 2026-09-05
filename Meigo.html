@@ -327,7 +327,7 @@
 </div>
 
 <script>
-    let SIZE = 13;
+    let SIZE = parseInt(document.getElementById('board-size').value);
     let board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
     let turn = 'black';
     let prison = { black: 0, white: 0 };
@@ -992,7 +992,6 @@
             backBtn.disabled = currentMoveIndex === 0;
             forwardBtn.disabled = currentMoveIndex === gameHistory.length - 1;
             endBtn.disabled = currentMoveIndex === gameHistory.length - 1;
-            randomBtn.disabled = !hasValidMove(turn);
         }
     }
 
@@ -1124,6 +1123,9 @@
         if (isGenerating) {
             stopGeneration();
             return;
+        }
+        if (!hasValidMove(turn)) {
+            resetGame(SIZE);
         }
 
         isGenerating = true;

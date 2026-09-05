@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pinwheel</title>
+    <title>Crosswire</title>
     <style>
         html, body { margin:0;padding:0;height:100vh;width:100vw;overflow:hidden;background-color:#f0f0f0;display:flex;justify-content:center;align-items:center; }
         .game-container { display:flex;flex-direction:column;width:100vw;max-width:100%; }
@@ -19,6 +19,8 @@
         #copy-move:hover .copy-icon path { fill:#555; }
         .grid { display:grid;width:100%;height:100%;position:relative; }
         .lines { position:absolute;width:100%;height:100%;z-index:0; }
+        .crosscuts { position:absolute;width:100%;height:100%;z-index:0;pointer-events:none; }
+        .merges { position:absolute;width:100%;height:100%;z-index:1;pointer-events:none; }
         .point { position:relative;cursor:pointer; }
         .stone { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;border-radius:50%;box-sizing:border-box; }
         .black { background:black; }
@@ -54,7 +56,9 @@
     <div class="board-container">
         <div class="board" id="board">
             <div class="lines" id="lines"></div>
+            <div class="crosscuts" id="crosscuts"></div>
             <div class="grid" id="grid"></div>
+            <div class="merges" id="merges"></div>
         </div>
         <div id="message"></div>
     </div>
@@ -77,12 +81,11 @@
                 <option value="clipboard">From clipboard</option>
             </select>
             <select id="board-size" onchange="changeBoardSize()" data-tooltip="Board size">
-                <option value="3">3×3</option><option value="4">4×4</option><option value="5">5×5</option>
-                <option value="6">6×6</option><option value="7">7×7</option><option value="8">8×8</option>
-                <option value="9">9×9</option><option value="10">10×10</option><option value="11">11×11</option>
-                <option value="12">12×12</option><option value="13" selected>13×13</option><option value="14">14×14</option>
-                <option value="15">15×15</option><option value="16">16×16</option><option value="17">17×17</option>
-                <option value="18">18×18</option><option value="19">19×19</option>
+                <option value="3">3×3</option><option value="5">5×5</option>
+                <option value="7">7×7</option><option value="9">9×9</option>
+                <option value="11">11×11</option><option value="13" selected>13×13</option>
+                <option value="15">15×15</option><option value="17">17×17</option>
+                <option value="19">19×19</option>
             </select>
             <input type="file" id="load-input" style="display:none;" accept=".txt" onchange="loadGame(event)">
         </div>
@@ -110,6 +113,8 @@
         gridDiv.innerHTML = '';
         const linesDiv = document.getElementById('lines');
         linesDiv.innerHTML = '';
+        document.getElementById('crosscuts').innerHTML = '';
+        document.getElementById('merges').innerHTML = '';
 
         const canvas = document.createElement('canvas');
         const boardSize = document.getElementById('board').offsetWidth;
@@ -137,7 +142,7 @@
             ctx.beginPath(); ctx.moveTo(pos, cellSize/2); ctx.lineTo(pos, boardSize-cellSize/2); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(cellSize/2, pos); ctx.lineTo(boardSize-cellSize/2, pos); ctx.stroke();
         }
-        ctx.lineWidth = 5;
+        ctx.lineWidth = 4;
         ctx.strokeStyle = 'black';
         ctx.beginPath(); ctx.moveTo(cellSize/2, cellSize/2); ctx.lineTo(boardSize-cellSize/2, cellSize/2); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(cellSize/2, boardSize-cellSize/2); ctx.lineTo(boardSize-cellSize/2, boardSize-cellSize/2); ctx.stroke();
@@ -145,38 +150,13 @@
         ctx.beginPath(); ctx.moveTo(cellSize/2, cellSize/2); ctx.lineTo(cellSize/2, boardSize-cellSize/2); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(boardSize-cellSize/2, cellSize/2); ctx.lineTo(boardSize-cellSize/2, boardSize-cellSize/2); ctx.stroke();
 
-        // Miter the four corners: each 5×5 overlap square is split along a 45° diagonal
-        // into two filled triangles so the black (horizontal) and white (vertical) edges
-        // meet cleanly with no crude overlap.
-        {
-            const e = ctx.lineWidth / 2; // 2.5px — half the border stroke width
-            const h = cellSize / 2;      // center of the corner squares
-            const W = boardSize;
-            function tri(color, x1,y1, x2,y2, x3,y3) {
-                ctx.fillStyle = color;
-                ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3);
-                ctx.closePath(); ctx.fill();
-            }
-            // Top-left: diagonal from outer (h-e,h-e) to inner (h+e,h+e)
-            tri('black', h-e,h-e, h+e,h-e, h+e,h+e);   // upper-right → black (top edge)
-            tri('white', h-e,h-e, h-e,h+e, h+e,h+e);   // lower-left  → white (left edge)
-            // Top-right: diagonal from outer (W-h+e,h-e) to inner (W-h-e,h+e)
-            tri('black', W-h-e,h-e, W-h+e,h-e, W-h-e,h+e);  // upper-left  → black (top edge)
-            tri('white', W-h+e,h-e, W-h+e,h+e, W-h-e,h+e);  // lower-right → white (right edge)
-            // Bottom-left: diagonal from outer (h-e,W-h+e) to inner (h+e,W-h-e)
-            tri('black', h-e,W-h+e, h+e,W-h+e, h+e,W-h-e);  // lower-right → black (bottom edge)
-            tri('white', h-e,W-h-e, h+e,W-h-e, h-e,W-h+e);  // upper-left  → white (left edge)
-            // Bottom-right: diagonal from outer (W-h+e,W-h+e) to inner (W-h-e,W-h-e)
-            tri('black', W-h-e,W-h+e, W-h+e,W-h+e, W-h-e,W-h-e);  // lower-left  → black (bottom edge)
-            tri('white', W-h+e,W-h-e, W-h+e,W-h+e, W-h-e,W-h-e);  // upper-right → white (right edge)
-        }
-        
         linesDiv.appendChild(canvas);
         updateStatus(); updateLastMoveDisplay(); updateButtonTooltips(); adjustHeaderLayout();
     }
 
     function saveGameState() {
-        const bWins = checkWin(0), wWins = checkWin(1);
+        const edges = computeCrosscutEdges();
+        const bWins = checkWin(0, edges), wWins = checkWin(1, edges);
         return { board: board.map(r=>[...r]), turn, lastMoveX, lastMoveY,
                  gameOver: bWins||wWins, blackWins: bWins, whiteWins: wWins, lastWasPieSwap: false };
     }
@@ -220,24 +200,29 @@
     function setMessage(msg) { document.getElementById('message').textContent = msg; }
     function clearMessage()  { document.getElementById('message').textContent = ''; }
 
-    function getChain(x, y, color, visited=new Set()) {
+    function getChain(x, y, color, visited=new Set(), edges=null) {
         if (x<0||x>=SIZE||y<0||y>=SIZE||visited.has(`${x},${y}`)||board[x][y]!==color) return [];
         visited.add(`${x},${y}`);
         const chain = [[x,y]];
-        for (const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0]]) chain.push(...getChain(x+dx,y+dy,color,visited));
+        for (const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0]]) chain.push(...getChain(x+dx,y+dy,color,visited,edges));
+        if (edges) {
+            const extra = edges.get(`${x},${y}`);
+            if (extra) for (const [nx,ny] of extra) chain.push(...getChain(nx,ny,color,visited,edges));
+        }
         return chain;
     }
 
-    function checkWin(color) {
+    function checkWin(color, edges=null) {
+        if (!edges) edges = computeCrosscutEdges();
         const visited = new Set();
         if (color===0) { // Black: top row → bottom row
             for (let y=0;y<SIZE;y++)
                 if (board[0][y]===0&&!visited.has(`0,${y}`))
-                    if (getChain(0,y,0,visited).some(([x])=>x===SIZE-1)) return true;
+                    if (getChain(0,y,0,visited,edges).some(([x])=>x===SIZE-1)) return true;
         } else { // White: left col → right col
             for (let x=0;x<SIZE;x++)
                 if (board[x][0]===1&&!visited.has(`${x},0`))
-                    if (getChain(x,0,1,visited).some(([,y])=>y===SIZE-1)) return true;
+                    if (getChain(x,0,1,visited,edges).some(([,y])=>y===SIZE-1)) return true;
         }
         return false;
     }
@@ -253,17 +238,219 @@
             if (i===lastMoveX&&j===lastMoveY) point.classList.add('last-move');
             else point.classList.remove('last-move');
         }
+        renderCrosscuts();
+    }
+
+    // ── Blobcut rules ──
+
+    // Finds every 2×2 crosscut on the board: a block whose four points are all occupied,
+    // with one diagonal pair one color and the other diagonal pair the other color.
+    // For each, determines the owner (if any) via the most central 3×3 area that contains
+    // the crosscut: a color owns the crosscut once it occupies at least 5 of the 9 points
+    // in that 3×3 area.
+    //
+    // The four points of the crosscut's 2×2 block are themselves the centers of the (up to)
+    // four 3×3 areas that contain it — top-left corner centers the top-left-most candidate
+    // window, etc. — so "most central" means: among those (board-bounded) candidate windows,
+    // the one closest to the true center of the board. Boards are restricted to odd sizes
+    // (see board-size select and processGameRecordText), which guarantees this window is
+    // always unique — an even-sized board can produce ties between equally central windows
+    // with no principled way to break them, which is why even sizes aren't offered.
+    function getCrosscuts() {
+        const result = [];
+        const mid = (SIZE-1)/2; // true center of the board (an integer, since SIZE is always odd)
+        for (let r=0;r<SIZE-1;r++) {
+            for (let c=0;c<SIZE-1;c++) {
+                const a=board[r][c], b=board[r][c+1], d=board[r+1][c], e=board[r+1][c+1];
+                if (a===null||b===null||d===null||e===null) continue;
+                if (a!==e || b!==d || a===b) continue; // need "\" pair equal, "/" pair equal, and the two pairs differ
+                const colorA=a, colorB=b; // colorA = "\" diagonal (r,c)-(r+1,c+1), colorB = "/" diagonal (r,c+1)-(r+1,c)
+
+                const top = (r<mid) ? r : r-1, left = (c<mid) ? c : c-1;
+                let black=0, white=0;
+                for (let i=top;i<top+3;i++) for (let j=left;j<left+3;j++) {
+                    if (board[i][j]===0) black++;
+                    else if (board[i][j]===1) white++;
+                }
+                const owner = black>=5 ? 0 : (white>=5 ? 1 : null);
+                result.push({r,c,colorA,colorB,owner});
+            }
+        }
+        return result;
+    }
+
+    // Builds the extra adjacency created by owned crosscuts: for each owned crosscut,
+    // the two same-colored diagonal stones belonging to the owner become connected.
+    function computeCrosscutEdges() {
+        const edges = new Map();
+        function addEdge(x1,y1,x2,y2) {
+            const k1=`${x1},${y1}`, k2=`${x2},${y2}`;
+            if (!edges.has(k1)) edges.set(k1, []);
+            if (!edges.has(k2)) edges.set(k2, []);
+            edges.get(k1).push([x2,y2]);
+            edges.get(k2).push([x1,y1]);
+        }
+        for (const cc of getCrosscuts()) {
+            if (cc.owner===null) continue;
+            if (cc.owner===cc.colorA) addEdge(cc.r,cc.c,cc.r+1,cc.c+1);
+            else addEdge(cc.r,cc.c+1,cc.r+1,cc.c);
+        }
+        return edges;
+    }
+
+    // Fills each owned crosscut with its owner's color. Black stones have no outline, so a
+    // black-owned crosscut already merges seamlessly with its stones. For white-owned crosscuts,
+    // the two white (owner) stones are masked so their own quadrant facing the crosscut is cut
+    // away entirely (fill + outline together, in one paint pass) revealing the white fill square
+    // beneath — a true merge with no compositing seam. The two black (non-owner) stones get a
+    // matching black arc, of the same thickness as a normal stone outline, drawn on their
+    // quadrant facing the crosscut, so their edge stays clearly delineated against the fill.
+    const CORNER_MASK_SECTOR = { br:[90,180], tl:[270,360], bl:[180,270], tr:[0,90] };   // conic-gradient angles (0deg = up, clockwise)
+    const CORNER_ARC_SECTOR  = { br:[0,90],   tl:[180,270], bl:[90,180],  tr:[270,360] }; // screen angles (0deg = right, clockwise)
+
+    function renderCrosscuts() {
+        const div = document.getElementById('crosscuts');
+        const mergeDiv = document.getElementById('merges');
+        div.innerHTML = '';
+        mergeDiv.innerHTML = '';
+        const boardEl = document.getElementById('board');
+        const boardRect = boardEl.getBoundingClientRect();
+        const points = document.getElementsByClassName('point');
+
+        // Point positions are laid out by CSS Grid (repeat(SIZE, 1fr)), which distributes
+        // fractional pixel remainders across columns/rows using its own internal rounding.
+        // That can drift, column by column, from a naive `boardPx/SIZE * index` JS calculation
+        // — the drift compounds with distance from the top-left corner, so a stone can end up
+        // rendered a fraction of a pixel away from where such a formula assumes it is. Since the
+        // crosscut fill square and arcs need to align exactly with the stones for the mask cut
+        // to be fully covered, we read each point's *actual* rendered center via
+        // getBoundingClientRect instead of computing it, so there's no drift to align against.
+        function centerOf(x, y) {
+            const r = points[x*SIZE+y].getBoundingClientRect();
+            return { x: r.left - boardRect.left + r.width/2, y: r.top - boardRect.top + r.height/2, r: r.width/2 };
+        }
+
+        // Reset any mask left over from a previous render.
+        for (let i=0;i<points.length;i++) {
+            const stone = points[i].firstChild;
+            stone.style.maskImage = 'none';
+            stone.style.webkitMaskImage = 'none';
+        }
+
+        // A stone can be the "owner corner" of two different crosscuts at once (it sits at the
+        // shared corner of two diagonally-adjacent 2x2 blocks), each wanting to cut away a
+        // different quadrant. Corners are accumulated per-stone and merged into a single mask
+        // at the end, instead of each call overwriting the previous one (which used to leave
+        // an earlier-masked quadrant's outline fully visible again).
+        const cutCorners = new Map(); // stone index -> Set of corner names
+        const QUADRANT_ORDER = ['tr','br','bl','tl']; // fixed 0-90-180-270-360 order, matches CORNER_MASK_SECTOR
+
+        function maskAwayCorner(x, y, corner) {
+            const idx = x*SIZE+y;
+            if (!cutCorners.has(idx)) cutCorners.set(idx, new Set());
+            cutCorners.get(idx).add(corner);
+        }
+
+        function applyStoneMasks() {
+            for (const [idx, corners] of cutCorners) {
+                const stone = points[idx].firstChild;
+                let stops = '';
+                for (let i=0;i<4;i++) {
+                    const q = QUADRANT_ORDER[i];
+                    const color = corners.has(q) ? 'transparent' : 'white';
+                    stops += `${color} ${i*90}deg ${(i+1)*90}deg, `;
+                }
+                const g = `conic-gradient(from 0deg, ${stops.slice(0,-2)})`;
+                stone.style.maskImage = g;
+                stone.style.webkitMaskImage = g;
+            }
+        }
+
+        const arcs = [];
+        function addArc(x, y, corner) {
+            const { x: cx, y: cy, r: radius } = centerOf(x, y);
+            // Outer edge stays fixed at radius+2 (same visible boundary against the crosscut
+            // fill, so the line's on-screen appearance is unchanged). The stroke is widened
+            // purely inward, past the stone's true edge and into the stone itself, so the
+            // extra width is invisible (black-on-black) but guarantees full coverage across
+            // the anti-aliased seam between the independently-rendered stone circle and arc
+            // stroke, which could otherwise let a hairline of the fill color show through.
+            const outerR = radius + 2;
+            const strokeWidth = 4;
+            const r = outerR - strokeWidth/2; // centerline
+            const [s,e] = CORNER_ARC_SECTOR[corner];
+            const sr = s*Math.PI/180, er = e*Math.PI/180;
+            const x1 = cx + r*Math.cos(sr), y1 = cy + r*Math.sin(sr);
+            const x2 = cx + r*Math.cos(er), y2 = cy + r*Math.sin(er);
+            arcs.push(`<path d="M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}" stroke="black" stroke-width="${strokeWidth}" fill="none"/>`);
+        }
+
+        // Two passes: white-owned squares first (padded, since white masks need to hide under
+        // them), then black-owned squares (exact, unpadded — they never back a mask, so they
+        // don't need it). Drawing black-owned squares second means that at any border between
+        // a white-owned and a black-owned crosscut, black's crisp true-boundary edge paints on
+        // top, cleanly covering white's padding overshoot instead of the two colors competing
+        // for that 1-2px strip (which used to leave a stray sliver of one color, or the other,
+        // bleeding across the boundary).
+        const crosscuts = getCrosscuts().filter(cc => cc.owner!==null);
+        function drawSquare(cc, pad) {
+            const sq = document.createElement('div');
+            sq.style.position = 'absolute';
+            const tl = centerOf(cc.r, cc.c), br = centerOf(cc.r+1, cc.c+1);
+            sq.style.left = (tl.x - pad) + 'px';
+            sq.style.top = (tl.y - pad) + 'px';
+            sq.style.width = (br.x - tl.x + pad*2) + 'px';
+            sq.style.height = (br.y - tl.y + pad*2) + 'px';
+            sq.style.backgroundColor = cc.owner===0 ? 'rgb(0,0,0)' : 'rgb(255,255,255)';
+            div.appendChild(sq);
+        }
+
+        for (const cc of crosscuts) {
+            if (cc.owner!==1) continue;
+            // Anchored to the actual rendered centers of the crosscut's top-left and
+            // bottom-right stones (not a computed cellSize*index formula), so the fill square's
+            // edges always exactly coincide with the real grid lines connecting those points —
+            // fully covering the masked-away pie-slice quadrants regardless of any CSS Grid
+            // sub-pixel rounding. A small 1px pad guards against ordinary anti-aliasing softness
+            // at the mask's hard edge; the overshoot lands under each stone's own opaque,
+            // unmasked quadrants, so it's never actually visible.
+            drawSquare(cc, 1);
+
+            if (cc.colorA===1) { // "\" diagonal is white: white stones at (r,c) & (r+1,c+1); black stones at (r,c+1) & (r+1,c)
+                maskAwayCorner(cc.r, cc.c, 'br');
+                maskAwayCorner(cc.r+1, cc.c+1, 'tl');
+                addArc(cc.r, cc.c+1, 'bl');
+                addArc(cc.r+1, cc.c, 'tr');
+            } else { // "/" diagonal is white: white stones at (r,c+1) & (r+1,c); black stones at (r,c) & (r+1,c+1)
+                maskAwayCorner(cc.r, cc.c+1, 'bl');
+                maskAwayCorner(cc.r+1, cc.c, 'tr');
+                addArc(cc.r, cc.c, 'br');
+                addArc(cc.r+1, cc.c+1, 'tl');
+            }
+        }
+
+        for (const cc of crosscuts) {
+            if (cc.owner!==0) continue;
+            drawSquare(cc, 0); // no mask ever relies on a black-owned square, so no pad needed
+        }
+
+        applyStoneMasks();
+
+        if (arcs.length) {
+            mergeDiv.innerHTML = `<svg width="${boardRect.width}" height="${boardRect.height}" style="position:absolute;top:0;left:0;">${arcs.join('')}</svg>`;
+        }
+    }
+
+    // Only odd-sized boards are allowed (see board-size select and processGameRecordText),
+    // so every crosscut always has exactly one most-central 3×3 area — no ties are possible,
+    // and no placement restriction is needed to avoid one.
+    function isValidMove(x, y, color) {
+        return board[x][y]===null;
     }
 
     function hasValidMove() {
-        for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++) {
-            if (board[x][y]===null) {
-                board[x][y]=turn;
-                const legal=!hasIllegalPattern(board);
-                board[x][y]=null;
-                if (legal) return true;
-            }
-        }
+        for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++)
+            if (isValidMove(x, y, turn)) return true;
         return false;
     }
 
@@ -276,67 +463,20 @@
         if (!hasValidMove()) { isDraw = true; gameOver = true; }
     }
 
-    // ── Cartwheel: illegal pattern detection ──
-
-    // Hard corner: a 2×2 with two diagonally adjacent same-color stones,
-    // one opposite-color stone, and one empty point.
-    function hasHardCorner(b) {
-        for (let r=0;r<SIZE-1;r++) for (let c=0;c<SIZE-1;c++) {
-            const a=b[r][c],bv=b[r][c+1],cv=b[r+1][c],d=b[r+1][c+1];
-            if (a!==null&&a===d) { const o=1-a; if ((bv===o&&cv===null)||(bv===null&&cv===o)) return true; }
-            if (bv!==null&&bv===cv) { const o=1-bv; if ((a===o&&d===null)||(a===null&&d===o)) return true; }
-        }
-        return false;
-    }
-
-    // Switch: a 2×3 (or 3×2) rectangle whose center two cells are empty,
-    // with one color at the two knight's-jump-apart corners of one diagonal
-    // and the other color at the remaining two corners.
-    function hasSwitch(b) {
-        // 2 rows × 3 cols: middle column (b,e) empty; (a,f) same color; (c,d) opposite color
-        for (let r=0;r<SIZE-1;r++) for (let c=0;c<SIZE-2;c++) {
-            const a=b[r][c],bv=b[r][c+1],cv=b[r][c+2],d=b[r+1][c],e=b[r+1][c+1],f=b[r+1][c+2];
-            if (bv===null&&e===null&&a!==null&&a===f&&cv!==null&&cv===d&&a!==cv) return true;
-        }
-        // 3 rows × 2 cols: middle row (c,d) empty; (a,f) same color; (b,e) opposite color
-        for (let r=0;r<SIZE-2;r++) for (let c=0;c<SIZE-1;c++) {
-            const a=b[r][c],bv=b[r][c+1],cv=b[r+1][c],d=b[r+1][c+1],e=b[r+2][c],f=b[r+2][c+1];
-            if (cv===null&&d===null&&a!==null&&a===f&&bv!==null&&bv===e&&a!==bv) return true;
-        }
-        return false;
-    }
-
-    // Pinwheel: an empty 2×2 area whose 8 orthogonal neighbors (going clockwise)
-    // alternate in color.
-    function hasPinwheel(b) {
-        for (let r=0;r<SIZE-1;r++) for (let c=0;c<SIZE-1;c++) {
-            if (b[r][c]!==null||b[r][c+1]!==null||b[r+1][c]!==null||b[r+1][c+1]!==null) continue;
-            if (r===0||r+2>=SIZE||c===0||c+2>=SIZE) continue;
-            const n=[b[r-1][c],b[r-1][c+1],b[r][c+2],b[r+1][c+2],b[r+2][c+1],b[r+2][c],b[r+1][c-1],b[r][c-1]];
-            if (n.some(v=>v===null)) continue;
-            if (n[0]===n[2]&&n[0]===n[4]&&n[0]===n[6]&&n[1]===n[3]&&n[1]===n[5]&&n[1]===n[7]&&n[0]!==n[1]) return true;
-        }
-        return false;
-    }
-
-    function hasIllegalPattern(b) {
-        return hasHardCorner(b)||hasSwitch(b)||hasPinwheel(b);
-    }
-
     // ── Play ──
 
     function play(x, y) {
         if (gameOver) { setMessage("Game is over!"); return; }
         if (board[x][y] !== null) return;
+        clearMessage();
 
         board[x][y] = turn;
-        if (hasIllegalPattern(board)) { board[x][y] = null; setMessage("Illegal move!"); return; }
-        clearMessage();
         setLastMoveMarker(x, y);
 
+        const movingPlayer = turn;
         turn = turn===0?1:0;
         const state = saveGameState();
-        state.initialX=x; state.initialY=y; state.isSkip=false; state.lastWasPieSwap=false;
+        state.player=movingPlayer; state.initialX=x; state.initialY=y; state.isSkip=false; state.lastWasPieSwap=false;
         if (currentMoveIndex < gameHistory.length-1)
             gameHistory = gameHistory.slice(0, currentMoveIndex+1);
         gameHistory.push(state); currentMoveIndex++;
@@ -374,7 +514,7 @@
     function replayEnd() {
         currentMoveIndex=gameHistory.length-1;
         loadGameState(gameHistory[currentMoveIndex]); clearMessage();
-        updateReplayButtons(); updateLastMoveDisplay();
+        updateReplayButtons();
     }
 
     function updateReplayButtons() {
@@ -419,24 +559,20 @@
     function makeBotReply() {
         if (!botReply || gameOver || isGenerating) return;
         const valid = [];
-        for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++) {
-            if (board[x][y]===null) {
-                board[x][y]=turn;
-                if (!hasIllegalPattern(board)) valid.push([x,y]);
-                board[x][y]=null;
-            }
-        }
+        for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++)
+            if (isValidMove(x, y, turn)) valid.push([x, y]);
         if (valid.length === 0) return;
         const [x, y] = valid[Math.floor(Math.random() * valid.length)];
         board[x][y] = turn;
         setLastMoveMarker(x, y);
-        turn = turn === 0 ? 1 : 0;
+        const movingPlayer = turn;
+        turn = turn===0?1:0;
         const state = saveGameState();
-        state.initialX = x; state.initialY = y; state.isSkip = false; state.lastWasPieSwap = false;
-        if (currentMoveIndex < gameHistory.length - 1)
-            gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
+        state.player=movingPlayer; state.initialX=x; state.initialY=y; state.isSkip=false; state.lastWasPieSwap=false;
+        if (currentMoveIndex < gameHistory.length-1)
+            gameHistory = gameHistory.slice(0, currentMoveIndex+1);
         gameHistory.push(state); currentMoveIndex++;
-        blackWins = state.blackWins; whiteWins = state.whiteWins; gameOver = state.gameOver;
+        blackWins=state.blackWins; whiteWins=state.whiteWins; gameOver=state.gameOver;
         isDraw=false; resolveSkips();
         renderBoard(); updateStatus(); updateReplayButtons(); updateLastMoveDisplay();
     }
@@ -489,22 +625,18 @@
             if (gameOver) { stopGeneration(); return; }
 
             const valid=[];
-            for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++) {
-                if (board[x][y]===null) {
-                    board[x][y]=turn;
-                    if (!hasIllegalPattern(board)) valid.push([x,y]);
-                    board[x][y]=null;
-                }
-            }
+            for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++)
+                if (isValidMove(x, y, turn)) valid.push([x,y]);
 
-            if (valid.length===0) { stopGeneration(); return; }
+            if (valid.length===0) { stopGeneration(); return; } // shouldn't happen; resolveSkips keeps turn correct
 
             const [x,y]=valid[Math.floor(Math.random()*valid.length)];
             board[x][y]=turn;
             setLastMoveMarker(x,y);
+            const movingPlayer=turn;
             turn=turn===0?1:0;
             const st=saveGameState();
-            st.initialX=x;st.initialY=y;st.isSkip=false;st.lastWasPieSwap=false;
+            st.player=movingPlayer; st.initialX=x;st.initialY=y;st.isSkip=false;st.lastWasPieSwap=false;
             if (currentMoveIndex<gameHistory.length-1) gameHistory=gameHistory.slice(0,currentMoveIndex+1);
             gameHistory.push(st); currentMoveIndex++;
             blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
@@ -519,9 +651,9 @@
     function generateGameRecordText() {
         const moves=[SIZE+'x'+SIZE];
         for (let i=1;i<gameHistory.length;i++) {
-            const st=gameHistory[i], prev=gameHistory[i-1];
+            const st=gameHistory[i];
             if (st.initialX!=null) {
-                const p=prev.turn===0?'B':'W';
+                const p=st.player===0?'B':'W';
                 const col=String.fromCharCode(97+st.initialY), row=SIZE-st.initialX;
                 moves.push(p+col+row);
             }
@@ -535,7 +667,7 @@
         if (opt==='file') {
             const a=document.createElement('a');
             a.href=URL.createObjectURL(new Blob([text],{type:'text/plain'}));
-            a.download='connection_sandbox_game.txt'; a.click();
+            a.download='crosswire_game.txt'; a.click();
         } else if (opt==='clipboard') {
             navigator.clipboard.writeText(text).then(()=>setMessage('Copied to clipboard!'));
         }
@@ -549,6 +681,13 @@
         sel.value='';
     }
 
+    function loadGame(event) {
+        const f=event.target.files[0]; if (!f) return;
+        const r=new FileReader();
+        r.onload=e=>processGameRecordText(e.target.result);
+        r.readAsText(f); event.target.value='';
+    }
+
     function processGameRecordText(rawText) {
         const moveText=(rawText||'').trim();
         if (!moveText) { setMessage("Error: Empty game record."); return false; }
@@ -556,7 +695,7 @@
         const sm=moves[0].match(/^(\d+)[-x×*\uFFFD](\d+)$/);
         if (!sm) { setMessage("Error: Must start with board size (e.g. 13x13)."); return false; }
         const ns=parseInt(sm[1]);
-        if (sm[1]!==sm[2]||ns<3||ns>19) { setMessage("Error: Invalid board size."); return false; }
+        if (sm[1]!==sm[2]||ns<3||ns>19||ns%2===0) { setMessage("Error: Invalid board size (must be odd, 3-19)."); return false; }
         resetGame(ns); document.getElementById('board-size').value=ns;
 
         let tempTurn=0;
@@ -574,35 +713,35 @@
             if (x<0||x>=ns||y<0||y>=ns) { setMessage("Error: Move out of bounds: "+mv); renderBoard(); return false; }
             if (board[x][y]!==null) { setMessage("Error: Position occupied: "+mv); renderBoard(); return false; }
 
-            turn=tempTurn;
             board[x][y]=tempTurn;
-            if (hasIllegalPattern(board)) { board[x][y]=null; setMessage("Error: Illegal move (pattern violation): "+mv); renderBoard(); return false; }
             setLastMoveMarker(x,y);
+            const movingPlayer=tempTurn;
             tempTurn=tempTurn===0?1:0;
-            const st=saveGameState(); st.turn=tempTurn; st.initialX=x; st.initialY=y; st.isSkip=false; st.lastWasPieSwap=false;
+            const st=saveGameState(); st.player=movingPlayer; st.turn=tempTurn; st.initialX=x; st.initialY=y; st.isSkip=false; st.lastWasPieSwap=false;
             gameHistory.push(st); currentMoveIndex++;
             blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
+            if (gameOver) break;
+            // Keep tempTurn in sync with resolveSkips logic (skip detection without touching history)
+            turn=tempTurn; isDraw=false;
+            if (!hasValidMove()) {
+                tempTurn=tempTurn===0?1:0; turn=tempTurn;
+                if (!hasValidMove()) { isDraw=true; gameOver=true; break; }
+            }
         }
 
-        turn=tempTurn; isDraw=false; resolveSkips();
+        turn=tempTurn; isDraw=false;
+        resolveSkips();
         renderBoard(); updateStatus(); updateReplayButtons(); updateLastMoveDisplay(); clearMessage();
         return true;
-    }
-
-    function loadGame(event) {
-        const f=event.target.files[0]; if (!f) return;
-        const r=new FileReader();
-        r.onload=e=>processGameRecordText(e.target.result);
-        r.readAsText(f); event.target.value='';
     }
 
     function updateLastMoveDisplay() {
         const txt=document.getElementById('last-move-text'), btn=document.getElementById('copy-move');
         if (currentMoveIndex<=0||gameHistory.length<=1) { txt.textContent=''; btn.style.display='none'; return; }
-        const rs=gameHistory[currentMoveIndex], prev=gameHistory[currentMoveIndex-1];
-        const p=prev?(prev.turn===0?'B':'W'):'B';
+        const rs=gameHistory[currentMoveIndex];
         if (!rs||rs.initialX==null) { txt.textContent=''; btn.style.display='none'; }
         else {
+            const p=rs.player===0?'B':'W';
             txt.textContent=p+String.fromCharCode(97+rs.initialY)+(SIZE-rs.initialX);
             btn.style.display='inline-flex';
         }

@@ -92,7 +92,7 @@
 </div>
 
 <script>
-    let SIZE = 13;
+    let SIZE = parseInt(document.getElementById('board-size').value);
     let board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
     let turn = 0; // 0=Black, 1=White
     let lastMoveX = null, lastMoveY = null;
