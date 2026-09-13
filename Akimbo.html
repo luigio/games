@@ -72,11 +72,13 @@
                 <option value="" disabled selected hidden>Save</option>
                 <option value="file">To file</option>
                 <option value="clipboard">To clipboard</option>
+                <option value="link">To link</option>
             </select>
             <select id="load-options" onchange="handleLoad()" data-tooltip="Load game">
                 <option value="" disabled selected hidden>Load</option>
                 <option value="file">From file</option>
                 <option value="clipboard">From clipboard</option>
+                <option value="link">From link</option>
             </select>
             <select id="board-size" onchange="changeBoardSize()" data-tooltip="Board size">
                 <option value="3">3×3</option><option value="4">4×4</option><option value="5">5×5</option>
@@ -694,8 +696,135 @@
         return moves.join(' ');
     }
 
+    // ── Compact binary link encoding ──
+    // Layout: [5 bits size-3][12 bits moveCount] then per move:
+    //   2-bit tag: 0=normal move, 1=skip ('B-'/'W-'), 2=WSwap
+    //   normal move is followed by ceil(log2(size*size)) bits giving the board index (x*size+y)
+    // Move colors are never stored: they're fully determined by replaying the same
+    // turn-alternation rule the text-format loader already uses (see processGameRecordText),
+    // so the decoder reconstructs them deterministically.
+
+    class BitWriter {
+        constructor() { this.bytes=[]; this.cur=0; this.nbits=0; }
+        writeBits(value, n) {
+            for (let i=n-1;i>=0;i--) {
+                this.cur=(this.cur<<1)|((value>>i)&1); this.nbits++;
+                if (this.nbits===8) { this.bytes.push(this.cur); this.cur=0; this.nbits=0; }
+            }
+        }
+        finish() {
+            if (this.nbits>0) { this.bytes.push(this.cur<<(8-this.nbits)); this.cur=0; this.nbits=0; }
+            return new Uint8Array(this.bytes);
+        }
+    }
+
+    class BitReader {
+        constructor(bytes) { this.bytes=bytes; this.pos=0; }
+        readBits(n) {
+            let v=0;
+            for (let i=0;i<n;i++) {
+                const byteIdx=this.pos>>3, bitIdx=7-(this.pos&7);
+                v=(v<<1)|((this.bytes[byteIdx]>>bitIdx)&1);
+                this.pos++;
+            }
+            return v;
+        }
+    }
+
+    function bytesToBase64Url(bytes) {
+        let binary='';
+        for (let i=0;i<bytes.length;i++) binary+=String.fromCharCode(bytes[i]);
+        return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    }
+
+    function base64UrlToBytes(str) {
+        let b64=str.replace(/-/g,'+').replace(/_/g,'/');
+        while (b64.length%4) b64+='=';
+        const binary=atob(b64);
+        const bytes=new Uint8Array(binary.length);
+        for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+        return bytes;
+    }
+
+    function packGameRecordText(text) {
+        const parts=text.trim().split(/\s+/);
+        const sm=parts[0].match(/^(\d+)x(\d+)$/);
+        const size=parseInt(sm[1]);
+        const moves=parts.slice(1);
+        const posBits=Math.max(1,Math.ceil(Math.log2(size*size)));
+        const w=new BitWriter();
+        w.writeBits(size-3,5);
+        w.writeBits(moves.length,12);
+        for (const mv of moves) {
+            if (mv.toLowerCase()==='wswap') { w.writeBits(2,2); continue; }
+            if (/^[BW]-$/.test(mv)) { w.writeBits(1,2); continue; }
+            const mm=mv.match(/^[BW]([a-z])(\d+)$/);
+            const y=mm[1].charCodeAt(0)-97, x=size-parseInt(mm[2]);
+            w.writeBits(0,2);
+            w.writeBits(x*size+y,posBits);
+        }
+        return w.finish();
+    }
+
+    function unpackGameRecordBytes(bytes) {
+        const r=new BitReader(bytes);
+        const size=r.readBits(5)+3;
+        const moveCount=r.readBits(12);
+        const posBits=Math.max(1,Math.ceil(Math.log2(size*size)));
+        const moves=[size+'x'+size];
+        let tempTurn=0;
+        for (let i=0;i<moveCount;i++) {
+            const tag=r.readBits(2);
+            if (tag===2) { moves.push('WSwap'); continue; } // tempTurn unchanged, mirrors text loader
+            const p=tempTurn===0?'B':'W';
+            if (tag===1) { moves.push(p+'-'); tempTurn=tempTurn===0?1:0; continue; }
+            const idx=r.readBits(posBits);
+            const x=Math.floor(idx/size), y=idx%size;
+            const col=String.fromCharCode(97+y), row=size-x;
+            moves.push(p+col+row);
+            tempTurn=tempTurn===0?1:0;
+        }
+        return moves.join(' ');
+    }
+
+    function generateGameLink() {
+        const bytes=packGameRecordText(generateGameRecordText());
+        const encoded=bytesToBase64Url(bytes);
+        return window.location.origin+window.location.pathname+'#g='+encoded;
+    }
+
+    function extractEncodedFromInput(input) {
+        const t=(input||'').trim();
+        const m=t.match(/[#&?]g=([A-Za-z0-9_-]+)/);
+        if (m) return m[1];
+        return t; // assume the raw encoded string was pasted
+    }
+
+    function loadGameFromLinkText(input) {
+        const encoded=extractEncodedFromInput(input);
+        if (!encoded) { setMessage("Error: No game link found."); return false; }
+        try {
+            const text=unpackGameRecordBytes(base64UrlToBytes(encoded));
+            return processGameRecordText(text);
+        } catch (e) {
+            setMessage("Error: Invalid game link.");
+            return false;
+        }
+    }
+
+    function tryLoadFromUrlHash() {
+        if (location.hash && location.hash.slice(1).startsWith('g=')) {
+            loadGameFromLinkText(location.hash.slice(1));
+        }
+    }
+
     function handleSave() {
         const sel=document.getElementById('save-options'), opt=sel.value; if (!opt) return;
+        if (opt==='link') {
+            const url=generateGameLink();
+            navigator.clipboard.writeText(url).then(()=>setMessage('Link copied to clipboard!'));
+            sel.value=''; return;
+        }
         const text=generateGameRecordText();
         if (opt==='file') {
             const a=document.createElement('a');
@@ -711,6 +840,7 @@
         const sel=document.getElementById('load-options'), opt=sel.value;
         if (opt==='file') document.getElementById('load-input').click();
         else if (opt==='clipboard') navigator.clipboard.readText().then(t=>processGameRecordText(t));
+        else if (opt==='link') navigator.clipboard.readText().then(t=>loadGameFromLinkText(t));
         sel.value='';
     }
 
@@ -846,6 +976,7 @@
 
     // ── Init ──
     resetGame(SIZE); updateButtonTooltips(); adjustHeaderLayout(); fixSquareButtons(); fixSaveLoadWidths();
+    tryLoadFromUrlHash();
     document.getElementById('copy-move').addEventListener('mousedown', copyLastMove);
 
     [document.getElementById('board-size'),document.getElementById('save-options'),document.getElementById('load-options')].forEach(sel=>{
