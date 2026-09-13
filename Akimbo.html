@@ -977,6 +977,7 @@
     // ── Init ──
     resetGame(SIZE); updateButtonTooltips(); adjustHeaderLayout(); fixSquareButtons(); fixSaveLoadWidths();
     tryLoadFromUrlHash();
+    window.addEventListener('hashchange', tryLoadFromUrlHash);
     document.getElementById('copy-move').addEventListener('mousedown', copyLastMove);
 
     [document.getElementById('board-size'),document.getElementById('save-options'),document.getElementById('load-options')].forEach(sel=>{
