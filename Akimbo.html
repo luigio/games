@@ -795,7 +795,7 @@
 
     function extractEncodedFromInput(input) {
         const t=(input||'').trim();
-        const m=t.match(/[#&?]g=([A-Za-z0-9_-]+)/);
+        const m=t.match(/(?:^|[#&?])g=([A-Za-z0-9_-]+)/);
         if (m) return m[1];
         return t; // assume the raw encoded string was pasted
     }
