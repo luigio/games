@@ -289,7 +289,7 @@
         gameOver = false; blackWins = false; whiteWins = false;
         nakedDiags = [new Set(), new Set()];
         const init = saveGameState();
-        init.turn = 0; init.initialX = null; init.initialY = null; init.isSkip = false;
+        init.turn = 0; init.initialX = null; init.initialY = null;
         gameHistory = [init]; currentMoveIndex = 0;
         clearMessage(); initBoard(); renderBoard(); updateReplayButtons(); updateLastMoveDisplay();
     }
@@ -403,11 +403,6 @@
         }
     }
 
-    function hasValidMove(player) {
-        for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++)
-            if (isValidAkimboMove(x,y,player)) return true;
-        return false;
-    }
 
     // ── Play ──
 
@@ -433,7 +428,7 @@
 
         turn = turn===0?1:0;
         const state = saveGameState();
-        state.initialX=x; state.initialY=y; state.isSkip=false; state.lastWasPieSwap=false;
+        state.initialX=x; state.initialY=y; state.lastWasPieSwap=false;
         if (currentMoveIndex < gameHistory.length-1)
             gameHistory = gameHistory.slice(0, currentMoveIndex+1);
         gameHistory.push(state); currentMoveIndex++;
@@ -441,13 +436,6 @@
 
         renderBoard(); updateStatus();
 
-        if (!gameOver && !hasValidMove(turn)) {
-            turn = turn===0?1:0;
-            const skip = saveGameState();
-            skip.initialX=null; skip.initialY=null; skip.isSkip=true; skip.lastWasPieSwap=false;
-            gameHistory.push(skip); currentMoveIndex++;
-            renderBoard(); updateStatus();
-        }
 
         updateReplayButtons(); updateLastMoveDisplay();
         if (!gameOver) setTimeout(makeBotReply, 0);
@@ -462,10 +450,7 @@
 
     function replayBack() {
         if (currentMoveIndex>0) {
-            if (gameHistory[currentMoveIndex].isSkip) {
-                currentMoveIndex--;
-                if (currentMoveIndex>0) currentMoveIndex--;
-            } else { currentMoveIndex--; }
+            currentMoveIndex--;
             loadGameState(gameHistory[currentMoveIndex]); clearMessage();
             renderBoard(); updateStatus(); updateReplayButtons(); updateLastMoveDisplay();
         }
@@ -476,18 +461,7 @@
             currentMoveIndex++;
             loadGameState(gameHistory[currentMoveIndex]); clearMessage();
             renderBoard(); updateStatus();
-            if (currentMoveIndex<gameHistory.length-1 && gameHistory[currentMoveIndex+1].isSkip) {
-                currentMoveIndex++;
-                loadGameState(gameHistory[currentMoveIndex]); renderBoard(); updateStatus();
-            }
             updateReplayButtons();
-            if (!gameOver && currentMoveIndex===gameHistory.length-1 && !hasValidMove(turn)) {
-                turn=turn===0?1:0;
-                const skip=saveGameState();
-                skip.initialX=null;skip.initialY=null;skip.isSkip=true;skip.lastWasPieSwap=false;
-                gameHistory.push(skip); currentMoveIndex++;
-                renderBoard(); updateStatus(); updateReplayButtons();
-            }
             updateLastMoveDisplay();
         }
     }
@@ -515,8 +489,7 @@
         const el=document.getElementById('turn-status');
         if (gameOver) el.innerHTML=(blackWins?blackStoneSVG:whiteStoneSVG)+' wins!';
         else {
-            el.innerHTML=(turn===0?blackStoneSVG:whiteStoneSVG)+' to move'+
-                (gameHistory[currentMoveIndex]&&gameHistory[currentMoveIndex].isSkip?' | Turn skipped':'');
+            el.innerHTML=(turn===0?blackStoneSVG:whiteStoneSVG)+' to move';
         }
         const nakedBlack = nakedDiags[0].size > 0;
         const nakedWhite = nakedDiags[1].size > 0;
@@ -563,19 +536,12 @@
         setLastMoveMarker(x, y);
         turn = turn === 0 ? 1 : 0;
         const state = saveGameState();
-        state.initialX = x; state.initialY = y; state.isSkip = false; state.lastWasPieSwap = false;
+        state.initialX = x; state.initialY = y; state.lastWasPieSwap = false;
         if (currentMoveIndex < gameHistory.length - 1)
             gameHistory = gameHistory.slice(0, currentMoveIndex + 1);
         gameHistory.push(state); currentMoveIndex++;
         blackWins = state.blackWins; whiteWins = state.whiteWins; gameOver = state.gameOver;
         renderBoard(); updateStatus();
-        if (!gameOver && !hasValidMove(turn)) {
-            turn = turn === 0 ? 1 : 0;
-            const skip = saveGameState();
-            skip.initialX = null; skip.initialY = null; skip.isSkip = true; skip.lastWasPieSwap = false;
-            gameHistory.push(skip); currentMoveIndex++;
-            renderBoard(); updateStatus();
-        }
         updateReplayButtons(); updateLastMoveDisplay();
     }
 
@@ -631,16 +597,7 @@
             for (let x=0;x<SIZE;x++) for (let y=0;y<SIZE;y++)
                 if (isValidAkimboMove(x,y,turn)) valid.push([x,y]);
 
-            if (valid.length===0) {
-                turn=turn===0?1:0;
-                const sk=saveGameState();
-                sk.initialX=null;sk.initialY=null;sk.isSkip=true;sk.lastWasPieSwap=false;
-                if (currentMoveIndex<gameHistory.length-1) gameHistory=gameHistory.slice(0,currentMoveIndex+1);
-                gameHistory.push(sk); currentMoveIndex++;
-                updateStatus(); updateReplayButtons(); updateLastMoveDisplay();
-                if (!hasValidMove(turn)) stopGeneration();
-                return;
-            }
+            if (valid.length===0) { stopGeneration(); return; }
 
             const [x,y]=valid[Math.floor(Math.random()*valid.length)];
             board[x][y]=turn;
@@ -650,7 +607,7 @@
             setLastMoveMarker(x,y);
             turn=turn===0?1:0; renderBoard();
             const st=saveGameState();
-            st.initialX=x;st.initialY=y;st.isSkip=false;st.lastWasPieSwap=false;
+            st.initialX=x;st.initialY=y;st.lastWasPieSwap=false;
             if (currentMoveIndex<gameHistory.length-1) gameHistory=gameHistory.slice(0,currentMoveIndex+1);
             gameHistory.push(st); currentMoveIndex++;
             blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
@@ -672,7 +629,7 @@
             else gameHistory=gameHistory.slice(0,currentMoveIndex+1);
         }
         const st=saveGameState();
-        st.turn=1; st.initialX=null; st.initialY=null; st.isSkip=false; st.lastWasPieSwap=true;
+        st.turn=1; st.initialX=null; st.initialY=null; st.lastWasPieSwap=true;
         gameHistory.push(st); currentMoveIndex++;
         renderBoard(); updateStatus(); updateLastMoveDisplay(); updateReplayButtons();
         if (!gameOver) setTimeout(makeBotReply, 0);
@@ -687,7 +644,6 @@
             const st=gameHistory[i], prev=gameHistory[i-1];
             const p=prev.turn===0?'B':'W';
             if (st.lastWasPieSwap) moves.push('WSwap');
-            else if (st.isSkip)    moves.push(p+'-');
             else if (st.initialX!=null) {
                 const col=String.fromCharCode(97+st.initialY), row=SIZE-st.initialX;
                 moves.push(p+col+row);
@@ -698,7 +654,7 @@
 
     // ── Compact binary link encoding ──
     // Layout: [5 bits size-3][12 bits moveCount] then per move:
-    //   2-bit tag: 0=normal move, 1=skip ('B-'/'W-'), 2=WSwap
+    //   2-bit tag: 0=normal move, 2=WSwap
     //   normal move is followed by ceil(log2(size*size)) bits giving the board index (x*size+y)
     // Move colors are never stored: they're fully determined by replaying the same
     // turn-alternation rule the text-format loader already uses (see processGameRecordText),
@@ -757,7 +713,6 @@
         w.writeBits(moves.length,12);
         for (const mv of moves) {
             if (mv.toLowerCase()==='wswap') { w.writeBits(2,2); continue; }
-            if (/^[BW]-$/.test(mv)) { w.writeBits(1,2); continue; }
             const mm=mv.match(/^[BW]([a-z])(\d+)$/);
             const y=mm[1].charCodeAt(0)-97, x=size-parseInt(mm[2]);
             w.writeBits(0,2);
@@ -777,7 +732,6 @@
             const tag=r.readBits(2);
             if (tag===2) { moves.push('WSwap'); continue; } // tempTurn unchanged, mirrors text loader
             const p=tempTurn===0?'B':'W';
-            if (tag===1) { moves.push(p+'-'); tempTurn=tempTurn===0?1:0; continue; }
             const idx=r.readBits(posBits);
             const x=Math.floor(idx/size), y=idx%size;
             const col=String.fromCharCode(97+y), row=size-x;
@@ -854,25 +808,15 @@
         if (sm[1]!==sm[2]||ns<3||ns>19) { setMessage("Error: Invalid board size."); return false; }
         resetGame(ns); document.getElementById('board-size').value=ns;
 
-        let tempTurn=0, lastSkip=false;
+        let tempTurn=0;
         for (let i=1;i<moves.length;i++) {
             const mv=moves[i]; if (!mv) continue;
 
             if (mv.toLowerCase()==='wswap') {
                 if (tempTurn!==1||currentMoveIndex!==1) { setMessage("Error: WSwap only legal as White's first move."); renderBoard(); return false; }
                 turn=1;
-                const st=saveGameState(); st.turn=1; st.initialX=null; st.initialY=null; st.isSkip=false; st.lastWasPieSwap=true;
-                gameHistory.push(st); currentMoveIndex++; lastSkip=false; continue;
-            }
-
-            const skm=mv.match(/^([BW])-$/);
-            if (skm) {
-                const pl=skm[1]==='B'?0:1;
-                if (pl!==tempTurn) { setMessage("Error: Move out of turn: "+mv); renderBoard(); return false; }
-                turn=tempTurn; tempTurn=tempTurn===0?1:0; lastSkip=true;
-                const ss=saveGameState(); ss.turn=tempTurn; ss.initialX=null; ss.initialY=null; ss.isSkip=true; ss.lastWasPieSwap=false;
-                gameHistory.push(ss); currentMoveIndex++;
-                blackWins=ss.blackWins; whiteWins=ss.whiteWins; gameOver=ss.gameOver; continue;
+                const st=saveGameState(); st.turn=1; st.initialX=null; st.initialY=null; st.lastWasPieSwap=true;
+                gameHistory.push(st); currentMoveIndex++; continue;
             }
 
             const mm=mv.match(/^([BW])([a-z])(\d+)$/);
@@ -891,16 +835,11 @@
             for (const [pr,pc] of rmv) updateNakedDiagsAround(pr,pc);
             setLastMoveMarker(x,y);
             tempTurn=tempTurn===0?1:0;
-            const st=saveGameState(); st.turn=tempTurn; st.initialX=x; st.initialY=y; st.isSkip=false; st.lastWasPieSwap=false;
+            const st=saveGameState(); st.turn=tempTurn; st.initialX=x; st.initialY=y; st.lastWasPieSwap=false;
             gameHistory.push(st); currentMoveIndex++;
-            blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver; lastSkip=false;
+            blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
         }
 
-        if (!gameOver&&!lastSkip&&!hasValidMove(tempTurn)) {
-            turn=tempTurn===0?1:0;
-            const ss=saveGameState(); ss.turn=tempTurn; ss.initialX=null; ss.initialY=null; ss.isSkip=true; ss.lastWasPieSwap=false;
-            gameHistory.push(ss); currentMoveIndex++;
-        }
         turn=tempTurn;
         renderBoard(); updateStatus(); updateReplayButtons(); updateLastMoveDisplay(); clearMessage();
         return true;
@@ -919,10 +858,10 @@
         const st=gameHistory[currentMoveIndex];
         if (st.lastWasPieSwap) { txt.textContent='WSwap'; btn.style.display='inline-flex'; return; }
         let idx=currentMoveIndex;
-        while (idx>0&&(gameHistory[idx].isSkip||gameHistory[idx].lastWasPieSwap)) idx--;
+        while (idx>0&&gameHistory[idx].lastWasPieSwap) idx--;
         const rs=gameHistory[idx], prev=gameHistory[idx-1];
         const p=prev?(prev.turn===0?'B':'W'):'B';
-        if (!rs||rs.isSkip||rs.lastWasPieSwap||rs.initialX==null) { txt.textContent=''; btn.style.display='none'; }
+        if (!rs||rs.lastWasPieSwap||rs.initialX==null) { txt.textContent=''; btn.style.display='none'; }
         else {
             txt.textContent=p+String.fromCharCode(97+rs.initialY)+(SIZE-rs.initialX);
             btn.style.display='inline-flex';

@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Madkimbo</title>
+    <style>
+        html, body { margin:0;padding:0;height:100vh;width:100vw;overflow:hidden;background-color:#f0f0f0;display:flex;justify-content:center;align-items:center; }
+        .game-container { display:flex;flex-direction:column;width:100vw;max-width:100%; }
+        .header { width:min(100vw,calc(100vh - 100px));height:50px;position:relative;display:flex;justify-content:space-between;align-items:center;margin:0 auto;overflow:visible; }
+        .status-left { font-family:Arial,sans-serif;font-size:1.2em;display:flex;align-items:center;white-space:nowrap;position:absolute;left:0;z-index:1;padding-right:0.5em; }
+        .controls-right { font-family:Arial,sans-serif;display:flex;align-items:center;white-space:nowrap;position:absolute;right:0;z-index:1;gap:0.5em; }
+        .board-container { display:flex;justify-content:center;align-items:center;width:100%;background-color:#f0f0f0; }
+        .footer { width:100%;height:50px;display:flex;justify-content:center;align-items:center; }
+        .board { width:min(100vw,calc(100vh - 100px));height:min(100vw,calc(100vh - 100px));background-color:#d9a359;position:relative;display:flex;justify-content:center;align-items:center; }
+        #last-move-text { font-family:Arial,sans-serif;font-size:1.2em;white-space:nowrap; }
+        #copy-move { font-size:1.2em;padding:0;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center; }
+        .copy-icon { width:1em;height:1em;vertical-align:middle; }
+        #copy-move:hover .copy-icon path { fill:#555; }
+        .grid { display:grid;width:100%;height:100%;position:relative; }
+        .lines { position:absolute;width:100%;height:100%;z-index:0; }
+        .point { position:relative;cursor:pointer; }
+        .stone { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;border-radius:50%;box-sizing:border-box; }
+        .black { background:black; }
+        .white { background:white;border:2px solid black; }
+        .point.last-move::after { content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:22%;height:22%;border-radius:50%;background:red;z-index:3; }
+        .replay-controls { display:flex;flex-wrap:nowrap;width:100%;gap:0.5em;overflow:hidden;justify-content:center; }
+        .replay-controls button,.replay-controls select { flex:0 1 auto;padding:0.3em 0.5em;font-size:1em;border:2px solid black;background:white;cursor:pointer;transition:background 0.3s ease;min-width:0;text-overflow:clip;overflow:hidden;white-space:nowrap;max-width:100px; }
+        button,select { font-size:1em;padding:0.3em 0.5em;border:2px solid black;background:white;cursor:pointer;transition:background 0.3s ease; }
+        button:not(:disabled):hover,select:hover { background:#FFF5E9; }
+        select { cursor:pointer;text-align:center; }
+        .replay-controls button:disabled { cursor:not-allowed;opacity:0.5; }
+        .stone-icon { width:1em;height:1em;vertical-align:middle;margin-right:0.5em; }
+        #message { font-family:Arial,sans-serif;position:absolute;left:calc(50vw + 50vh - 30px);top:50%;transform:translateY(-50%);font-size:1.2em;color:#d32f2f;width:20vw;text-align:left; }
+        #random-button { flex:0 1 auto;min-width:0; }
+        #bot-reply-button { flex:0 1 auto;min-width:0;max-width:8em; }
+        .sq { padding:0 !important; display:flex !important; align-items:center; justify-content:center; flex-shrink:0; }
+        #save-options, #load-options { flex:0 1 auto;min-width:0;text-align:center; }
+        .left-spacing { margin-left:0.5em; }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div class="header">
+        <div class="status-left" id="turn-status"></div>
+        <div id="center-status" style="font-family:Arial,sans-serif;font-size:1.2em;white-space:nowrap;position:absolute;left:50%;transform:translateX(-50%);z-index:1;display:flex;align-items:center;">
+            <span id="reserve-status" title="Reserve"></span>
+        </div>
+        <div class="controls-right">
+            <div id="last-move-display" style="display:flex;align-items:center;gap:0.5em;">
+                <span id="last-move-text"></span>
+                <button id="copy-move" title="Copy last move" style="display:none;">
+                    <svg class="copy-icon" viewBox="0 0 24 24"><path fill="black" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/></svg>
+                </button>
+            </div>
+            <button id="hold-button" onmousedown="hold()" style="display:none;">Hold</button>
+        </div>
+    </div>
+    <div class="board-container">
+        <div class="board" id="board">
+            <div class="lines" id="lines"></div>
+            <div class="grid" id="grid"></div>
+        </div>
+        <div id="message"></div>
+    </div>
+    <div class="footer">
+        <div class="replay-controls">
+            <button class="sq" onmousedown="replayStart()" title="Go to start" data-tooltip="Go to start"><<</button>
+            <button class="sq" onmousedown="replayBack()" title="Previous move" data-tooltip="Previous move"><</button>
+            <button class="sq" onmousedown="replayForward()" title="Next move" data-tooltip="Next move">></button>
+            <button class="sq" onmousedown="replayEnd()" title="Go to end" data-tooltip="Go to end">>></button>
+            <button class="sq" id="random-button" onmousedown="generateRandomGame()" title="Generate random game" data-tooltip="Generate random game" data-tooltip-alt="Stop generation"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="7" cy="17" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="17" r="1.5" fill="currentColor" stroke="none"/></svg></button>
+            <button class="sq" id="bot-reply-button" onmousedown="toggleBotReply()" title="Bot reply" data-tooltip="Bot reply is OFF" data-tooltip-alt="Bot reply is ON"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="4" y="2" width="16" height="20" rx="2"/><rect x="1" y="8" width="3" height="5" rx="1"/><rect x="20" y="8" width="3" height="5" rx="1"/><line x1="7" y1="8.75" x2="10.5" y2="8.75"/><line x1="13.5" y1="8.75" x2="17" y2="8.75"/><line x1="8" y1="17" x2="16" y2="17"/></svg></button>
+            <select id="save-options" onchange="handleSave()" data-tooltip="Save game">
+                <option value="" disabled selected hidden>Save</option>
+                <option value="file">To file</option>
+                <option value="clipboard">To clipboard</option>
+                <option value="link">To link</option>
+            </select>
+            <select id="load-options" onchange="handleLoad()" data-tooltip="Load game">
+                <option value="" disabled selected hidden>Load</option>
+                <option value="file">From file</option>
+                <option value="clipboard">From clipboard</option>
+                <option value="link">From link</option>
+            </select>
+            <select id="board-size" onchange="changeBoardSize()" data-tooltip="Board size">
+                <option value="3">3×3</option><option value="4">4×4</option><option value="5">5×5</option>
+                <option value="6">6×6</option><option value="7">7×7</option><option value="8">8×8</option>
+                <option value="9">9×9</option><option value="10">10×10</option><option value="11">11×11</option>
+                <option value="12">12×12</option><option value="13" selected>13×13</option><option value="14">14×14</option>
+                <option value="15">15×15</option><option value="16">16×16</option><option value="17">17×17</option>
+                <option value="18">18×18</option><option value="19">19×19</option>
+            </select>
+            <input type="file" id="load-input" style="display:none;" accept=".txt" onchange="loadGame(event)">
+        </div>
+    </div>
+</div>
+
+<script>
+    let SIZE = parseInt(document.getElementById('board-size').value);
+    let board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+    let turn = 0; // 0=Black, 1=White
+    let lastMoveX = null, lastMoveY = null;
+    let gameHistory = [];
+    let currentMoveIndex = -1;
+    let isGenerating = false, generationInterval = null;
+    let botReply = false;
+    let gameOver = false, blackWins = false, whiteWins = false;
+    // reserve[color] = number of stones of that color in the reserve (the stock is unlimited and never shown).
+    let reserve = [0, 0];
+    // Friendly stones removed from the board earlier in the current (uncommitted) turn.
+    let pendingRemoved = [];
+
+    const blackStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="black"/></svg>`;
+    const whiteStoneSVG = `<svg class="stone-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white" stroke="black" stroke-width="5"/></svg>`;
+
+    // ── Akimbo core logic ──
+
+    // nakedDiags[color] is a Set of integer keys for each naked diagonal of that
+    // color currently on the global board.  Keys encode both the top-left corner
+    // (r,c) of the 2×2 square and the diagonal type (A or B):
+    //   Type-A key = r*(SIZE-1) + c
+    //   Type-B key = (SIZE-1)² + r*(SIZE-1) + c
+    // The sets are kept incrementally — only squares touching a changed cell are
+    // ever rechecked, so each update is O(1) rather than O(SIZE²).
+    let nakedDiags = [new Set(), new Set()];
+
+    // Recheck both diagonal types in the 2×2 square whose top-left is (r,c).
+    // For a square with corners TL, TR, BL, BR:
+    //   Type A (TL–BR diagonal): naked for color iff TL===color && BR===color
+    //                             && TR!==color && BL!==color
+    //   Type B (TR–BL diagonal): naked for color iff TR===color && BL===color
+    //                             && TL!==color && BR!==color
+    function recheckSquare(r, c) {
+        if (r < 0 || r >= SIZE-1 || c < 0 || c >= SIZE-1) return;
+        const TL=board[r][c], TR=board[r][c+1], BL=board[r+1][c], BR=board[r+1][c+1];
+        const sq = (SIZE-1);
+        const kA = r*sq + c, kB = sq*sq + r*sq + c;
+        for (let col = 0; col <= 1; col++) {
+            if (TL===col && BR===col && TR!==col && BL!==col) nakedDiags[col].add(kA);
+            else nakedDiags[col].delete(kA);
+            if (TR===col && BL===col && TL!==col && BR!==col) nakedDiags[col].add(kB);
+            else nakedDiags[col].delete(kB);
+        }
+    }
+
+    // Update nakedDiags for all ≤4 squares that include cell (x,y).
+    function updateNakedDiagsAround(x, y) {
+        for (let r = x-1; r <= x; r++)
+            for (let c = y-1; c <= y; c++)
+                recheckSquare(r, c);
+    }
+
+    // Full rebuild from the current global board — O(SIZE²).
+    // Call after wholesale board replacements (reset, state load).
+    function recomputeNakedDiagonals() {
+        nakedDiags = [new Set(), new Set()];
+        for (let r = 0; r < SIZE-1; r++)
+            for (let c = 0; c < SIZE-1; c++)
+                recheckSquare(r, c);
+    }
+
+    // After placing `player`'s stone at (x,y) on board `b`, remove `player`'s
+    // OTHER stone in every crosscut that (x,y) participates in.
+    // Returns array of removed positions.
+    function resolveCrosscutsOnBoard(x, y, player, b) {
+        const toRemove = new Set();
+        for (let i = Math.max(0, x-1); i <= x; i++) {
+            for (let j = Math.max(0, y-1); j <= y; j++) {
+                if (i >= SIZE-1 || j >= SIZE-1) continue;
+                const a=b[i][j], bv=b[i][j+1], cv=b[i+1][j], d=b[i+1][j+1];
+                if (a!==null && bv!==null && cv!==null && d!==null &&
+                    a!==bv && a===d && bv===cv) {
+                    // Crosscut found; remove player's stone that is not (x,y)
+                    for (const [pr,pc] of [[i,j],[i,j+1],[i+1,j],[i+1,j+1]]) {
+                        if (b[pr][pc]===player && !(pr===x && pc===y))
+                            toRemove.add(`${pr},${pc}`);
+                    }
+                }
+            }
+        }
+        const removed = [];
+        for (const key of toRemove) {
+            const [pr,pc] = key.split(',').map(Number);
+            b[pr][pc] = null;
+            removed.push([pr,pc]);
+        }
+        return removed;
+    }
+
+    // True iff placing `player` at (x,y) leaves at most one naked diagonal of `player`'s color.
+    // (The check happens right after placement, before any crosscut removal.)
+    // Temporarily mutates the global board and nakedDiags, then restores them.
+    function isValidMadkimboMove(x, y, player) {
+        if (board[x][y] !== null) return false;
+        board[x][y] = player;
+        updateNakedDiagsAround(x, y);
+        const valid = nakedDiags[player].size <= 1;
+        board[x][y] = null;
+        updateNakedDiagsAround(x, y);
+        return valid;
+    }
+
+    // Temporarily take the given `player` stones off the board, run fn(), then put them back.
+    function withRemoved(list, player, fn) {
+        for (const [rx, ry] of list) board[rx][ry] = null;
+        for (const [rx, ry] of list) updateNakedDiagsAround(rx, ry);
+        const result = fn();
+        for (const [rx, ry] of list) board[rx][ry] = player;
+        for (const [rx, ry] of list) updateNakedDiagsAround(rx, ry);
+        return result;
+    }
+
+    function validPlacements(player) {
+        const v = [];
+        for (let x = 0; x < SIZE; x++) for (let y = 0; y < SIZE; y++)
+            if (isValidMadkimboMove(x, y, player)) v.push([x, y]);
+        return v;
+    }
+
+
+    // Returns an error string, or null if (removals, placement) is a legal turn for `player`.
+    function validateMove(player, removed, x, y) {
+        if (removed.length) {
+            if (reserve[player] !== 0) return "Cannot remove stones while the reserve holds stones of that color";
+            const seen = new Set();
+            for (const [rx, ry] of removed) {
+                const k = rx + ',' + ry;
+                if (seen.has(k) || board[rx][ry] !== player) return "Invalid removal";
+                seen.add(k);
+            }
+        }
+        if (removed.some(([rx, ry]) => rx === x && ry === y)) return "Cannot place on a point vacated this turn";
+        return withRemoved(removed, player, () => {
+            if (board[x][y] !== null) return "Position occupied";
+            if (!isValidMadkimboMove(x, y, player)) return "Illegal move";
+            return null;
+        });
+    }
+
+    // Place the stone. Removals (if any) have ALREADY been taken off the board and are `removed`.
+    // Stones removed this turn go to the reserve and the placed stone comes from the stock;
+    // otherwise the placed stone comes from the reserve if it holds one, else from the stock.
+    // A stone removed by a crosscut returns to the stock.
+    function finishPlacement(player, removed, x, y) {
+        if (removed.length) reserve[player] += removed.length;
+        else if (reserve[player] > 0) reserve[player]--;
+        board[x][y] = player;
+        const cut = resolveCrosscutsOnBoard(x, y, player, board);
+        updateNakedDiagsAround(x, y);
+        for (const [pr, pc] of cut) updateNakedDiagsAround(pr, pc);
+    }
+
+    // Full turn in one go (bot, random game, loading): removals then placement.
+    function applyMove(player, removals, x, y) {
+        for (const [rx, ry] of removals) { board[rx][ry] = null; updateNakedDiagsAround(rx, ry); }
+        finishPlacement(player, removals, x, y);
+    }
+
+    function chooseRandomMove(player) {
+        const pick = a => a[Math.floor(Math.random() * a.length)];
+        const own = [];
+        for (let x = 0; x < SIZE; x++) for (let y = 0; y < SIZE; y++)
+            if (board[x][y] === player) own.push([x, y]);
+        const valid = validPlacements(player);
+        const canRemove = reserve[player] === 0 && own.length > 0;
+        if (!(canRemove && (valid.length === 0 || Math.random() < 0.1))) {
+            if (!valid.length) return null;
+            const [x, y] = pick(valid);
+            return { removals: [], x, y };
+        }
+        for (let a = 0; a < 20; a++) {
+            const q = Math.random() * 0.5;
+            let rem = own.filter(() => Math.random() < q);
+            if (!rem.length) rem = [pick(own)];
+            const v = withRemoved(rem, player, () => validPlacements(player))
+                .filter(([px, py]) => !rem.some(([rx, ry]) => rx === px && ry === py));
+            if (v.length) { const [x, y] = pick(v); return { removals: rem, x, y }; }
+        }
+        const v = withRemoved(own, player, () => validPlacements(player))
+            .filter(([px, py]) => !own.some(([rx, ry]) => rx === px && ry === py));
+        if (v.length) { const [x, y] = pick(v); return { removals: own, x, y }; }
+        return null;
+    }
+
+    // Uncommitted removals (UI): put them all back / put one back.
+    function cancelPending() {
+        if (!pendingRemoved.length) return;
+        for (const [rx, ry] of pendingRemoved) { board[rx][ry] = turn; updateNakedDiagsAround(rx, ry); }
+        pendingRemoved = [];
+        renderBoard(); updateStatus();
+    }
+
+    function restoreRemoved(x, y) {
+        const i = pendingRemoved.findIndex(([rx, ry]) => rx === x && ry === y);
+        if (i < 0) return;
+        pendingRemoved.splice(i, 1);
+        board[x][y] = turn; updateNakedDiagsAround(x, y);
+        renderBoard(); updateStatus();
+    }
+
+    function posName(x, y) { return String.fromCharCode(97 + y) + (SIZE - x); }
+    function removalsStr(rem) {
+        return [...(rem || [])].sort((a, b) => a[0] - b[0] || a[1] - b[1])
+            .map(([x, y]) => 'x' + posName(x, y)).join('');
+    }
+
+    // ── Board / state management ──
+
+    function initBoard() {
+        const gridDiv = document.getElementById('grid');
+        gridDiv.innerHTML = '';
+        const linesDiv = document.getElementById('lines');
+        linesDiv.innerHTML = '';
+
+        const canvas = document.createElement('canvas');
+        const boardSize = document.getElementById('board').offsetWidth;
+        canvas.width = boardSize; canvas.height = boardSize;
+        const ctx = canvas.getContext('2d');
+        const cellSize = boardSize / SIZE;
+
+        gridDiv.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+        gridDiv.style.gridTemplateRows    = `repeat(${SIZE}, 1fr)`;
+
+        for (let i = 0; i < SIZE; i++) {
+            for (let j = 0; j < SIZE; j++) {
+                const point = document.createElement('div');
+                point.className = 'point';
+                point.dataset.x = i; point.dataset.y = j;
+                point.onmousedown = () => play(i, j);
+                point.appendChild(document.createElement('div')).className = 'stone';
+                // fix: firstChild already appended above
+                gridDiv.appendChild(point);
+            }
+        }
+
+        ctx.strokeStyle = 'black'; ctx.lineWidth = 1;
+        for (let i = 0; i < SIZE; i++) {
+            const pos = cellSize/2 + i*cellSize;
+            ctx.beginPath(); ctx.moveTo(pos, cellSize/2); ctx.lineTo(pos, boardSize-cellSize/2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cellSize/2, pos); ctx.lineTo(boardSize-cellSize/2, pos); ctx.stroke();
+        }
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = 'black';
+        ctx.beginPath(); ctx.moveTo(cellSize/2, cellSize/2); ctx.lineTo(boardSize-cellSize/2, cellSize/2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cellSize/2, boardSize-cellSize/2); ctx.lineTo(boardSize-cellSize/2, boardSize-cellSize/2); ctx.stroke();
+        ctx.strokeStyle = 'white';
+        ctx.beginPath(); ctx.moveTo(cellSize/2, cellSize/2); ctx.lineTo(cellSize/2, boardSize-cellSize/2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(boardSize-cellSize/2, cellSize/2); ctx.lineTo(boardSize-cellSize/2, boardSize-cellSize/2); ctx.stroke();
+
+        // Miter the four corners: each 5×5 overlap square is split along a 45° diagonal
+        // into two filled triangles so the black (horizontal) and white (vertical) edges
+        // meet cleanly with no crude overlap.
+        {
+            const e = ctx.lineWidth / 2; // 2.5px — half the border stroke width
+            const h = cellSize / 2;      // center of the corner squares
+            const W = boardSize;
+            function tri(color, x1,y1, x2,y2, x3,y3) {
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3);
+                ctx.closePath(); ctx.fill();
+            }
+            // Top-left: diagonal from outer (h-e,h-e) to inner (h+e,h+e)
+            tri('black', h-e,h-e, h+e,h-e, h+e,h+e);   // upper-right → black (top edge)
+            tri('white', h-e,h-e, h-e,h+e, h+e,h+e);   // lower-left  → white (left edge)
+            // Top-right: diagonal from outer (W-h+e,h-e) to inner (W-h-e,h+e)
+            tri('black', W-h-e,h-e, W-h+e,h-e, W-h-e,h+e);  // upper-left  → black (top edge)
+            tri('white', W-h+e,h-e, W-h+e,h+e, W-h-e,h+e);  // lower-right → white (right edge)
+            // Bottom-left: diagonal from outer (h-e,W-h+e) to inner (h+e,W-h-e)
+            tri('black', h-e,W-h+e, h+e,W-h+e, h+e,W-h-e);  // lower-right → black (bottom edge)
+            tri('white', h-e,W-h-e, h+e,W-h-e, h-e,W-h+e);  // upper-left  → white (left edge)
+            // Bottom-right: diagonal from outer (W-h+e,W-h+e) to inner (W-h-e,W-h-e)
+            tri('black', W-h-e,W-h+e, W-h+e,W-h+e, W-h-e,W-h-e);  // lower-left  → black (bottom edge)
+            tri('white', W-h+e,W-h-e, W-h+e,W-h+e, W-h-e,W-h-e);  // upper-right → white (right edge)
+        }
+        
+        linesDiv.appendChild(canvas);
+        updateStatus(); updateLastMoveDisplay(); updateButtonTooltips(); adjustHeaderLayout();
+    }
+
+    function saveGameState() {
+        const bWins = checkWin(0), wWins = checkWin(1);
+        return { board: board.map(r=>[...r]), turn, lastMoveX, lastMoveY, reserve: [...reserve],
+                 gameOver: bWins||wWins, blackWins: bWins, whiteWins: wWins, lastWasPieSwap: false };
+    }
+
+    function loadGameState(state) {
+        board = state.board.map(r=>[...r]);
+        reserve = state.reserve ? [...state.reserve] : [0, 0];
+        pendingRemoved = [];
+        turn = (state.turn !== undefined) ? state.turn : (currentMoveIndex%2===0 ? 0 : 1);
+        lastMoveX = state.lastMoveX; lastMoveY = state.lastMoveY;
+        blackWins = state.blackWins; whiteWins = state.whiteWins; gameOver = state.gameOver;
+        recomputeNakedDiagonals();
+        renderBoard(); updateStatus(); updateLastMoveDisplay();
+    }
+
+    function resetGame(newSize) {
+        SIZE = newSize;
+        board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+        turn = 0; lastMoveX = null; lastMoveY = null;
+        reserve = [0, 0]; pendingRemoved = [];
+        gameOver = false; blackWins = false; whiteWins = false;
+        nakedDiags = [new Set(), new Set()];
+        const init = saveGameState();
+        init.turn = 0; init.initialX = null; init.initialY = null;
+        gameHistory = [init]; currentMoveIndex = 0;
+        clearMessage(); initBoard(); renderBoard(); updateReplayButtons(); updateLastMoveDisplay();
+    }
+
+    function changeBoardSize() {
+        resetGame(parseInt(document.getElementById('board-size').value));
+    }
+
+    function clearLastMoveMarker() {
+        if (lastMoveX!==null && lastMoveY!==null)
+            document.getElementsByClassName('point')[lastMoveX*SIZE+lastMoveY].classList.remove('last-move');
+        lastMoveX = null; lastMoveY = null;
+    }
+
+    function setLastMoveMarker(x, y) {
+        clearLastMoveMarker();
+        document.getElementsByClassName('point')[x*SIZE+y].classList.add('last-move');
+        lastMoveX = x; lastMoveY = y;
+    }
+
+    function setMessage(msg) { document.getElementById('message').textContent = msg; }
+    function clearMessage()  { document.getElementById('message').textContent = ''; }
+
+    function getChain(x, y, color, visited=new Set()) {
+        if (x<0||x>=SIZE||y<0||y>=SIZE||visited.has(`${x},${y}`)||board[x][y]!==color) return [];
+        visited.add(`${x},${y}`);
+        const chain = [[x,y]];
+        for (const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0]]) chain.push(...getChain(x+dx,y+dy,color,visited));
+        return chain;
+    }
+
+    function checkWin(color) {
+        const visited = new Set();
+        if (color===0) { // Black: top row → bottom row
+            for (let y=0;y<SIZE;y++)
+                if (board[0][y]===0&&!visited.has(`0,${y}`))
+                    if (getChain(0,y,0,visited).some(([x])=>x===SIZE-1)) return true;
+        } else { // White: left col → right col
+            for (let x=0;x<SIZE;x++)
+                if (board[x][0]===1&&!visited.has(`${x},0`))
+                    if (getChain(x,0,1,visited).some(([,y])=>y===SIZE-1)) return true;
+        }
+        return false;
+    }
+
+    function renderBoard() {
+        const points = document.getElementsByClassName('point');
+        for (let i=0;i<SIZE;i++) for (let j=0;j<SIZE;j++) {
+            const point = points[i*SIZE+j];
+            const stone = point.firstChild;
+            stone.className = 'stone';
+            if (board[i][j]===0) stone.classList.add('black');
+            else if (board[i][j]===1) stone.classList.add('white');
+            if (i===lastMoveX&&j===lastMoveY) point.classList.add('last-move');
+            else point.classList.remove('last-move');
+        }
+        renderNakedDiagLines();
+    }
+
+    function renderNakedDiagLines() {
+        const boardEl = document.getElementById('board');
+        const boardSize = boardEl.offsetWidth;
+        const cellSize = boardSize / SIZE;
+        let svg = document.getElementById('naked-diag-svg');
+        if (!svg) {
+            svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.id = 'naked-diag-svg';
+            svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:none;';
+            boardEl.appendChild(svg);
+        }
+        svg.setAttribute('width', boardSize);
+        svg.setAttribute('height', boardSize);
+        svg.innerHTML = '';
+
+        const sq = SIZE - 1;
+        for (let col = 0; col <= 1; col++) {
+            // Black stones (col=0) get white lines/dots; white stones (col=1) get black lines/dots
+            const strokeColor = col === 0 ? 'white' : 'black';
+            for (const key of nakedDiags[col]) {
+                let x1, y1, x2, y2;
+                if (key < sq * sq) {
+                    // Type A: TL=(r,c) to BR=(r+1,c+1)
+                    const r = Math.floor(key / sq), c = key % sq;
+                    x1=r; y1=c; x2=r+1; y2=c+1;
+                } else {
+                    // Type B: TR=(r,c+1) to BL=(r+1,c)
+                    const k = key - sq*sq;
+                    const r = Math.floor(k / sq), c = k % sq;
+                    x1=r; y1=c+1; x2=r+1; y2=c;
+                }
+                const px1 = (y1 + 0.5) * cellSize;
+                const py1 = (x1 + 0.5) * cellSize;
+                const px2 = (y2 + 0.5) * cellSize;
+                const py2 = (x2 + 0.5) * cellSize;
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', px1); line.setAttribute('y1', py1);
+                line.setAttribute('x2', px2); line.setAttribute('y2', py2);
+                line.setAttribute('stroke', strokeColor);
+                line.setAttribute('stroke-width', '2');
+                svg.appendChild(line);
+
+                for (const [px, py] of [[px1, py1], [px2, py2]]) {
+                    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    dot.setAttribute('cx', px); dot.setAttribute('cy', py);
+                    dot.setAttribute('r', '2');
+                    dot.setAttribute('fill', strokeColor);
+                    svg.appendChild(dot);
+                }
+            }
+        }
+    }
+
+    // Record a completed turn (placement at x,y after `removed` removals) in the history.
+    function recordMove(x, y, removed) {
+        setLastMoveMarker(x, y);
+        turn = turn===0?1:0;
+        const state = saveGameState();
+        state.initialX=x; state.initialY=y; state.lastWasPieSwap=false;
+        state.removed = removed;
+        if (currentMoveIndex < gameHistory.length-1)
+            gameHistory = gameHistory.slice(0, currentMoveIndex+1);
+        gameHistory.push(state); currentMoveIndex++;
+        blackWins=state.blackWins; whiteWins=state.whiteWins; gameOver=state.gameOver;
+
+        renderBoard(); updateStatus();
+
+
+        updateReplayButtons(); updateLastMoveDisplay();
+    }
+
+    // ── Play ──
+    // Clicking a friendly stone removes it (to the reserve, once the turn is completed);
+    // clicking an empty point places a stone. Where the stone comes from is automatic.
+
+    function play(x, y) {
+        if (gameOver) { setMessage("Game is over!"); return; }
+
+        if (board[x][y] !== null) {
+            if (canPieSwap()) { performPieSwap(); return; }
+            if (board[x][y] === turn) {
+                if (reserve[turn] > 0) {
+                    setMessage("You can't remove stones while you have stones in the reserve.");
+                    return;
+                }
+                clearMessage();
+                board[x][y] = null;
+                pendingRemoved.push([x, y]);
+                updateNakedDiagsAround(x, y);
+                renderBoard(); updateStatus();
+            }
+            return;
+        }
+
+        if (pendingRemoved.some(([rx, ry]) => rx === x && ry === y)) {
+            clearMessage();
+            restoreRemoved(x, y);
+            return;
+        }
+
+        if (!isValidMadkimboMove(x, y, turn)) {
+            setMessage("That move would leave you with too many naked diagonals.");
+            return;
+        }
+
+        clearMessage();
+        const removed = pendingRemoved; pendingRemoved = [];
+        finishPlacement(turn, removed, x, y);
+        recordMove(x, y, removed);
+        if (!gameOver) setTimeout(makeBotReply, 0);
+    }
+
+    // ── Replay ──
+
+    function replayStart() {
+        currentMoveIndex=0; loadGameState(gameHistory[0]); clearMessage();
+        updateReplayButtons(); updateLastMoveDisplay();
+    }
+
+    function replayBack() {
+        if (currentMoveIndex>0) {
+            currentMoveIndex--;
+            loadGameState(gameHistory[currentMoveIndex]); clearMessage();
+            renderBoard(); updateStatus(); updateReplayButtons(); updateLastMoveDisplay();
+        }
+    }
+
+    function replayForward() {
+        if (currentMoveIndex < gameHistory.length-1) {
+            currentMoveIndex++;
+            loadGameState(gameHistory[currentMoveIndex]); clearMessage();
+            renderBoard(); updateStatus();
+            updateReplayButtons();
+            updateLastMoveDisplay();
+        }
+    }
+
+    function replayEnd() {
+        currentMoveIndex=gameHistory.length-1;
+        loadGameState(gameHistory[currentMoveIndex]); clearMessage(); updateReplayButtons();
+    }
+
+    function updateReplayButtons() {
+        const s=document.querySelector('button[onmousedown="replayStart()"]');
+        const b=document.querySelector('button[onmousedown="replayBack()"]');
+        const f=document.querySelector('button[onmousedown="replayForward()"]');
+        const e=document.querySelector('button[onmousedown="replayEnd()"]');
+        const r=document.getElementById('random-button');
+        if (isGenerating) { s.disabled=b.disabled=f.disabled=e.disabled=true; r.disabled=false; }
+        else {
+            s.disabled=b.disabled=(currentMoveIndex===0);
+            f.disabled=e.disabled=(currentMoveIndex===gameHistory.length-1);
+            r.disabled=false;
+        }
+    }
+
+    function updateStatus() {
+        const el=document.getElementById('turn-status');
+        if (gameOver) el.innerHTML=(blackWins?blackStoneSVG:whiteStoneSVG)+' wins!';
+        else {
+            el.innerHTML=(turn===0?blackStoneSVG:whiteStoneSVG)+' to move';
+        }
+        const rb = reserve[0] + (turn===0 ? pendingRemoved.length : 0);
+        const rw = reserve[1] + (turn===1 ? pendingRemoved.length : 0);
+        document.getElementById('reserve-status').innerHTML =
+            `${rb}<span class="left-spacing">${blackStoneSVG}</span> ${rw}<span class="left-spacing">${whiteStoneSVG}</span>`;
+        adjustHeaderLayout();
+    }
+
+    // ── Random game ──
+
+    const BOT_ON_SVG  = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="4" y="2" width="16" height="20" rx="2"/><rect x="1" y="8" width="3" height="5" rx="1"/><rect x="20" y="8" width="3" height="5" rx="1"/><rect x="7" y="7" width="3.5" height="3.5" rx="0.5"/><rect x="13.5" y="7" width="3.5" height="3.5" rx="0.5"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`;
+    const BOT_OFF_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="4" y="2" width="16" height="20" rx="2"/><rect x="1" y="8" width="3" height="5" rx="1"/><rect x="20" y="8" width="3" height="5" rx="1"/><line x1="7" y1="8.75" x2="10.5" y2="8.75"/><line x1="13.5" y1="8.75" x2="17" y2="8.75"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`;
+
+    function toggleBotReply() {
+        botReply = !botReply;
+        const btn = document.getElementById('bot-reply-button');
+        btn.innerHTML = botReply ? BOT_ON_SVG : BOT_OFF_SVG;
+        btn.title = btn.dataset.tooltip = botReply ? 'Bot reply is ON' : 'Bot reply is OFF';
+        if (botReply) setTimeout(makeBotReply, 0);
+    }
+
+    function makeBotReply() {
+        if (!botReply || gameOver || isGenerating) return;
+        cancelPending();
+        const mv = chooseRandomMove(turn);
+        if (!mv) return;
+        applyMove(turn, mv.removals, mv.x, mv.y);
+        recordMove(mv.x, mv.y, mv.removals);
+    }
+
+    const DICE_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="7" cy="17" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="17" r="1.5" fill="currentColor" stroke="none"/></svg>`;
+    const STOP_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="display:block;"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
+
+    function fixSquareButtons() {
+        document.querySelectorAll('.sq').forEach(btn => {
+            btn.style.width = '';
+            btn.style.width = btn.offsetHeight + 'px';
+        });
+    }
+
+    function fixSaveLoadWidths() {
+        for (const [id, label] of [['save-options', 'Save'], ['load-options', 'Load']]) {
+            const sel = document.getElementById(id);
+            const clone = sel.cloneNode(false); // no children
+            const opt = document.createElement('option');
+            opt.textContent = label;
+            clone.appendChild(opt);
+            clone.style.cssText = 'position:absolute;visibility:hidden;width:auto;';
+            document.body.appendChild(clone);
+            const w = clone.offsetWidth;
+            document.body.removeChild(clone);
+            sel.style.width = w + 'px';
+        }
+    }
+
+    function stopGeneration() {
+        if (generationInterval) {
+            clearInterval(generationInterval); generationInterval=null; isGenerating=false;
+            const r=document.getElementById('random-button');
+            r.innerHTML=DICE_SVG; r.setAttribute('onmousedown','generateRandomGame()');
+            r.title=r.dataset.tooltip='Generate random game';
+            updateReplayButtons(); renderBoard();
+        }
+    }
+
+    function generateRandomGame() {
+        if (isGenerating) { stopGeneration(); return; }
+        cancelPending();
+        if (gameOver) resetGame(SIZE);
+        isGenerating=true;
+        const r=document.getElementById('random-button');
+        r.innerHTML=STOP_SVG;
+        r.title=r.dataset.tooltip='Stop generation';
+        r.setAttribute('onmousedown','stopGeneration()'); updateReplayButtons();
+
+        generationInterval=setInterval(()=>{
+            if (gameOver) { stopGeneration(); return; }
+            if (canPieSwap()&&Math.random()<0.5) { performPieSwap(); return; }
+
+            const mv=chooseRandomMove(turn);
+
+            if (!mv) { stopGeneration(); return; }
+
+            const {x,y,removals}=mv;
+            applyMove(turn,removals,x,y);
+            setLastMoveMarker(x,y);
+            turn=turn===0?1:0; renderBoard();
+            const st=saveGameState();
+            st.initialX=x;st.initialY=y;st.lastWasPieSwap=false;st.removed=removals;
+            if (currentMoveIndex<gameHistory.length-1) gameHistory=gameHistory.slice(0,currentMoveIndex+1);
+            gameHistory.push(st); currentMoveIndex++;
+            blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
+            updateStatus(); updateReplayButtons(); updateLastMoveDisplay();
+        },1);
+    }
+
+    // ── Pie swap ──
+
+    function canPieSwap() {
+        return turn===1 && currentMoveIndex===1 && !gameOver && !isGenerating;
+    }
+
+    function performPieSwap() {
+        if (!canPieSwap()) { setMessage("Swap only available as White's first move."); return; }
+        if (currentMoveIndex<gameHistory.length-1) {
+            const next=gameHistory[currentMoveIndex+1];
+            if (next.lastWasPieSwap) { currentMoveIndex++; loadGameState(gameHistory[currentMoveIndex]); updateReplayButtons(); return; }
+            else gameHistory=gameHistory.slice(0,currentMoveIndex+1);
+        }
+        const st=saveGameState();
+        st.turn=1; st.initialX=null; st.initialY=null; st.lastWasPieSwap=true;
+        gameHistory.push(st); currentMoveIndex++;
+        renderBoard(); updateStatus(); updateLastMoveDisplay(); updateReplayButtons();
+        if (!gameOver) setTimeout(makeBotReply, 0);
+    }
+
+    // ── Save / Load ──
+
+    // Move notation: [BW]{x[col][row]}[col][row]  — optional friendly removals (x-prefixed), then the placement.
+    // Crosscut removals are implicit and deterministic.
+    function generateGameRecordText() {
+        const moves=[SIZE+'x'+SIZE];
+        for (let i=1;i<gameHistory.length;i++) {
+            const st=gameHistory[i], prev=gameHistory[i-1];
+            const p=prev.turn===0?'B':'W';
+            if (st.lastWasPieSwap) moves.push('WSwap');
+            else if (st.initialX!=null) {
+                const col=String.fromCharCode(97+st.initialY), row=SIZE-st.initialX;
+                moves.push(p+removalsStr(st.removed)+col+row);
+            }
+        }
+        return moves.join(' ');
+    }
+
+    // ── Compact binary link encoding ──
+    // Layout: [5 bits size-3][12 bits moveCount] then per move:
+    //   2-bit tag: 0=normal move, 2=WSwap, 3=move with removals
+    //   (tag 3: 9-bit removal count, then that many board indices, then the placement index)
+    //   normal move is followed by ceil(log2(size*size)) bits giving the board index (x*size+y)
+    // Move colors are never stored: they're fully determined by replaying the same
+    // turn-alternation rule the text-format loader already uses (see processGameRecordText),
+    // so the decoder reconstructs them deterministically.
+
+    class BitWriter {
+        constructor() { this.bytes=[]; this.cur=0; this.nbits=0; }
+        writeBits(value, n) {
+            for (let i=n-1;i>=0;i--) {
+                this.cur=(this.cur<<1)|((value>>i)&1); this.nbits++;
+                if (this.nbits===8) { this.bytes.push(this.cur); this.cur=0; this.nbits=0; }
+            }
+        }
+        finish() {
+            if (this.nbits>0) { this.bytes.push(this.cur<<(8-this.nbits)); this.cur=0; this.nbits=0; }
+            return new Uint8Array(this.bytes);
+        }
+    }
+
+    class BitReader {
+        constructor(bytes) { this.bytes=bytes; this.pos=0; }
+        readBits(n) {
+            let v=0;
+            for (let i=0;i<n;i++) {
+                const byteIdx=this.pos>>3, bitIdx=7-(this.pos&7);
+                v=(v<<1)|((this.bytes[byteIdx]>>bitIdx)&1);
+                this.pos++;
+            }
+            return v;
+        }
+    }
+
+    function bytesToBase64Url(bytes) {
+        let binary='';
+        for (let i=0;i<bytes.length;i++) binary+=String.fromCharCode(bytes[i]);
+        return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    }
+
+    function base64UrlToBytes(str) {
+        let b64=str.replace(/-/g,'+').replace(/_/g,'/');
+        while (b64.length%4) b64+='=';
+        const binary=atob(b64);
+        const bytes=new Uint8Array(binary.length);
+        for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+        return bytes;
+    }
+
+    function packGameRecordText(text) {
+        const parts=text.trim().split(/\s+/);
+        const sm=parts[0].match(/^(\d+)x(\d+)$/);
+        const size=parseInt(sm[1]);
+        const moves=parts.slice(1);
+        const posBits=Math.max(1,Math.ceil(Math.log2(size*size)));
+        const w=new BitWriter();
+        w.writeBits(size-3,5);
+        w.writeBits(moves.length,12);
+        for (const mv of moves) {
+            if (mv.toLowerCase()==='wswap') { w.writeBits(2,2); continue; }
+            const mm=mv.match(/^[BW]((?:x[a-z]\d+)*)([a-z])(\d+)$/);
+            const y=mm[2].charCodeAt(0)-97, x=size-parseInt(mm[3]);
+            const rem=[...mm[1].matchAll(/x([a-z])(\d+)/g)].map(m=>(size-parseInt(m[2]))*size+(m[1].charCodeAt(0)-97));
+            if (rem.length) {
+                w.writeBits(3,2);
+                w.writeBits(rem.length,9);
+                for (const ri of rem) w.writeBits(ri,posBits);
+            } else {
+                w.writeBits(0,2);
+            }
+            w.writeBits(x*size+y,posBits);
+        }
+        return w.finish();
+    }
+
+    function unpackGameRecordBytes(bytes) {
+        const r=new BitReader(bytes);
+        const size=r.readBits(5)+3;
+        const moveCount=r.readBits(12);
+        const posBits=Math.max(1,Math.ceil(Math.log2(size*size)));
+        const moves=[size+'x'+size];
+        let tempTurn=0;
+        for (let i=0;i<moveCount;i++) {
+            const tag=r.readBits(2);
+            if (tag===2) { moves.push('WSwap'); continue; } // tempTurn unchanged, mirrors text loader
+            const p=tempTurn===0?'B':'W';
+            let rem='';
+            if (tag===3) {
+                const n=r.readBits(9);
+                for (let k=0;k<n;k++) {
+                    const ri=r.readBits(posBits);
+                    rem+='x'+String.fromCharCode(97+ri%size)+(size-Math.floor(ri/size));
+                }
+            }
+            const idx=r.readBits(posBits);
+            const x=Math.floor(idx/size), y=idx%size;
+            const col=String.fromCharCode(97+y), row=size-x;
+            moves.push(p+rem+col+row);
+            tempTurn=tempTurn===0?1:0;
+        }
+        return moves.join(' ');
+    }
+
+    function generateGameLink() {
+        const bytes=packGameRecordText(generateGameRecordText());
+        const encoded=bytesToBase64Url(bytes);
+        return window.location.origin+window.location.pathname+'#g='+encoded;
+    }
+
+    function extractEncodedFromInput(input) {
+        const t=(input||'').trim();
+        const m=t.match(/(?:^|[#&?])g=([A-Za-z0-9_-]+)/);
+        if (m) return m[1];
+        return t; // assume the raw encoded string was pasted
+    }
+
+    function loadGameFromLinkText(input) {
+        const encoded=extractEncodedFromInput(input);
+        if (!encoded) { setMessage("Error: No game link found."); return false; }
+        try {
+            const text=unpackGameRecordBytes(base64UrlToBytes(encoded));
+            return processGameRecordText(text);
+        } catch (e) {
+            setMessage("Error: Invalid game link.");
+            return false;
+        }
+    }
+
+    function tryLoadFromUrlHash() {
+        if (location.hash && location.hash.slice(1).startsWith('g=')) {
+            loadGameFromLinkText(location.hash.slice(1));
+        }
+    }
+
+    function handleSave() {
+        const sel=document.getElementById('save-options'), opt=sel.value; if (!opt) return;
+        if (opt==='link') {
+            const url=generateGameLink();
+            navigator.clipboard.writeText(url).then(()=>setMessage('Link copied to clipboard!'));
+            sel.value=''; return;
+        }
+        const text=generateGameRecordText();
+        if (opt==='file') {
+            const a=document.createElement('a');
+            a.href=URL.createObjectURL(new Blob([text],{type:'text/plain'}));
+            a.download='madkimbo_game.txt'; a.click();
+        } else if (opt==='clipboard') {
+            navigator.clipboard.writeText(text).then(()=>setMessage('Copied to clipboard!'));
+        }
+        sel.value='';
+    }
+
+    function handleLoad() {
+        const sel=document.getElementById('load-options'), opt=sel.value;
+        if (opt==='file') document.getElementById('load-input').click();
+        else if (opt==='clipboard') navigator.clipboard.readText().then(t=>processGameRecordText(t));
+        else if (opt==='link') navigator.clipboard.readText().then(t=>loadGameFromLinkText(t));
+        sel.value='';
+    }
+
+    function processGameRecordText(rawText) {
+        const moveText=(rawText||'').trim();
+        if (!moveText) { setMessage("Error: Empty game record."); return false; }
+        const moves=moveText.split(/\s+/);
+        const sm=moves[0].match(/^(\d+)[-x×*\uFFFD](\d+)$/);
+        if (!sm) { setMessage("Error: Must start with board size (e.g. 13x13)."); return false; }
+        const ns=parseInt(sm[1]);
+        if (sm[1]!==sm[2]||ns<3||ns>19) { setMessage("Error: Invalid board size."); return false; }
+        resetGame(ns); document.getElementById('board-size').value=ns;
+
+        let tempTurn=0;
+        for (let i=1;i<moves.length;i++) {
+            const mv=moves[i]; if (!mv) continue;
+
+            if (mv.toLowerCase()==='wswap') {
+                if (tempTurn!==1||currentMoveIndex!==1) { setMessage("Error: WSwap only legal as White's first move."); renderBoard(); return false; }
+                turn=1;
+                const st=saveGameState(); st.turn=1; st.initialX=null; st.initialY=null; st.lastWasPieSwap=true;
+                gameHistory.push(st); currentMoveIndex++; continue;
+            }
+
+            const mm=mv.match(/^([BW])((?:x[a-z]\d+)*)([a-z])(\d+)$/);
+            if (!mm) { setMessage("Error: Invalid move: "+mv); renderBoard(); return false; }
+            const pl=mm[1]==='B'?0:1;
+            if (pl!==tempTurn) { setMessage("Error: Move out of turn: "+mv); renderBoard(); return false; }
+            const x=ns-parseInt(mm[4]), y=mm[3].charCodeAt(0)-97;
+            if (x<0||x>=ns||y<0||y>=ns) { setMessage("Error: Move out of bounds: "+mv); renderBoard(); return false; }
+            const removed=[];
+            for (const m of mm[2].matchAll(/x([a-z])(\d+)/g)) {
+                const rx=ns-parseInt(m[2]), ry=m[1].charCodeAt(0)-97;
+                if (rx<0||rx>=ns||ry<0||ry>=ns) { setMessage("Error: Removal out of bounds: "+mv); renderBoard(); return false; }
+                removed.push([rx,ry]);
+            }
+
+            turn=tempTurn;
+            const err=validateMove(tempTurn,removed,x,y);
+            if (err) { setMessage("Error: "+err+": "+mv); renderBoard(); return false; }
+            applyMove(tempTurn,removed,x,y);
+            setLastMoveMarker(x,y);
+            tempTurn=tempTurn===0?1:0;
+            const st=saveGameState(); st.turn=tempTurn; st.initialX=x; st.initialY=y; st.lastWasPieSwap=false; st.removed=removed;
+            gameHistory.push(st); currentMoveIndex++;
+            blackWins=st.blackWins; whiteWins=st.whiteWins; gameOver=st.gameOver;
+        }
+
+        turn=tempTurn;
+        renderBoard(); updateStatus(); updateReplayButtons(); updateLastMoveDisplay(); clearMessage();
+        return true;
+    }
+
+    function loadGame(event) {
+        const f=event.target.files[0]; if (!f) return;
+        const r=new FileReader();
+        r.onload=e=>processGameRecordText(e.target.result);
+        r.readAsText(f); event.target.value='';
+    }
+
+    function updateLastMoveDisplay() {
+        const txt=document.getElementById('last-move-text'), btn=document.getElementById('copy-move');
+        if (currentMoveIndex<=0||gameHistory.length<=1) { txt.textContent=''; btn.style.display='none'; return; }
+        const st=gameHistory[currentMoveIndex];
+        if (st.lastWasPieSwap) { txt.textContent='WSwap'; btn.style.display='inline-flex'; return; }
+        let idx=currentMoveIndex;
+        while (idx>0&&gameHistory[idx].lastWasPieSwap) idx--;
+        const rs=gameHistory[idx], prev=gameHistory[idx-1];
+        const p=prev?(prev.turn===0?'B':'W'):'B';
+        if (!rs||rs.lastWasPieSwap||rs.initialX==null) { txt.textContent=''; btn.style.display='none'; }
+        else {
+            txt.textContent=p+removalsStr(rs.removed)+String.fromCharCode(97+rs.initialY)+(SIZE-rs.initialX);
+            btn.style.display='inline-flex';
+        }
+    }
+
+    function copyLastMove() {
+        const t=document.getElementById('last-move-text').textContent;
+        if (t) navigator.clipboard.writeText(t)
+            .then(()=>{ setMessage('Move copied!'); setTimeout(()=>{ if (document.getElementById('message').textContent==='Move copied!') clearMessage(); },2000); })
+            .catch(()=>{ setMessage('Failed to copy!'); setTimeout(()=>{ if (document.getElementById('message').textContent==='Failed to copy!') clearMessage(); },2000); });
+    }
+
+    // ── Layout helpers ──
+
+    function getTotalMaxWidth() {
+        const controls=document.querySelector('.replay-controls'), els=controls.querySelectorAll('button,select');
+        const s=getComputedStyle(els[0]);
+        const ew=parseFloat(s.maxWidth)+parseFloat(s.paddingLeft)+parseFloat(s.paddingRight)+parseFloat(s.borderLeftWidth)+parseFloat(s.borderRightWidth);
+        return ew*els.length+parseFloat(getComputedStyle(controls).gap)*(els.length-1);
+    }
+
+    function updateButtonTooltips() {
+        const els=[...document.querySelectorAll('.replay-controls button'),...document.querySelectorAll('.replay-controls select')];
+        const wide=window.innerWidth>=getTotalMaxWidth();
+        els.forEach(el=>{
+            const tooltip=el.dataset.tooltip;
+            if (!tooltip) return;
+            const squareButton = el.classList.contains('sq');
+            if (squareButton||!wide) el.setAttribute('title',tooltip);
+            else el.removeAttribute('title');
+        });
+    }
+
+    function adjustHeaderLayout() {
+        const hdr=document.querySelector('.header'),sl=document.querySelector('.status-left'),cr=document.querySelector('.controls-right');
+        const nakedEl=document.getElementById('center-status');
+        sl.style.position=cr.style.position='absolute'; sl.style.left='0'; cr.style.right='0';
+        if (nakedEl && nakedEl.style.display!=='none') {
+            const hw=hdr.offsetWidth, lw=sl.offsetWidth, rw=cr.offsetWidth, cw=nakedEl.offsetWidth;
+            const centerLeft=(hw-cw)/2, centerRight=centerLeft+cw;
+            const leftPush=lw>centerLeft ? lw-centerLeft : 0;
+            const rightPush=rw>(hw-centerRight) ? rw-(hw-centerRight) : 0;
+            sl.style.left=leftPush>0?`-${leftPush}px`:'0';
+            cr.style.right=rightPush>0?`-${rightPush}px`:'0';
+        } else {
+            const ov=sl.offsetWidth+cr.offsetWidth-hdr.offsetWidth;
+            if (ov>0) { sl.style.left=`-${ov/2}px`; cr.style.right=`-${ov/2}px`; }
+        }
+    }
+
+    // ── Init ──
+    resetGame(SIZE); updateButtonTooltips(); adjustHeaderLayout(); fixSquareButtons(); fixSaveLoadWidths();
+    tryLoadFromUrlHash();
+    window.addEventListener('hashchange', tryLoadFromUrlHash);
+    document.getElementById('copy-move').addEventListener('mousedown', copyLastMove);
+
+    [document.getElementById('board-size'),document.getElementById('save-options'),document.getElementById('load-options')].forEach(sel=>{
+        sel.addEventListener('keydown',e=>{ if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault(); });
+    });
+
+    window.addEventListener('resize',()=>{
+        initBoard(); renderBoard(); updateButtonTooltips(); fixSquareButtons(); fixSaveLoadWidths();
+        adjustHeaderLayout();
+    });
+
+    window.addEventListener('wheel',e=>{ e.preventDefault(); if (e.deltaY>0) replayForward(); else replayBack(); },{passive:false});
+
+    document.addEventListener('DOMContentLoaded', updateButtonTooltips);
+    document.querySelectorAll('.replay-controls select').forEach(sel=>{
+        sel.addEventListener('change',()=>{ updateButtonTooltips(); if (sel.id==='save-options'||sel.id==='load-options') sel.value=''; sel.blur(); });
+    });
+
+    window.addEventListener('keydown',e=>{
+        if (e.key==='Escape') { cancelPending(); return; }
+        const ae=document.activeElement, inp=ae.tagName==='INPUT'||ae.tagName==='SELECT'||ae.tagName==='TEXTAREA';
+        const keys=['r','b','i','o','a','s','x','z','c','arrowup','arrowdown','arrowleft','arrowright'];
+        if (inp&&ae.tagName==='SELECT'&&['ArrowUp','ArrowDown','Space'].includes(e.key)) {}
+        else if (inp&&e.key.toLowerCase()==='c'&&(e.metaKey||e.ctrlKey)) {}
+        else if (keys.includes(e.key.toLowerCase())) e.preventDefault();
+        else return;
+        const bss=document.getElementById('board-size');
+        switch(e.key.toLowerCase()) {
+            case 'r': isGenerating?stopGeneration():generateRandomGame(); break;
+            case 'b': toggleBotReply(); break;
+            case 'i': if(bss&&document.activeElement!==bss){bss.selectedIndex=Math.max(0,bss.selectedIndex-1);bss.dispatchEvent(new Event('change'));} break;
+            case 'o': if(bss&&document.activeElement!==bss){bss.selectedIndex=Math.min(bss.options.length-1,bss.selectedIndex+1);bss.dispatchEvent(new Event('change'));} break;
+            case 'a': {const l=document.getElementById('load-options');if(l){l.value='file';l.dispatchEvent(new Event('change'));}} break;
+            case 's': {const s=document.getElementById('save-options');if(s){s.value='file';s.dispatchEvent(new Event('change'));}} break;
+            case 'z': {const l=document.getElementById('load-options');if(l){l.value='clipboard';l.dispatchEvent(new Event('change'));}} break;
+            case 'x': {const s=document.getElementById('save-options');if(s){s.value='clipboard';s.dispatchEvent(new Event('change'));}} break;
+            case 'c': copyLastMove(); break;
+        }
+        if (ae.tagName!=='SELECT'&&!inp) {
+            switch(e.key) {
+                case 'ArrowUp': replayStart(); break; case 'ArrowDown': replayEnd(); break;
+                case 'ArrowLeft': replayBack(); break; case 'ArrowRight': replayForward(); break;
+            }
+        }
+    });
+</script>
+</body>
+</html>
